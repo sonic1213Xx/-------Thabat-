@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarCheck, Check, FileText, Save, X } from "lucide-react";
+import { CalendarCheck, Check, FileText, Loader2, Save, X } from "lucide-react";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
@@ -56,6 +56,8 @@ export default function AttendancePage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [selectedDivision, setSelectedDivision] = useState("ALL");
   const [saving, setSaving] = useState(false);
+  const [loadingStudents, setLoadingStudents] = useState(true);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [message, setMessage] = useState("");
   const [attendanceTemplateDivisions, setAttendanceTemplateDivisions] =
     useState<string[]>([]);
@@ -104,32 +106,40 @@ export default function AttendancePage() {
       ? { "x-thabat-user-id": session.id }
       : undefined;
     const load = async () => {
-      if (session && profile)
-        await fetch("/api/users/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: session.id,
-            name: session.name,
-            role: session.role,
-            assigned_divisions: profile.assigned_divisions ?? [],
-          }),
-        });
-      const responses = isTeacher
-        ? await Promise.all(
-            assigned.map((code) =>
-              fetch(`/api/students?division=${encodeURIComponent(code)}`, {
-                headers,
-              }),
-            ),
-          )
-        : [await fetch("/api/students", { headers })];
-      const payloads = await Promise.all(
-        responses.map((response) => response.json()),
-      );
-      setStudents(payloads.flatMap((payload) => payload.data ?? []));
+      setLoadingStudents(true);
+      try {
+        if (session && profile)
+          await fetch("/api/users/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: session.id,
+              name: session.name,
+              role: session.role,
+              assigned_divisions: profile.assigned_divisions ?? [],
+            }),
+          });
+        const responses = isTeacher
+          ? await Promise.all(
+              assigned.map((code) =>
+                fetch(`/api/students?division=${encodeURIComponent(code)}`, {
+                  headers,
+                }),
+              ),
+            )
+          : [await fetch("/api/students", { headers })];
+        const payloads = await Promise.all(
+          responses.map((response) => response.json()),
+        );
+        setStudents(payloads.flatMap((payload) => payload.data ?? []));
+      } finally {
+        setLoadingStudents(false);
+      }
     };
-    if (isTeacher && !assigned.length) setStudents([]);
+    if (isTeacher && !assigned.length) {
+      setStudents([]);
+      setLoadingStudents(false);
+    }
     else
       void load().catch(() =>
         setMessage(
@@ -149,39 +159,47 @@ export default function AttendancePage() {
   ]);
 
   useEffect(() => {
-    if (!students.length || !session?.id || !divisions.length) return;
+    if (!students.length || !session?.id || !divisions.length) {
+      setLoadingAttendance(false);
+      return;
+    }
     const load = async () => {
-      const groups = await Promise.all(
-        divisions.map(async (group) => {
-          const params = new URLSearchParams({
-            date,
-            mode,
-            divisionId: group.code,
-          });
-          if (mode === "CLASS") params.set("teacherId", session.id);
-          const response = await fetch(`/api/attendance?${params}`, {
-            headers: { "x-thabat-user-id": session.id },
-          });
-          return (await response.json()).data ?? [];
-        }),
-      );
-      const records = groups.flat() as Student[];
-      setStatuses(
-        Object.fromEntries(
-          records.map((record) => [
-            record.studentId ?? record.id,
-            record.status ?? "UNMARKED",
-          ]),
-        ),
-      );
-      setNotes(
-        Object.fromEntries(
-          records.map((record) => [
-            record.studentId ?? record.id,
-            record.notes ?? "",
-          ]),
-        ),
-      );
+      setLoadingAttendance(true);
+      try {
+        const groups = await Promise.all(
+          divisions.map(async (group) => {
+            const params = new URLSearchParams({
+              date,
+              mode,
+              divisionId: group.code,
+            });
+            if (mode === "CLASS") params.set("teacherId", session.id);
+            const response = await fetch(`/api/attendance?${params}`, {
+              headers: { "x-thabat-user-id": session.id },
+            });
+            return (await response.json()).data ?? [];
+          }),
+        );
+        const records = groups.flat() as Student[];
+        setStatuses(
+          Object.fromEntries(
+            records.map((record) => [
+              record.studentId ?? record.id,
+              record.status ?? "UNMARKED",
+            ]),
+          ),
+        );
+        setNotes(
+          Object.fromEntries(
+            records.map((record) => [
+              record.studentId ?? record.id,
+              record.notes ?? "",
+            ]),
+          ),
+        );
+      } finally {
+        setLoadingAttendance(false);
+      }
     };
     void load().catch(() =>
       setMessage(english ? "Unable to load attendance." : "تعذر تحميل الحضور."),
@@ -218,6 +236,7 @@ export default function AttendancePage() {
           return {
             studentId: student.id,
             divisionId: group.code,
+            date,
             status: selectedStatus.startsWith("OTHER:")
               ? "OTHER"
               : selectedStatus,
@@ -315,6 +334,7 @@ export default function AttendancePage() {
         other: "Other",
         otherPlaceholder: "Write a custom status...",
         empty: "No divisions available.",
+        loading: "Loading attendance...",
       }
     : {
         title: "الحضور والغياب",
@@ -340,7 +360,10 @@ export default function AttendancePage() {
         other: "أخرى",
         otherPlaceholder: "اكتب حالة مخصصة...",
         empty: "لا توجد شعب متاحة.",
+          loading: "جارٍ تحميل بيانات الحضور...",
       };
+
+        const isLoading = loadingStudents || loadingAttendance;
 
   return (
     <div className="attendance-page space-y-6" dir={dir}>
@@ -501,7 +524,13 @@ export default function AttendancePage() {
           </div>,
           document.body,
         )}
-      <main className="space-y-8">
+      {isLoading && (
+        <div className="flex min-h-[420px] flex-col items-center justify-center gap-5 rounded-xl border border-slate-200 bg-white/90 p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/90" role="status" aria-live="polite">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"><Loader2 className="h-7 w-7 animate-spin" /></div>
+          <div className="w-full max-w-md space-y-3"><p className="font-semibold text-slate-700 dark:text-slate-200">{text.loading}</p><div className="h-3 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-3 w-4/5 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-3 w-3/5 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /></div>
+        </div>
+      )}
+      <main className={`space-y-8 ${isLoading ? "hidden" : ""}`}>
         {visibleDivisions.map((group) => (
           <section
             id={`division-${group.code}`}
