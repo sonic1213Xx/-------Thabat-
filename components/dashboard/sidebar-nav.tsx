@@ -15,7 +15,6 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
-  X,
   FileSpreadsheet,
   UserPlus,
   ShieldAlert,
@@ -196,9 +195,6 @@ export function SidebarNav() {
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600">{t('helpBrand')}</p>
                 <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{helpContent.title}</h2>
               </div>
-              <button type="button" onClick={() => setHelpOpen(false)} className="rounded-md p-2 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={t('closeHelp')}>
-                <X className="h-4 w-4" />
-              </button>
             </div>
 
             <div className="space-y-3">

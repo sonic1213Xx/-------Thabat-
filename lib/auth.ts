@@ -86,8 +86,10 @@ export function getSession(): SessionUser | null {
   if (typeof window === 'undefined') return null
   try {
     if (runtimeSession) return runtimeSession
-    const value = localStorage.getItem(AUTH_PERSISTENCE_KEY) === 'true' ? localStorage.getItem(AUTH_STORAGE_KEY) : null
-    if (!value && localStorage.getItem(AUTH_STORAGE_KEY)) localStorage.removeItem(AUTH_STORAGE_KEY)
+    const storedSession = localStorage.getItem(AUTH_STORAGE_KEY)
+    const persistence = localStorage.getItem(AUTH_PERSISTENCE_KEY)
+    const value = persistence === 'true' || (storedSession && persistence === null) ? storedSession : null
+    if (!value && storedSession) localStorage.removeItem(AUTH_STORAGE_KEY)
     return value ? JSON.parse(value) as SessionUser : null
   } catch {
     return null
