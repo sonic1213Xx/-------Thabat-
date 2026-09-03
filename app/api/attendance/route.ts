@@ -156,10 +156,11 @@ export async function POST(request: NextRequest) {
       if (studentsInDivision.length !== new Set(studentIds).size) return forbidden()
       const recordsToSave = body.records.filter((record) => record.status !== 'UNMARKED')
       for (let index = 0; index < recordsToSave.length; index += 50) {
-        await Promise.all(recordsToSave.slice(index, index + 50).map((record) => {
+        const operations = recordsToSave.slice(index, index + 50).map((record) => {
           const divisionId = record.divisionId || body.divisionId!
           return prisma.classAttendance.upsert({ where: { studentId_date_divisionId_teacherId: { studentId: record.studentId, date: requestDate, divisionId, teacherId } }, update: { status: record.status }, create: { studentId: record.studentId, date: requestDate, divisionId, teacherId, status: record.status } })
-        }))
+        })
+        await prisma.$transaction(operations)
       }
       for (const [divisionId, group] of groups) {
           await prisma.attendanceLog.create({ data: { date: requestDate, divisionId, teacherId, mode: 'CLASS', statusMap: JSON.stringify(Object.fromEntries(group.map((record) => [record.studentId, record.status]))), recordsJson: JSON.stringify(Object.fromEntries(group.map((record) => [record.studentId, record.status]))), presentCount: group.filter((record) => record.status === 'PRESENT').length, absentCount: group.filter((record) => record.status.startsWith('ABSENT')).length } })
@@ -197,7 +198,9 @@ export async function POST(request: NextRequest) {
     }
     for (let index = 0; index < recordsToSave.length; index += 50) {
       const batch = recordsToSave.slice(index, index + 50).filter((record) => existingAttendanceIds.has(record.studentId))
-      await Promise.all(batch.map((record) => prisma.attendance.update({ where: { studentId_date: { studentId: record.studentId, date: requestDate } }, data: { status: record.status, notes: record.notes || null, markedBy: body.markedBy || null, markedByName: body.markedByName || null, updatedAt: new Date() } })))
+      if (batch.length) {
+        await prisma.$transaction(batch.map((record) => prisma.attendance.update({ where: { studentId_date: { studentId: record.studentId, date: requestDate } }, data: { status: record.status, notes: record.notes || null, markedBy: body.markedBy || null, markedByName: body.markedByName || null, updatedAt: new Date() } })))
+      }
     }
     const saved = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: recordsToSave.map((record) => record.studentId) } }, select: { id: true, studentId: true, date: true, status: true, notes: true, markedBy: true, markedByName: true, updatedAt: true } })
     for (const record of recordsToSave) {
