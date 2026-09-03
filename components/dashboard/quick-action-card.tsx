@@ -28,7 +28,7 @@ export function QuickActionCard({
       whileTap={{ scale: 0.96 }}
       className="group"
     >
-      <Link href={href} className="block h-full">
+      <Link href={href} prefetch={false} className="block h-full">
         <div className={cn(
           'flex h-full min-h-[190px] flex-col items-center justify-center rounded-lg p-5 text-center',
           'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900',

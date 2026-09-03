@@ -74,6 +74,7 @@ export function DivisionGuard({ open, onOpenChange }: DivisionGuardProps) {
                 {t('cancel')}
               </button>
               <Link
+                prefetch={false}
                 href="/dashboard/divisions"
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
               >

@@ -149,6 +149,7 @@ export function SidebarNav() {
           return (
             <Link
               key={item.href}
+              prefetch={false}
               href={item.href}
               onClick={() => {
                 if (pathname !== item.href) setNavigating(true)
