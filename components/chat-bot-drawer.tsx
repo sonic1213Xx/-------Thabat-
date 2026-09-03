@@ -8,7 +8,6 @@ import { Bot, Send, Sparkles, Trash2, X } from 'lucide-react'
 import { type ChatMessage } from '@/lib/utils'
 import { useLanguage } from '@/components/language-provider'
 
-const CHAT_STORAGE_KEY = 'thabat_chat_history'
 const CHAT_LOADING_DELAY = 300
 
 const TypingIndicator = () => (
@@ -18,33 +17,6 @@ const TypingIndicator = () => (
     <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
   </div>
 )
-
-const readSavedMessages = (welcomeMessage: ChatMessage): ChatMessage[] => {
-  if (typeof window === 'undefined') return [welcomeMessage]
-
-  try {
-    const raw = window.localStorage.getItem(CHAT_STORAGE_KEY)
-    if (!raw) return [welcomeMessage]
-
-    const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed) || parsed.length === 0) return [welcomeMessage]
-
-    return parsed as ChatMessage[]
-  } catch {
-    return [welcomeMessage]
-  }
-}
-
-const persistMessages = (nextMessages: ChatMessage[]) => {
-  if (typeof window === 'undefined') return
-
-  if (!nextMessages.length) {
-    window.localStorage.removeItem(CHAT_STORAGE_KEY)
-    return
-  }
-
-  window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(nextMessages.slice(-50)))
-}
 
 export function ChatBotDrawer() {
   const { dir, t } = useLanguage()
@@ -71,7 +43,7 @@ export function ChatBotDrawer() {
   }, [])
 
   useEffect(() => {
-    const handleOpenChat = () => startFreshConversation()
+    const handleOpenChat = () => openConversation()
     window.addEventListener('thabat-chat-open', handleOpenChat)
 
     return () => {
@@ -79,14 +51,8 @@ export function ChatBotDrawer() {
     }
   }, [])
 
-  const startFreshConversation = () => {
+  const openConversation = () => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
-    requestControllerRef.current?.abort()
-    requestControllerRef.current = null
-    setLoading(false)
-    setInput('')
-    setMessages([welcomeMessage])
-    if (typeof window !== 'undefined') window.localStorage.removeItem(CHAT_STORAGE_KEY)
     setOpen(true)
     setDrawerClosing(false)
     setDrawerRendered(true)
@@ -193,9 +159,6 @@ export function ChatBotDrawer() {
   const clearHistory = () => {
     const resetMessages = [welcomeMessage]
     setMessages(resetMessages)
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(CHAT_STORAGE_KEY)
-    }
   }
 
   const isThinking = loading
@@ -238,7 +201,7 @@ export function ChatBotDrawer() {
       `}</style>
       <button
         type="button"
-        onClick={() => open ? closeDrawer() : startFreshConversation()}
+        onClick={() => open ? closeDrawer() : openConversation()}
         aria-label={t('askBot')}
         className={`group fixed bottom-5 ${floatingSide} z-50 flex h-14 items-center gap-2 rounded-2xl border border-emerald-300/40 bg-emerald-600 px-4 text-white shadow-xl shadow-emerald-900/20 transition duration-300 hover:-translate-y-1 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950`}
       >
