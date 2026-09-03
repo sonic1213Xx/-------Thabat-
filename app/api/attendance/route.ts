@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       const teacherId = user.role === 'TEACHER' ? user.id : request.nextUrl.searchParams.get('teacherId')
       if (!divisionId || !teacherId) return NextResponse.json({ error: 'divisionId and teacherId are required for class attendance' }, { status: 400 })
       const students = await prisma.student.findMany({ where: { isActive: true, divisionCode: divisionId }, select: { id: true, fullName: true, divisionCode: true }, orderBy: { fullName: 'asc' } })
-      const records = await prisma.classAttendance.findMany({ where: { date, divisionId, teacherId } })
+      const records = await prisma.classAttendance.findMany({ where: { date, divisionId, teacherId }, select: { studentId: true, status: true, updatedAt: true } })
       const recordMap = new Map(records.map((record) => [record.studentId, record]))
       return NextResponse.json({ data: students.map((student) => ({ ...student, studentId: student.id, status: recordMap.get(student.id)?.status ?? 'UNMARKED' })), date, mode })
     }
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
       const batch = recordsToSave.slice(index, index + 50).filter((record) => existingAttendanceIds.has(record.studentId))
       await Promise.all(batch.map((record) => prisma.attendance.update({ where: { studentId_date: { studentId: record.studentId, date: requestDate } }, data: { status: record.status, notes: record.notes || null, markedBy: body.markedBy || null, markedByName: body.markedByName || null, updatedAt: new Date() } })))
     }
-    const saved = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: recordsToSave.map((record) => record.studentId) } } })
+    const saved = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: recordsToSave.map((record) => record.studentId) } }, select: { id: true, studentId: true, date: true, status: true, notes: true, markedBy: true, markedByName: true, updatedAt: true } })
     for (const record of recordsToSave) {
 
       if (record.status === 'ABSENT_UNEXCUSED') {

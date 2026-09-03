@@ -20,18 +20,19 @@ export async function PUT(request: NextRequest, context: { params: { id: string 
       return NextResponse.json({ error: 'Division code is required.' }, { status: 400 })
     }
 
-    const current = await prisma.division.findUnique({ where: { id: context.params.id } })
+    const current = await prisma.division.findUnique({ where: { id: context.params.id }, select: { id: true, code: true, name: true } })
     if (!current) {
       return NextResponse.json({ error: 'Division not found.' }, { status: 404 })
     }
 
-    const existing = await prisma.division.findUnique({ where: { code } })
+    const existing = await prisma.division.findUnique({ where: { code }, select: { id: true } })
     if (existing && existing.id !== context.params.id) {
       return NextResponse.json({ error: 'A division with this code already exists.' }, { status: 409 })
     }
 
     const division = await prisma.division.update({
       where: { id: context.params.id },
+      select: { id: true, code: true, name: true, createdAt: true, updatedAt: true },
       data: {
         code,
         name: body.name?.trim() || current.name,
@@ -55,7 +56,7 @@ export async function PATCH(request: NextRequest, context: { params: { id: strin
 
 export async function DELETE(_request: NextRequest, context: { params: { id: string } }) {
   try {
-    const current = await prisma.division.findUnique({ where: { id: context.params.id } })
+    const current = await prisma.division.findUnique({ where: { id: context.params.id }, select: { id: true, code: true } })
     if (!current) {
       return NextResponse.json({ error: 'Division not found.' }, { status: 404 })
     }

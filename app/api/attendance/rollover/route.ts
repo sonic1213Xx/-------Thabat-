@@ -14,14 +14,14 @@ function previousDate(value?: string) {
 export async function POST(request: NextRequest) {
   try {
     const actorId = request.headers.get('x-thabat-user-id')
-    const actor = actorId ? await prisma.user.findUnique({ where: { id: actorId } }) : null
+    const actor = actorId ? await prisma.user.findUnique({ where: { id: actorId }, select: { id: true, role: true, isActive: true } }) : null
     const cronAuthorized = Boolean(process.env.ATTENDANCE_ROLLOVER_SECRET && request.headers.get('x-rollover-secret') === process.env.ATTENDANCE_ROLLOVER_SECRET)
     if (!cronAuthorized && (!actor || !['PRINCIPAL', 'VICE_PRINCIPAL'].includes(actor.role))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const body = await request.json().catch(() => ({})) as { date?: string }
     const date = previousDate(body.date)
-    const schoolRecords = await prisma.attendance.findMany({ where: { date }, include: { student: { select: { divisionCode: true } } } })
-    const classRecords = await prisma.classAttendance.findMany({ where: { date } })
+    const schoolRecords = await prisma.attendance.findMany({ where: { date }, select: { studentId: true, status: true, student: { select: { divisionCode: true } } } })
+    const classRecords = await prisma.classAttendance.findMany({ where: { date }, select: { studentId: true, divisionId: true, teacherId: true, status: true } })
     const groups = new Map<string, { mode: 'SCHOOL' | 'CLASS'; teacherId: string | null; records: Record<string, string> }>()
     for (const record of schoolRecords) {
       const divisionId = record.student.divisionCode ?? 'UNASSIGNED'

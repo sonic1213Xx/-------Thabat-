@@ -8,6 +8,7 @@ import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
 import { exportAttendanceWorkbook } from "@/lib/export-attendance-fixed";
 import { exportAttendancePdf } from "@/lib/export-attendance-pdf";
+import { fetchCached, invalidateCached } from "@/lib/client-cache";
 
 type Status =
   | "UNMARKED"
@@ -122,14 +123,14 @@ export default function AttendancePage() {
         const responses = isTeacher
           ? await Promise.all(
               assigned.map((code) =>
-                fetch(`/api/students?division=${encodeURIComponent(code)}`, {
+                fetchCached<{ data?: Student[] }>(`students:${code}`, `/api/students?division=${encodeURIComponent(code)}`, {
                   headers,
                 }),
               ),
             )
-          : [await fetch("/api/students", { headers })];
+          : [await fetchCached<{ data?: Student[] }>("students:all", "/api/students", { headers })];
         const payloads = await Promise.all(
-          responses.map((response) => response.json()),
+        responses.map((response) => response instanceof Response ? response.json() : response),
         );
         setStudents(payloads.flatMap((payload) => payload.data ?? []));
       } finally {
@@ -174,10 +175,10 @@ export default function AttendancePage() {
               divisionId: group.code,
             });
             if (mode === "CLASS") params.set("teacherId", session.id);
-            const response = await fetch(`/api/attendance?${params}`, {
+            const response = await fetchCached<{ data?: Student[] }>(`attendance:${date}:${mode}:${group.code}:${session.id}`, `/api/attendance?${params}`, {
               headers: { "x-thabat-user-id": session.id },
             });
-            return (await response.json()).data ?? [];
+            return response.data ?? [];
           }),
         );
         const records = groups.flat() as Student[];
@@ -266,6 +267,10 @@ export default function AttendancePage() {
             ? "Unable to save attendance."
             : "تعذر حفظ الحضور.",
       );
+      if (response.ok) {
+        invalidateCached("dashboard:attendance", ...divisions.map((group) => `attendance:${date}:${mode}:${group.code}:${session.id}`));
+        window.dispatchEvent(new CustomEvent("thabat-attendance-changed"));
+      }
     } catch {
       setMessage(english ? "Unable to save attendance." : "تعذر حفظ الحضور.");
     } finally {

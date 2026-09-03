@@ -25,9 +25,9 @@ export async function POST(request: NextRequest) {
     if (!rows.length) return NextResponse.json({ error: 'لا توجد صفوف صالحة للاستيراد.' }, { status: 400 })
 
     const actor = body.createdByUserId
-      ? await prisma.user.findUnique({ where: { id: body.createdByUserId } })
+      ? await prisma.user.findUnique({ where: { id: body.createdByUserId }, select: { id: true, name: true, role: true } })
       : null
-    const fallbackActor = actor ?? await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } }) ?? await prisma.user.create({ data: { username: 'system', name: 'نظام ثَبَت', password: 'system-managed', role: 'PRINCIPAL', isActive: true } })
+    const fallbackActor = actor ?? await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true, role: true } }) ?? await prisma.user.create({ data: { username: 'system', name: 'نظام ثَبَت', password: 'system-managed', role: 'PRINCIPAL', isActive: true }, select: { id: true, name: true, role: true } })
 
     const now = new Date()
     const validRows = rows.filter((row) => (typeof row.name === 'string' && row.name.trim()) || (typeof row.academicId === 'string' && row.academicId.trim()))

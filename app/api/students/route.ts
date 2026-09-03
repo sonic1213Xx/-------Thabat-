@@ -15,11 +15,11 @@ if (process.env.NODE_ENV !== 'production') {
 
 async function getActor(userId?: string) {
   if (userId) {
-    const actor = await prisma.user.findUnique({ where: { id: userId } })
+    const actor = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, role: true, isActive: true } })
     if (actor) return actor
   }
 
-  const existing = await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } })
+  const existing = await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true, role: true, isActive: true } })
   if (existing) return existing
 
   return prisma.user.create({
@@ -75,10 +75,16 @@ export async function GET(request: NextRequest) {
       orderBy: {
         fullName: 'asc',
       },
-      include: {
-        warnings: true,
-        attendance: true,
-        transferHistory: true,
+      select: {
+        id: true, nationalId: true, academicId: true, fullName: true, arabicName: true,
+        gradeLevel: true, level: true, gpa: true, parentPhone: true, divisionId: true,
+        divisionCode: true, conductNotes: true, behaviorScore: true, attendanceScore: true,
+        admissionDate: true, createdAt: true, createdDateOnly: true, createdTimeOnly: true,
+        updatedAt: true, lastUpdatedBy: true, lastUpdatedByName: true, lastUpdatedByRole: true,
+        isActive: true,
+        warnings: { select: { id: true, type: true, reason: true, deduction: true, severity: true, isResolved: true, issuedAt: true, issuedByName: true } },
+        attendance: { select: { id: true, date: true, status: true, notes: true, markedBy: true, markedByName: true, updatedAt: true } },
+        transferHistory: { select: { id: true, fromDivision: true, toDivision: true, reason: true, transferredAt: true, performedByName: true, performedByRole: true } },
       },
     })
 

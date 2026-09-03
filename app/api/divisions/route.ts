@@ -13,7 +13,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 export async function GET() {
   try {
-    const divisions = await prisma.division.findMany({ orderBy: { code: 'asc' } })
+    const divisions = await prisma.division.findMany({ orderBy: { code: 'asc' }, select: { id: true, code: true, name: true, createdAt: true, updatedAt: true } })
     return NextResponse.json({ data: divisions })
   } catch {
     return NextResponse.json({ error: 'Unable to fetch divisions.' }, { status: 500 })
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Division code is required.' }, { status: 400 })
     }
 
-    const existing = await prisma.division.findUnique({ where: { code } })
+    const existing = await prisma.division.findUnique({ where: { code }, select: { id: true } })
     if (existing) {
       return NextResponse.json({ error: 'A division with this code already exists.' }, { status: 409 })
     }
