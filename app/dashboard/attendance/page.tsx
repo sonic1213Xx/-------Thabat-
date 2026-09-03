@@ -206,6 +206,7 @@ export default function AttendancePage() {
   const save = async () => {
     if (!session?.id) return;
     setSaving(true);
+    setProgress(0);
     try {
       const headers = {
         "Content-Type": "application/json",
@@ -615,9 +616,9 @@ export default function AttendancePage() {
           >
             <div className="pointer-events-none flex min-w-[280px] flex-col items-center gap-4 rounded-2xl border border-border bg-card px-8 py-7 text-center text-card-foreground shadow-2xl">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary" />
-              <p className="text-base font-bold">جاري حفظ سجل الحضور... %{progress}</p>
-              <div className="h-3 w-full overflow-hidden rounded-full bg-muted" aria-label={`Progress ${progress}%`}>
-                <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${progress}%` }} />
+              <div className="flex w-full items-center justify-between gap-4"><p className="text-base font-bold">جاري حفظ سجل الحضور...</p><strong className="text-lg tabular-nums text-primary">{progress}%</strong></div>
+              <div className="h-4 w-full overflow-hidden rounded-full border border-border bg-muted" role="progressbar" aria-label={`Progress ${progress}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+                <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${progress}%` }} />
               </div>
             </div>
           </div>,
