@@ -69,6 +69,7 @@ export default function AttendancePage() {
   const studentsRequestRef = useRef<string | null>(null);
   const attendanceRequestRef = useRef<string | null>(null);
   const hasFetchedRef = useRef<string | null>(null);
+  const initialAttendanceMapRef = useRef<Map<string, { status: Status; note: string }>>(new Map());
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     if (saving) document.body.style.overflow = "hidden";
@@ -180,6 +181,11 @@ export default function AttendancePage() {
         const records = response.data ?? [];
         setStatuses(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.status ?? "UNMARKED"])));
         setNotes(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.notes ?? ""])));
+        const fetchedRecords = new Map(records.map((record) => [record.studentId ?? record.id, { status: record.status ?? "UNMARKED", note: record.notes ?? "" }]));
+        initialAttendanceMapRef.current = new Map(students.flatMap((student) => {
+          const record = fetchedRecords.get(student.id);
+          return [[student.id, { status: record?.status ?? "UNMARKED", note: record?.note ?? "" }]];
+        }));
       } finally {
         setLoadingAttendance(false);
       }
@@ -205,6 +211,27 @@ export default function AttendancePage() {
     }));
   const save = async () => {
     if (!session?.id) return;
+    const currentRecords = divisions.flatMap((group) =>
+      group.students.map((student) => {
+        const selectedStatus = statuses[student.id] ?? "UNMARKED";
+        return {
+          studentId: student.id,
+          divisionId: group.code,
+          date,
+          status: (selectedStatus.startsWith("OTHER:") ? "OTHER" : selectedStatus) as Status,
+          note: selectedStatus.startsWith("OTHER:") ? selectedStatus.slice(6) : notes[student.id] ?? "",
+        };
+      }),
+    );
+    const initialMap = initialAttendanceMapRef.current;
+    const changedRecords = currentRecords.filter((record) => {
+      const initial = initialMap.get(record.studentId);
+      return record.status !== initial?.status || record.note !== initial?.note;
+    });
+    if (!changedRecords.length) {
+      setMessage(english ? "No changes to save" : "لا توجد تغييرات للحفظ");
+      return;
+    }
     setSaving(true);
     setProgress(0);
     try {
@@ -212,23 +239,7 @@ export default function AttendancePage() {
         "Content-Type": "application/json",
         "x-thabat-user-id": session.id,
       };
-      const records = divisions.flatMap((group) =>
-        group.students.map((student) => {
-          const selectedStatus = statuses[student.id] ?? "UNMARKED";
-          return {
-            studentId: student.id,
-            divisionId: group.code,
-            date,
-            status: selectedStatus.startsWith("OTHER:")
-              ? "OTHER"
-              : selectedStatus,
-            notes: selectedStatus.startsWith("OTHER:")
-              ? selectedStatus.slice(6)
-              : notes[student.id],
-          };
-        }),
-      );
-      const chunks = Array.from({ length: Math.ceil(records.length / 100) }, (_, index) => records.slice(index * 100, (index + 1) * 100));
+      const chunks = Array.from({ length: Math.ceil(changedRecords.length / 100) }, (_, index) => changedRecords.slice(index * 100, (index + 1) * 100));
       const totalChunks = chunks.length;
       for (let index = 0; index < totalChunks; index += 1) {
         const response = await fetch("/api/attendance", {
@@ -239,7 +250,7 @@ export default function AttendancePage() {
             mode,
             teacherId: session.id,
             markedBy: session.id,
-            records: chunks[index],
+            records: chunks[index].map((record) => ({ ...record, notes: record.note })),
           }),
         });
         if (!response.ok) throw new Error("Attendance save failed");
@@ -248,6 +259,8 @@ export default function AttendancePage() {
       setMessage(
         english ? "Attendance saved." : "تم حفظ الحضور.",
       );
+      initialAttendanceMapRef.current = new Map(initialMap);
+      for (const record of changedRecords) initialAttendanceMapRef.current.set(record.studentId, { status: record.status, note: record.note });
       invalidateCached("dashboard:attendance", `attendance:${date}:${mode}:${divisionKey}:${session.id}`);
       window.dispatchEvent(new CustomEvent("thabat-attendance-changed"));
     } catch {
