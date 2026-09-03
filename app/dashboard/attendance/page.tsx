@@ -57,6 +57,7 @@ export default function AttendancePage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [selectedDivision, setSelectedDivision] = useState("ALL");
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [loadingStudents, setLoadingStudents] = useState(true);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [message, setMessage] = useState("");
@@ -226,34 +227,33 @@ export default function AttendancePage() {
           };
         }),
       );
-      const response = await fetch("/api/attendance", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          date,
-          mode,
-          teacherId: session.id,
-          markedBy: session.id,
-          records,
-        }),
-      });
-      setMessage(
-        response.ok
-          ? english
-            ? "Attendance saved."
-            : "تم حفظ الحضور."
-          : english
-            ? "Unable to save attendance."
-            : "تعذر حفظ الحضور.",
-      );
-      if (response.ok) {
-        invalidateCached("dashboard:attendance", `attendance:${date}:${mode}:${divisionKey}:${session.id}`);
-        window.dispatchEvent(new CustomEvent("thabat-attendance-changed"));
+      const chunks = Array.from({ length: Math.ceil(records.length / 100) }, (_, index) => records.slice(index * 100, (index + 1) * 100));
+      const totalChunks = chunks.length;
+      for (let index = 0; index < totalChunks; index += 1) {
+        const response = await fetch("/api/attendance", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            date,
+            mode,
+            teacherId: session.id,
+            markedBy: session.id,
+            records: chunks[index],
+          }),
+        });
+        if (!response.ok) throw new Error("Attendance save failed");
+        setProgress(Math.round(((index + 1) / totalChunks) * 100));
       }
+      setMessage(
+        english ? "Attendance saved." : "تم حفظ الحضور.",
+      );
+      invalidateCached("dashboard:attendance", `attendance:${date}:${mode}:${divisionKey}:${session.id}`);
+      window.dispatchEvent(new CustomEvent("thabat-attendance-changed"));
     } catch {
       setMessage(english ? "Unable to save attendance." : "تعذر حفظ الحضور.");
     } finally {
       setSaving(false);
+      setProgress(0);
     }
   };
   const visibleDivisions =
@@ -615,7 +615,10 @@ export default function AttendancePage() {
           >
             <div className="pointer-events-none flex min-w-[280px] flex-col items-center gap-4 rounded-2xl border border-border bg-card px-8 py-7 text-center text-card-foreground shadow-2xl">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary" />
-              <p className="text-base font-bold">{t("labels.saving")}</p>
+              <p className="text-base font-bold">جاري حفظ سجل الحضور... %{progress}</p>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-muted" aria-label={`Progress ${progress}%`}>
+                <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${progress}%` }} />
+              </div>
             </div>
           </div>,
           document.body,
