@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 export async function GET() {
   try { return NextResponse.json({ data: await prisma.team.findMany({ orderBy: { label: 'asc' } }) }) }
