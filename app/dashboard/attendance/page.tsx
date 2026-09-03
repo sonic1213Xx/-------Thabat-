@@ -1,7 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarCheck, Check, FileText, Loader2, Save, X } from "lucide-react";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { useLanguage } from "@/components/language-provider";
@@ -65,6 +65,8 @@ export default function AttendancePage() {
   const [templateSelectionReady, setTemplateSelectionReady] = useState(false);
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
   const [exportType, setExportType] = useState<"EXCEL" | "PDF">("EXCEL");
+  const studentsRequestRef = useRef<string | null>(null);
+  const attendanceRequestRef = useRef<string | null>(null);
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     if (saving) document.body.style.overflow = "hidden";
@@ -103,6 +105,9 @@ export default function AttendancePage() {
   }, [divisions, templateSelectionReady]);
 
   useEffect(() => {
+    const requestKey = `${session?.id ?? "anonymous"}:${isTeacher}:${assigned.join(",")}:${profile?.id ?? ""}`;
+    if (studentsRequestRef.current === requestKey) return;
+    studentsRequestRef.current = requestKey;
     const headers = session?.id
       ? { "x-thabat-user-id": session.id }
       : undefined;
@@ -141,22 +146,14 @@ export default function AttendancePage() {
       setStudents([]);
       setLoadingStudents(false);
     }
-    else
-      void load().catch(() =>
-        setMessage(
-          english ? "Unable to load attendance." : "تعذر تحميل الحضور.",
-        ),
-      );
+    else void load().catch(() => setMessage("تعذر تحميل الحضور."));
   }, [
-    date,
-    mode,
     isTeacher,
     assigned.join(","),
     session?.id,
     session?.role,
     session?.name,
     profile?.id,
-    english,
   ]);
 
   useEffect(() => {
@@ -164,6 +161,10 @@ export default function AttendancePage() {
       setLoadingAttendance(false);
       return;
     }
+    const divisionKey = divisions.map((group) => group.code).join(",");
+    const requestKey = `${session.id}:${date}:${mode}:${divisionKey}`;
+    if (attendanceRequestRef.current === requestKey) return;
+    attendanceRequestRef.current = requestKey;
     const load = async () => {
       setLoadingAttendance(true);
       try {
@@ -182,30 +183,14 @@ export default function AttendancePage() {
           }),
         );
         const records = groups.flat() as Student[];
-        setStatuses(
-          Object.fromEntries(
-            records.map((record) => [
-              record.studentId ?? record.id,
-              record.status ?? "UNMARKED",
-            ]),
-          ),
-        );
-        setNotes(
-          Object.fromEntries(
-            records.map((record) => [
-              record.studentId ?? record.id,
-              record.notes ?? "",
-            ]),
-          ),
-        );
+        setStatuses(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.status ?? "UNMARKED"])));
+        setNotes(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.notes ?? ""])));
       } finally {
         setLoadingAttendance(false);
       }
     };
-    void load().catch(() =>
-      setMessage(english ? "Unable to load attendance." : "تعذر تحميل الحضور."),
-    );
-  }, [date, mode, divisions.length, session?.id, english]);
+    void load().catch(() => setMessage("تعذر تحميل الحضور."));
+  }, [date, mode, divisions.map((group) => group.code).join(","), session?.id]);
 
   const setStudentStatus = (studentId: string, status: Status) =>
     setStatuses((current) => ({ ...current, [studentId]: status }));
