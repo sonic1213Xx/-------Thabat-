@@ -9,6 +9,7 @@ import { type ChatMessage } from '@/lib/utils'
 import { useLanguage } from '@/components/language-provider'
 
 const CHAT_STORAGE_KEY = 'thabat_chat_history'
+const CHAT_LOADING_DELAY = 300
 
 const TypingIndicator = () => (
   <div className="flex w-fit items-center gap-1.5 rounded-2xl bg-slate-100 px-3 py-1.5 dark:bg-slate-800">
@@ -49,6 +50,8 @@ export function ChatBotDrawer() {
   const { dir, t } = useLanguage()
   const welcomeMessage: ChatMessage = { role: 'model', content: t('botWelcome') }
   const [open, setOpen] = useState(false)
+  const [drawerRendered, setDrawerRendered] = useState(false)
+  const [drawerClosing, setDrawerClosing] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -56,10 +59,15 @@ export function ChatBotDrawer() {
   const [isInputFocused, setIsInputFocused] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
   const requestControllerRef = useRef<AbortController | null>(null)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     setMounted(true)
     setMessages([welcomeMessage])
+  }, [])
+
+  useEffect(() => () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
   }, [])
 
   useEffect(() => {
@@ -72,6 +80,7 @@ export function ChatBotDrawer() {
   }, [])
 
   const startFreshConversation = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
     requestControllerRef.current?.abort()
     requestControllerRef.current = null
     setLoading(false)
@@ -79,6 +88,18 @@ export function ChatBotDrawer() {
     setMessages([welcomeMessage])
     if (typeof window !== 'undefined') window.localStorage.removeItem(CHAT_STORAGE_KEY)
     setOpen(true)
+    setDrawerClosing(false)
+    setDrawerRendered(true)
+  }
+
+  const closeDrawer = () => {
+    setOpen(false)
+    setDrawerClosing(true)
+    closeTimerRef.current = setTimeout(() => {
+      setDrawerRendered(false)
+      setDrawerClosing(false)
+      closeTimerRef.current = null
+    }, 180)
   }
 
   useEffect(() => {
@@ -100,6 +121,7 @@ export function ChatBotDrawer() {
     requestControllerRef.current = controller
 
     try {
+      await new Promise((resolve) => setTimeout(resolve, CHAT_LOADING_DELAY))
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -200,10 +222,23 @@ export function ChatBotDrawer() {
         .animate-border-beam {
           animation: sweep-animation 8s linear infinite !important;
         }
+
+        @keyframes chat-drawer-enter {
+          from { opacity: 0; transform: translateY(12px) scale(0.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes chat-drawer-exit {
+          from { opacity: 1; transform: translateY(0) scale(1); }
+          to { opacity: 0; transform: translateY(12px) scale(0.96); }
+        }
+
+        .chat-drawer-enter { animation: chat-drawer-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .chat-drawer-exit { animation: chat-drawer-exit 180ms ease-in both; }
       `}</style>
       <button
         type="button"
-        onClick={() => open ? setOpen(false) : startFreshConversation()}
+        onClick={() => open ? closeDrawer() : startFreshConversation()}
         aria-label={t('askBot')}
         className={`group fixed bottom-5 ${floatingSide} z-50 flex h-14 items-center gap-2 rounded-2xl border border-emerald-300/40 bg-emerald-600 px-4 text-white shadow-xl shadow-emerald-900/20 transition duration-300 hover:-translate-y-1 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950`}
       >
@@ -211,11 +246,11 @@ export function ChatBotDrawer() {
         <span className="hidden text-sm font-bold sm:inline">{t('askBot')}</span>
       </button>
 
-      {open && (
+      {drawerRendered && (
         <section
           aria-label={t('askBot')}
           dir={dir}
-          className={`fixed bottom-24 ${drawerSide} z-[999] flex h-[min(520px,calc(100vh-9rem))] w-[min(360px,calc(100vw-2rem))] max-w-[360px] flex-col overflow-hidden rounded-3xl border border-border bg-card text-foreground shadow-2xl shadow-slate-950/20`}
+          className={`fixed bottom-24 ${drawerSide} z-[999] flex h-[min(520px,calc(100vh-9rem))] w-[min(360px,calc(100vw-2rem))] max-w-[360px] flex-col overflow-hidden rounded-3xl border border-border bg-card text-foreground shadow-2xl shadow-slate-950/20 ${drawerClosing ? 'chat-drawer-exit' : 'chat-drawer-enter'}`}
         >
           <header className="flex items-center justify-between border-b border-border bg-muted/35 px-4 py-3">
             <div className="flex items-center gap-3">
@@ -239,7 +274,7 @@ export function ChatBotDrawer() {
               </button>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={closeDrawer}
                 aria-label={t('close')}
                 className="rounded-xl p-2 text-foreground/55 transition hover:bg-accent hover:text-foreground"
               >
