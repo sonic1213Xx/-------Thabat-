@@ -59,11 +59,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (mode === 'CLASS') {
-      const divisionId = request.nextUrl.searchParams.get('divisionId')
+      const requestedDivisions = request.nextUrl.searchParams.getAll('divisionId')
+      const divisionIds = requestedDivisions.length ? requestedDivisions : user.role === 'TEACHER' ? assignedDivisions(user) : undefined
       const teacherId = user.role === 'TEACHER' ? user.id : request.nextUrl.searchParams.get('teacherId')
-      if (!divisionId || !teacherId) return NextResponse.json({ error: 'divisionId and teacherId are required for class attendance' }, { status: 400 })
-      const students = await prisma.student.findMany({ where: { isActive: true, divisionCode: divisionId }, select: { id: true, fullName: true, divisionCode: true }, orderBy: { fullName: 'asc' } })
-      const records = await prisma.classAttendance.findMany({ where: { date, divisionId, teacherId }, select: { studentId: true, status: true, updatedAt: true } })
+      if (!teacherId || (user.role === 'TEACHER' && !divisionIds?.length)) return NextResponse.json({ error: 'teacherId and assigned divisions are required for class attendance' }, { status: 400 })
+      if (user.role === 'TEACHER' && divisionIds?.some((divisionId) => !assignedDivisions(user).includes(divisionId))) return forbidden()
+      const students = await prisma.student.findMany({ where: { isActive: true, ...(divisionIds ? { divisionCode: { in: divisionIds } } : {}) }, select: { id: true, fullName: true, divisionCode: true }, orderBy: { fullName: 'asc' } })
+      const records = await prisma.classAttendance.findMany({ where: { date, ...(divisionIds ? { divisionId: { in: divisionIds } } : {}), teacherId }, select: { studentId: true, status: true, updatedAt: true } })
       const recordMap = new Map(records.map((record) => [record.studentId, record]))
       return NextResponse.json({ data: students.map((student) => ({ ...student, studentId: student.id, status: recordMap.get(student.id)?.status ?? 'UNMARKED' })), date, mode })
     }

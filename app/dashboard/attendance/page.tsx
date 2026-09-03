@@ -67,6 +67,7 @@ export default function AttendancePage() {
   const [exportType, setExportType] = useState<"EXCEL" | "PDF">("EXCEL");
   const studentsRequestRef = useRef<string | null>(null);
   const attendanceRequestRef = useRef<string | null>(null);
+  const hasFetchedRef = useRef<string | null>(null);
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     if (saving) document.body.style.overflow = "hidden";
@@ -95,6 +96,7 @@ export default function AttendancePage() {
         })),
     [students, isTeacher, assigned],
   );
+  const divisionKey = divisions.map((group) => group.code).join(",");
 
   useEffect(() => {
     const codes = divisions.map((group) => group.code);
@@ -161,28 +163,19 @@ export default function AttendancePage() {
       setLoadingAttendance(false);
       return;
     }
-    const divisionKey = divisions.map((group) => group.code).join(",");
     const requestKey = `${session.id}:${date}:${mode}:${divisionKey}`;
-    if (attendanceRequestRef.current === requestKey) return;
+    if (hasFetchedRef.current === requestKey || attendanceRequestRef.current === requestKey) return;
+    hasFetchedRef.current = requestKey;
     attendanceRequestRef.current = requestKey;
     const load = async () => {
       setLoadingAttendance(true);
       try {
-        const groups = await Promise.all(
-          divisions.map(async (group) => {
-            const params = new URLSearchParams({
-              date,
-              mode,
-              divisionId: group.code,
-            });
-            if (mode === "CLASS") params.set("teacherId", session.id);
-            const response = await fetchCached<{ data?: Student[] }>(`attendance:${date}:${mode}:${group.code}:${session.id}`, `/api/attendance?${params}`, {
-              headers: { "x-thabat-user-id": session.id },
-            });
-            return response.data ?? [];
-          }),
-        );
-        const records = groups.flat() as Student[];
+        const params = new URLSearchParams({ date, mode });
+        if (mode === "CLASS") params.set("teacherId", session.id);
+        const response = await fetchCached<{ data?: Student[] }>(`attendance:${date}:${mode}:${divisionKey}:${session.id}`, `/api/attendance?${params}`, {
+          headers: { "x-thabat-user-id": session.id },
+        });
+        const records = response.data ?? [];
         setStatuses(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.status ?? "UNMARKED"])));
         setNotes(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.notes ?? ""])));
       } finally {
@@ -190,7 +183,7 @@ export default function AttendancePage() {
       }
     };
     void load().catch(() => setMessage("تعذر تحميل الحضور."));
-  }, [date, mode, divisions.map((group) => group.code).join(","), session?.id]);
+  }, [date, mode, divisionKey, session?.id]);
 
   const setStudentStatus = (studentId: string, status: Status) =>
     setStatuses((current) => ({ ...current, [studentId]: status }));
@@ -253,7 +246,7 @@ export default function AttendancePage() {
             : "تعذر حفظ الحضور.",
       );
       if (response.ok) {
-        invalidateCached("dashboard:attendance", ...divisions.map((group) => `attendance:${date}:${mode}:${group.code}:${session.id}`));
+        invalidateCached("dashboard:attendance", `attendance:${date}:${mode}:${divisionKey}:${session.id}`);
         window.dispatchEvent(new CustomEvent("thabat-attendance-changed"));
       }
     } catch {
