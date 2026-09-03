@@ -1,7 +1,19 @@
 import { PrismaClient } from '@prisma/client'
 
+const getConnectionLimitedUrl = () => {
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) return undefined
+
+  const url = new URL(databaseUrl)
+  url.searchParams.set('connection_limit', '1')
+  return url.toString()
+}
+
 const prismaClientSingleton = () => {
-  return new PrismaClient()
+  const databaseUrl = getConnectionLimitedUrl()
+  return databaseUrl
+    ? new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+    : new PrismaClient()
 }
 
 const globalForPrisma = globalThis as typeof globalThis & {
