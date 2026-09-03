@@ -1,0 +1,380 @@
+// ===================================
+// ثَبَت (Thabat) - Prisma Schema
+// Database models for school operations logging
+// ===================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ User Model ============
+// System users: Principal, Vice Principal, Teachers
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  name      String
+  email     String?  @unique
+  password  String   // Hashed password (bcryptjs)
+  role      String   @default("TEACHER")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  assignedDivisions String @default("[]")
+
+  // Relations
+  warnings      Warning[]
+  transfers     TransferHistory[] @relation("ChangedBy")
+  auditLogs     AuditLog[]        @relation("User")
+  loginHistory  LoginHistory[]
+  issuedGatePasses GatePass[]     @relation("IssuedGatePasses")
+  transferNotifications TransferNotification[] @relation("TransferNotificationRecipient")
+
+  @@index([username])
+  @@index([role])
+}
+
+// ============ Student Model ============
+// Student records with academic performance and edit tracking
+model Student {
+  id               String   @id @default(cuid())
+  nationalId       String?  @unique
+  academicId       String?  @unique
+  fullName         String
+  arabicName       String? // Full Arabic name
+  gradeLevel       Int?
+  level            String?
+  gpa              Float?
+  parentPhone      String?
+  divisionId       String?
+  divisionCode     String?
+  conductNotes     String?
+  behaviorScore    Int      @default(100) // Deductions via warnings
+  attendanceScore  Int      @default(100) // Track attendance performance
+  
+  admissionDate    DateTime @default(now())
+  
+  // Comprehensive timestamp tracking
+  createdAt        DateTime @default(now())
+  createdDateOnly  String?  // YYYY-MM-DD
+  createdTimeOnly  String?  // HH:mm:ss
+  
+  updatedAt        DateTime @updatedAt
+  lastUpdatedBy    String?  // User ID of last person who modified
+  lastUpdatedByName String? // Name of last modifier
+  lastUpdatedByRole String? // Role of last modifier
+  
+  isActive         Boolean  @default(true)
+
+  // Relations
+  warnings         Warning[]
+  transferHistory  TransferHistory[]
+  auditLogs        AuditLog[]        @relation("TargetStudent")
+  attendance       Attendance[]
+  gatePasses       GatePass[]
+
+  @@index([divisionCode])
+  @@index([gradeLevel])
+  @@index([isActive])
+  @@index([createdDateOnly])
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date      String   // YYYY-MM-DD format for unique constraint
+  status    String   @default("UNMARKED") // UNMARKED | PRESENT | ABSENT_EXCUSED | ABSENT_UNEXCUSED | LATE
+  notes     String?  // Optional notes for absence or late marking
+  markedBy  String?  // User ID of who marked attendance
+  markedByName String? // Cached name of who marked
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, date])
+  @@index([date])
+  @@index([studentId])
+  @@index([status])
+}
+
+model GatePass {
+  id              String   @id @default(cuid())
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  issuedBy        String
+  issuedByUser    User     @relation("IssuedGatePasses", fields: [issuedBy], references: [id], onDelete: Restrict)
+  approvedBy      String?
+  approvedAt      DateTime?
+  scannedBy       String?
+  scannedAt       DateTime?
+  status          String   @default("PENDING")
+  parentName      String?
+  reason          String
+  departureDate   String
+  departureTime   String
+  expiresAt       DateTime?
+  qrToken         String   @unique
+  attendanceState String   @default("PENDING")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([status])
+  @@index([departureDate])
+  @@index([qrToken])
+}
+
+model AttendanceLog {
+  id         String   @id @default(cuid())
+  date       String
+  divisionId String
+  teacherId  String?
+  statusMap  String
+  mode       String   @default("SCHOOL")
+  presentCount Int     @default(0)
+  absentCount  Int     @default(0)
+  recordsJson  String  @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([date])
+  @@index([divisionId])
+  @@index([teacherId])
+}
+
+model ClassAttendance {
+  id         String   @id @default(cuid())
+  studentId  String
+  date       String
+  divisionId String
+  teacherId  String
+  status     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([studentId, date, divisionId, teacherId])
+  @@index([date])
+  @@index([divisionId])
+  @@index([teacherId])
+}
+
+model GradebookModificationLog {
+  id        String   @id @default(cuid())
+  studentId String
+  divisionId String
+  teacherId String?
+  field     String
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+
+  @@index([studentId])
+  @@index([divisionId])
+  @@index([teacherId])
+  @@index([createdAt])
+}
+
+model GradebookScore {
+  id            String   @id @default(cuid())
+  studentId     String
+  divisionId    String
+  subject       String
+  teacherId     String
+  taskPeriod1   Float?
+  taskPeriod2   Float?
+  examPeriod1   Float?
+  examPeriod2   Float?
+  finalExam     Float?
+  customScoresJson String @default("{}")
+  updatedBy     String?
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@unique([studentId, divisionId, subject, teacherId])
+  @@index([divisionId])
+  @@index([updatedBy])
+  @@index([teacherId])
+}
+
+model Division {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  label     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============ Warning Model ============
+// Student behavior warnings and score deductions with full timestamp tracking
+model Warning {
+  id               String      @id @default(cuid())
+  studentId        String
+  student          Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  issuedBy         String
+  issuedByUser     User        @relation(fields: [issuedBy], references: [id], onDelete: Cascade)
+  issuedByName     String      // Full name of issuing user (cached for audit)
+  issuedByRole     String      // Role of issuing user (PRINCIPAL, VICE_PRINCIPAL, TEACHER)
+  
+  type             String      @default("TARDINESS")
+  reason           String?
+  deduction        Int         @default(2) // Points deducted from behavior score
+  severity         String      @default("MINOR")
+  
+  isResolved       Boolean     @default(false)
+  resolvedBy       String?
+  resolvedByName   String?     // Name of resolver
+  resolvedAt       DateTime?
+  
+  issuedAt         DateTime    @default(now())  // When warning was issued
+  issuedDateOnly   String?     // YYYY-MM-DD format for quick filtering
+  issuedTimeOnly   String?     // HH:mm:ss format for display
+  
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([studentId])
+  @@index([issuedBy])
+  @@index([issuedAt])
+  @@index([issuedDateOnly])
+}
+
+
+// ============ TransferHistory Model ============
+// Track student division transfers with full user attribution
+model TransferHistory {
+  id               String   @id @default(cuid())
+  studentId        String
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  fromDivision     String
+  toDivision       String
+  
+  changedBy        String
+  changedByUser    User     @relation("ChangedBy", fields: [changedBy], references: [id], onDelete: Cascade)
+  performedByName  String   // Full name of person who performed transfer
+  performedByRole  String   // Role (PRINCIPAL, VICE_PRINCIPAL, TEACHER)
+  
+  reason           String?
+  
+  transferredAt    DateTime @default(now())  // When transfer occurred
+  transferDateOnly String?  // YYYY-MM-DD for filtering
+  transferTimeOnly String?  // HH:mm:ss for display
+  
+  timestamp        DateTime @default(now())
+
+  @@index([studentId])
+  @@index([transferredAt])
+  @@index([transferDateOnly])
+}
+
+model TransferNotification {
+  id                  String   @id @default(cuid())
+  recipientId         String
+  recipient           User     @relation("TransferNotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  createdBy           String
+  fromDivision        String
+  toDivision          String
+  studentIdsJson      String
+  studentSnapshotJson String
+  gradeSnapshotJson   String   @default("[]")
+  readAt              DateTime?
+  reviewedAt          DateTime?
+  createdAt           DateTime @default(now())
+
+  @@index([recipientId, readAt])
+  @@index([createdAt])
+}
+
+// ============ AuditLog Model ============
+// Complete operation audit trail for compliance with precise timestamps
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation("User", fields: [userId], references: [id], onDelete: SetNull)
+  userName   String   // Cached user name for audit immutability
+  userRole   String   // Cached user role (PRINCIPAL, VICE_PRINCIPAL, TEACHER)
+  
+  action     String
+  targetType String     // e.g., "Student", "Warning", "Division"
+  targetId   String?
+  targetName String?
+  
+  // Optional: if action involves a student
+  studentId  String?
+  student    Student? @relation("TargetStudent", fields: [studentId], references: [id], onDelete: SetNull)
+  
+  // Detailed change tracking
+  details    String?  // JSON serializable details
+  oldValue   String?  // Previous value (if applicable)
+  newValue   String?  // New value (if applicable)
+  
+  ipAddress  String?
+  userAgent  String?
+  
+  // Full timestamp tracking
+  timestamp  DateTime @default(now())
+  dateOnly   String   // YYYY-MM-DD format for easy daily filtering
+  timeOnly   String   // HH:mm:ss format for display
+  
+  // Relative time helper
+  relativeTime String? // e.g., "اليوم الساعة 10:45 ص" or "أمس - 14:30"
+
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
+  @@index([dateOnly])
+  @@index([studentId])
+}
+
+
+// ============ LoginHistory Model ============
+// Track user login attempts for security
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  ipAddress String?
+  userAgent String?
+  success   Boolean  @default(true)
+  reason    String?  // Error reason if failed
+  
+  timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
+}
+
+// ============ ExcelImportLog Model ============
+// Track Excel file imports for data integrity
+model ExcelImportLog {
+  id          String   @id @default(cuid())
+  fileName    String
+  fileSize    Int
+  rowCount    Int
+  successCount Int
+  errorCount  Int
+  
+  importedBy  String?
+  status      String      @default("PENDING")
+  
+  details     String?  // JSON: detailed error logs
+  
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
