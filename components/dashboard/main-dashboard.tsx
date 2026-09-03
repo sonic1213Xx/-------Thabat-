@@ -383,25 +383,18 @@ export function MainDashboard() {
   const [pendingTab, setPendingTab] = useState<DashboardTabId | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const tabTimerRef = useRef<number | null>(null)
+  const session = getSession()
 
   useEffect(() => {
     async function loadDashboardData() {
       try {
-        const [studentsData, warningsData, auditData, attendanceData, teamsData, divisionsData] = await Promise.all([
-          fetchCached<{ data?: ApiStudent[] }>('dashboard:students', '/api/students'),
-          fetchCached<{ data?: ApiWarning[] }>('dashboard:warnings', '/api/warnings/today'),
-          fetchCached<{ data?: ApiAudit[] }>('dashboard:audit', '/api/audit-log?limit=8'),
-          fetchCached<{ data?: ApiAttendance[] }>('dashboard:attendance', '/api/attendance'),
-          fetchCached<{ data?: Array<{ id: string; label: string }> }>('dashboard:teams', '/api/teams'),
-          fetchCached<{ data?: Array<{ id: string; code: string; name: string }> }>('dashboard:divisions', '/api/divisions'),
-        ])
-
-        setStudents(studentsData.data ?? [])
-        setWarnings(warningsData.data ?? [])
-        setAuditLogs(auditData.data ?? [])
-        setAttendance(attendanceData.data ?? [])
-        setTeams(teamsData.data ?? [])
-        setDivisions(divisionsData.data ?? [])
+        const dashboardData = await fetchCached<{ data?: { students?: ApiStudent[]; warnings?: ApiWarning[]; auditLogs?: ApiAudit[]; attendance?: ApiAttendance[]; teams?: Array<{ id: string; label: string }>; divisions?: Array<{ id: string; code: string; name: string }> } }>(`dashboard:data:${session?.id ?? 'anonymous'}`, '/api/dashboard/data', { headers: session?.id ? { 'x-thabat-user-id': session.id } : undefined })
+        setStudents(dashboardData.data?.students ?? [])
+        setWarnings(dashboardData.data?.warnings ?? [])
+        setAuditLogs(dashboardData.data?.auditLogs ?? [])
+        setAttendance(dashboardData.data?.attendance ?? [])
+        setTeams(dashboardData.data?.teams ?? [])
+        setDivisions(dashboardData.data?.divisions ?? [])
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
       } finally {
@@ -410,15 +403,16 @@ export function MainDashboard() {
     }
 
     void loadDashboardData()
-    const refreshAttendance = () => { invalidateCached('dashboard:attendance'); void loadDashboardData() }
-    const refreshWarnings = () => { invalidateCached('dashboard:warnings', 'dashboard:audit'); void loadDashboardData() }
+    const cacheKey = `dashboard:data:${session?.id ?? 'anonymous'}`
+    const refreshAttendance = () => { invalidateCached(cacheKey); void loadDashboardData() }
+    const refreshWarnings = () => { invalidateCached(cacheKey); void loadDashboardData() }
     window.addEventListener('thabat-attendance-changed', refreshAttendance)
     window.addEventListener('thabat-warnings-changed', refreshWarnings)
     return () => {
       window.removeEventListener('thabat-attendance-changed', refreshAttendance)
       window.removeEventListener('thabat-warnings-changed', refreshWarnings)
     }
-  }, [])
+  }, [session?.id])
 
   const hasDashboardData = students.length > 0 || warnings.length > 0 || auditLogs.length > 0 || attendance.length > 0 || teams.length > 0 || divisions.length > 0
 
