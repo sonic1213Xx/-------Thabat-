@@ -212,35 +212,34 @@ export default function AttendancePage() {
         "Content-Type": "application/json",
         "x-thabat-user-id": session.id,
       };
-      const responses = await Promise.all(
-        divisions.map((group) =>
-          fetch("/api/attendance", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              date,
-              mode,
-              divisionId: group.code,
-              teacherId: session.id,
-              markedBy: session.id,
-              records: group.students.map((student) => {
-                const selectedStatus = statuses[student.id] ?? "UNMARKED";
-                return {
-                  studentId: student.id,
-                  status: selectedStatus.startsWith("OTHER:")
-                    ? "OTHER"
-                    : selectedStatus,
-                  notes: selectedStatus.startsWith("OTHER:")
-                    ? selectedStatus.slice(6)
-                    : notes[student.id],
-                };
-              }),
-            }),
-          }),
-        ),
+      const records = divisions.flatMap((group) =>
+        group.students.map((student) => {
+          const selectedStatus = statuses[student.id] ?? "UNMARKED";
+          return {
+            studentId: student.id,
+            divisionId: group.code,
+            status: selectedStatus.startsWith("OTHER:")
+              ? "OTHER"
+              : selectedStatus,
+            notes: selectedStatus.startsWith("OTHER:")
+              ? selectedStatus.slice(6)
+              : notes[student.id],
+          };
+        }),
       );
+      const response = await fetch("/api/attendance", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          date,
+          mode,
+          teacherId: session.id,
+          markedBy: session.id,
+          records,
+        }),
+      });
       setMessage(
-        responses.every((response) => response.ok)
+        response.ok
           ? english
             ? "Attendance saved."
             : "تم حفظ الحضور."
