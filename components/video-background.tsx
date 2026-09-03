@@ -10,20 +10,24 @@ export function VideoBackground() {
   const { locale } = useLanguage()
   const audioRef = useRef<HTMLAudioElement>(null)
   const [isMuted, setIsMuted] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
 
   useEffect(() => {
     const savedMute = localStorage.getItem(AUDIO_MUTED_KEY) === 'true'
     setIsMuted(savedMute)
     const startAudio = () => {
-      if (audioRef.current) {
-        audioRef.current.volume = 0.2
-        audioRef.current.muted = savedMute
-      }
-      void audioRef.current?.play().catch(() => undefined)
+      const audio = audioRef.current
+      if (!audio || savedMute) return
+      audio.volume = 0.2
+      audio.muted = false
+      void audio.play().then(() => {
+        setIsPlaying(true)
+        document.removeEventListener('pointerdown', startAudio)
+      }).catch(() => setIsPlaying(false))
     }
 
     startAudio()
-    document.addEventListener('pointerdown', startAudio, { once: true })
+    document.addEventListener('pointerdown', startAudio)
     return () => {
       document.removeEventListener('pointerdown', startAudio)
       audioRef.current?.pause()
@@ -31,16 +35,20 @@ export function VideoBackground() {
   }, [])
 
   const toggleMute = () => {
-    const nextMuted = !isMuted
+    const nextMuted = isPlaying && !isMuted
     setIsMuted(nextMuted)
     localStorage.setItem(AUDIO_MUTED_KEY, String(nextMuted))
     if (audioRef.current) {
       audioRef.current.muted = nextMuted
-      if (!nextMuted) void audioRef.current.play().catch(() => undefined)
+      if (!nextMuted) {
+        void audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
+      } else {
+        setIsPlaying(false)
+      }
     }
   }
 
-  const muteLabel = isMuted
+  const muteLabel = isMuted || !isPlaying
     ? (locale === 'ar' ? 'تشغيل الموسيقى الخلفية' : 'Unmute background music')
     : (locale === 'ar' ? 'كتم الموسيقى الخلفية' : 'Mute background music')
 
