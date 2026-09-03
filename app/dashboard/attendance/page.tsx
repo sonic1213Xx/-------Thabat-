@@ -630,8 +630,9 @@ export default function AttendancePage() {
             <div className="pointer-events-none flex w-[min(380px,calc(100vw-2rem))] flex-col items-center gap-4 rounded-2xl border-2 border-emerald-500/30 bg-card px-6 py-7 text-center text-card-foreground shadow-2xl">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-muted border-t-primary" />
               <div className="flex w-full items-center justify-between gap-4"><p className="text-base font-bold">جاري حفظ سجل الحضور...</p><strong className="text-xl tabular-nums text-emerald-600 dark:text-emerald-400">{progress}%</strong></div>
-              <div dir="ltr" className="h-5 w-full overflow-hidden rounded-full border-2 border-emerald-600/40 bg-slate-200 shadow-inner dark:bg-slate-800" role="progressbar" aria-label={`Progress ${progress}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
-                <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-300" style={{ width: `${progress}%` }} />
+              <p className="w-full text-start text-xs font-semibold text-muted-foreground">{progress}% مكتمل</p>
+              <div dir="ltr" className="h-5 w-full min-w-[280px] overflow-hidden rounded-full border-2 border-emerald-600/60 bg-slate-300 shadow-inner dark:bg-slate-700" role="progressbar" aria-label={`Progress ${progress}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+                <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${progress}%`, backgroundColor: "#10b981" }} />
               </div>
             </div>
           </div>,
