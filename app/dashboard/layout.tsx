@@ -9,12 +9,12 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return <AuthGate>
-    <div className="flex h-screen w-full overflow-hidden bg-slate-50 dark:bg-slate-950">
+    <div className="flex min-h-screen w-full overflow-x-hidden bg-slate-50 dark:bg-slate-950 md:h-screen md:overflow-hidden">
       <SidebarNav />
       <ChatBotDrawer />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col md:overflow-hidden">
         <TopNav />
-        <main className="dashboard-main mx-auto w-full max-w-7xl flex-1 overscroll-contain overflow-y-auto overflow-x-hidden p-6">
+        <main className="dashboard-main mx-auto w-full max-w-7xl flex-1 overflow-x-hidden p-6 md:overscroll-contain md:overflow-y-auto">
           {children}
         </main>
       </div>
