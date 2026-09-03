@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         },
       })
       return { imported, skipped, divisionCount: divisionIds.size, students: createdStudents }
-    })
+    }, { timeout: 30000, maxWait: 10000 })
 
     return NextResponse.json({ data: result })
   } catch (error) {
