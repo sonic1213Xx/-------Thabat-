@@ -17,6 +17,6 @@ export async function POST(request: NextRequest) {
   if (!body.studentId || !body.issuedBy || !body.reason || !body.departureDate || !body.departureTime) return NextResponse.json({ error: 'studentId, issuedBy, reason, departureDate, and departureTime are required.' }, { status: 400 })
   const student = await prisma.student.findUnique({ where: { id: body.studentId } })
   if (!student) return NextResponse.json({ error: 'Student not found.' }, { status: 404 })
-  const pass = await prisma.gatePass.create({ data: { studentId: student.id, issuedBy: body.issuedBy, parentName: body.parentName, reason: body.reason, departureDate: body.departureDate, departureTime: body.departureTime, expiresAt: body.expiresAt ? new Date(body.expiresAt) : null, qrToken: crypto.randomUUID(), status: 'PENDING', attendanceState: 'PENDING' }, include: { student: true } })
+  const pass = await prisma.gatePass.create({ data: { studentId: student.id, issuedBy: body.issuedBy, parentName: body.parentName, reason: body.reason, departureDate: body.departureDate, departureTime: body.departureTime, expiresAt: body.expiresAt ? new Date(body.expiresAt) : null, qrToken: crypto.randomUUID(), status: 'APPROVED', approvedBy: body.issuedBy, approvedAt: new Date(), attendanceState: 'PENDING' }, include: { student: true } })
   return NextResponse.json({ data: pass }, { status: 201 })
 }

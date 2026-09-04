@@ -17,5 +17,6 @@ const recordAudit = (action: string, targetType: string, targetId: string, targe
 }
 export const getGatePasses = () => read<GatePass>(GATE_PASSES_KEY)
 export const saveGatePass = (pass: GatePass) => { write(GATE_PASSES_KEY, [pass, ...getGatePasses()]); recordAudit('GATE_PASS_ISSUED', 'GatePass', pass.id, pass.studentName, pass.studentId, { divisionCode: pass.divisionCode, reason: pass.reason }) }
+export const deleteGatePass = (id: string) => write(GATE_PASSES_KEY, getGatePasses().filter((pass) => pass.id !== id))
 export const getIncidents = () => read<Incident>(INCIDENTS_KEY)
 export const saveIncident = (incident: Incident) => { write(INCIDENTS_KEY, [incident, ...getIncidents()]); recordAudit('INCIDENT_RECORDED', 'Incident', incident.id, incident.studentName, incident.studentId, { divisionCode: incident.divisionCode, degree: incident.degree, action: incident.action }) }

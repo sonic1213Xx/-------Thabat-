@@ -7,13 +7,14 @@ import {
   LogOut,
   Search,
   ShieldAlert,
+  Trash2,
   User,
   Users,
 } from "lucide-react";
 import { GatePassModal } from "@/components/gate-pass-modal";
 import { IncidentLogger } from "@/components/incident-logger";
 import { EducationValidationPanel } from "@/components/dashboard/education-validation-panel";
-import { getGatePasses, getIncidents, type GatePass } from "@/lib/vp-operations";
+import { deleteGatePass, getGatePasses, getIncidents, type GatePass } from "@/lib/vp-operations";
 import { getGradeLevelArabic } from "@/lib/utils";
 import { can } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
@@ -31,15 +32,16 @@ type Student = {
 export default function VicePrincipalPage() {
   const { t, locale } = useLanguage();
   const searchParams = useSearchParams();
+  const session = getSession();
   const [students, setStudents] = useState<Student[]>([]);
   const [query, setQuery] = useState("");
   const [gateOpen, setGateOpen] = useState(false);
   const [selectedPass, setSelectedPass] = useState<GatePass | null>(null);
+  const [deletingPassId, setDeletingPassId] = useState<string | null>(null);
   const [incidentOpen, setIncidentOpen] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const requestedStudentId = searchParams.get("studentId");
   useEffect(() => {
-    const session = getSession();
     if (!session || !can(session.role, "can_approve_gate_passes"))
       window.location.href = "/dashboard";
     else {
@@ -69,6 +71,21 @@ export default function VicePrincipalPage() {
   const [passes, setPasses] = useState<GatePass[]>(() => getGatePasses());
   const incidents = getIncidents();
   const today = new Date().toISOString().slice(0, 10);
+  const deletePass = async (pass: GatePass) => {
+    if (!session || !window.confirm(locale === "ar" ? `حذف تصريح ${pass.studentName}؟` : `Delete the permit for ${pass.studentName}?`)) return;
+    setDeletingPassId(pass.id);
+    try {
+      const response = await fetch(`/api/gate-passes/${encodeURIComponent(pass.id)}`, { method: "DELETE", headers: { "x-thabat-role": session.role } });
+      if (!response.ok) throw new Error("Unable to delete permit");
+      deleteGatePass(pass.id);
+      setPasses((current) => current.filter((item) => item.id !== pass.id));
+      if (selectedPass?.id === pass.id) setSelectedPass(null);
+    } catch {
+      window.alert(locale === "ar" ? "تعذر حذف التصريح." : "Unable to delete the permit.");
+    } finally {
+      setDeletingPassId(null);
+    }
+  };
   return (
     <div className="space-y-6" dir="rtl">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -127,7 +144,7 @@ export default function VicePrincipalPage() {
           </div>
           <LogOut className="h-5 w-5 text-emerald-600" />
         </div>
-        {passes.length ? <div className="mt-4 overflow-x-auto"><table className="min-w-full text-sm"><thead className="border-b border-slate-200 text-start dark:border-slate-800"><tr><th className="px-3 py-3 text-start">{locale === "ar" ? "الطالب" : "Student"}</th><th className="px-3 py-3 text-start">{locale === "ar" ? "الفصل" : "Division"}</th><th className="px-3 py-3 text-start">{locale === "ar" ? "التاريخ" : "Date"}</th><th className="px-3 py-3 text-start">{locale === "ar" ? "الإجراء" : "Action"}</th></tr></thead><tbody>{passes.map((pass) => <tr key={pass.id} role="button" tabIndex={0} onClick={() => setSelectedPass(pass)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedPass(pass) } }} className="cursor-pointer border-b border-slate-100 transition hover:bg-emerald-50 dark:border-slate-800 dark:hover:bg-emerald-950/20"><td className="px-3 py-3 font-semibold">{pass.studentName}</td><td className="px-3 py-3 text-slate-500">{pass.divisionCode}</td><td className="px-3 py-3 text-slate-500">{pass.departureDate} · {pass.departureTime}</td><td className="px-3 py-3"><button type="button" onClick={(event) => { event.stopPropagation(); setSelectedPass(pass) }} className="rounded-lg border border-emerald-600 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300">{locale === "ar" ? "عرض التصريح" : "View permit"}</button></td></tr>)}</tbody></table></div> : <p className="mt-4 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700">{locale === "ar" ? "لا توجد تصاريح مسجلة بعد." : "No permits have been issued yet."}</p>}
+        {passes.length ? <div className="mt-4 overflow-x-auto"><table className="min-w-full text-sm"><thead className="border-b border-slate-200 text-start dark:border-slate-800"><tr><th className="px-3 py-3 text-start">{locale === "ar" ? "الطالب" : "Student"}</th><th className="px-3 py-3 text-start">{locale === "ar" ? "الفصل" : "Division"}</th><th className="px-3 py-3 text-start">{locale === "ar" ? "التاريخ" : "Date"}</th><th className="px-3 py-3 text-start">{locale === "ar" ? "الإجراء" : "Action"}</th></tr></thead><tbody>{passes.map((pass) => <tr key={pass.id} role="button" tabIndex={0} onClick={() => setSelectedPass(pass)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedPass(pass) } }} className="cursor-pointer border-b border-slate-100 transition hover:bg-emerald-50 dark:border-slate-800 dark:hover:bg-emerald-950/20"><td className="px-3 py-3 font-semibold">{pass.studentName}</td><td className="px-3 py-3 text-slate-500">{pass.divisionCode}</td><td className="px-3 py-3 text-slate-500">{pass.departureDate} · {pass.departureTime}</td><td className="flex flex-wrap gap-2 px-3 py-3"><button type="button" onClick={(event) => { event.stopPropagation(); setSelectedPass(pass) }} className="rounded-lg border border-emerald-600 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300">{locale === "ar" ? "عرض التصريح" : "View permit"}</button><button type="button" disabled={deletingPassId === pass.id} onClick={(event) => { event.stopPropagation(); void deletePass(pass) }} className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-50 dark:border-red-700 dark:text-red-300">{deletingPassId === pass.id ? "..." : <Trash2 className="h-4 w-4" />}{locale === "ar" ? "حذف" : "Delete"}</button></td></tr>)}</tbody></table></div> : <p className="mt-4 rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-slate-700">{locale === "ar" ? "لا توجد تصاريح مسجلة بعد." : "No permits have been issued yet."}</p>}
       </section>
       <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <div className="relative">

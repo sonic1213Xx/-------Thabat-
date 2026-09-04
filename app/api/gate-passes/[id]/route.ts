@@ -24,3 +24,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   await prisma.attendance.upsert({ where: { studentId_date: { studentId: pass.studentId, date } }, update: { status: 'LEFT_WITH_PERMISSION', notes: `Gate pass ${pass.id}`, markedBy: body.actorId }, create: { studentId: pass.studentId, date, status: 'LEFT_WITH_PERMISSION', notes: `Gate pass ${pass.id}`, markedBy: body.actorId } })
   return NextResponse.json({ data: await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'USED', scannedBy: body.actorId, scannedAt: now, attendanceState: 'LEFT_WITH_PERMISSION' } }) })
 }
+
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  const permission = requirePermission(request, 'gate_passes', 'delete')
+  if (permission) return permission
+  try {
+    const pass = await prisma.gatePass.findUnique({ where: { id: params.id }, select: { id: true } })
+    if (!pass) return NextResponse.json({ error: 'Gate pass not found.' }, { status: 404 })
+    await prisma.gatePass.delete({ where: { id: pass.id } })
+    return NextResponse.json({ data: { id: pass.id } })
+  } catch (error) {
+    console.error('Gate pass deletion failed:', error)
+    return NextResponse.json({ error: 'Unable to delete gate pass.' }, { status: 500 })
+  }
+}
