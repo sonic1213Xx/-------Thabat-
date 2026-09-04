@@ -9,6 +9,9 @@ const getConnectionLimitedUrl = () => {
   return url.toString()
 }
 
+// DATABASE_URL should be the pooled PgBouncer URL in production. Prisma CLI uses
+// POSTGRES_URL through the schema's directUrl for migrations and db push.
+
 const prismaClientSingleton = () => {
   const databaseUrl = getConnectionLimitedUrl()
   return databaseUrl

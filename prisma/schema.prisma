@@ -10,6 +10,9 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Set DIRECT_URL to a non-pooled Postgres URL in production. The fallback
+  // keeps local and existing deployments compatible until it is configured.
+  directUrl = env("DATABASE_URL")
 }
 
 // ============ User Model ============
@@ -80,6 +83,7 @@ model Student {
   gatePasses       GatePass[]
 
   @@index([divisionCode])
+  @@index([divisionCode, isActive])
   @@index([gradeLevel])
   @@index([isActive])
   @@index([createdDateOnly])
@@ -101,6 +105,7 @@ model Attendance {
   @@index([date])
   @@index([studentId])
   @@index([status])
+  @@index([date, status])
 }
 
 model GatePass {
@@ -199,6 +204,7 @@ model GradebookScore {
   @@index([divisionId])
   @@index([updatedBy])
   @@index([teacherId])
+  @@index([divisionId, subject, teacherId])
 }
 
 model Division {

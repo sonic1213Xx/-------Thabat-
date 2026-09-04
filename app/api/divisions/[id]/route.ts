@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
+import { invalidateCache } from '@/lib/redis'
 
 const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient
@@ -43,6 +44,7 @@ export async function PUT(request: NextRequest, context: { params: { id: string 
       where: { divisionCode: current.code },
       data: { divisionCode: code },
     })
+    await invalidateCache('thabat:divisions:all')
 
     return NextResponse.json({ data: division })
   } catch {
@@ -67,6 +69,7 @@ export async function DELETE(_request: NextRequest, context: { params: { id: str
     })
 
     await prisma.division.delete({ where: { id: context.params.id } })
+    await invalidateCache('thabat:divisions:all')
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: 'Unable to delete division.' }, { status: 500 })

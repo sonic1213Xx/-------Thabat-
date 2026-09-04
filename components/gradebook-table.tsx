@@ -322,41 +322,21 @@ export function GradebookTable({
     );
     let responses: Response[] = [];
     try {
-      responses = await Promise.all(
-        rowsToSave.flatMap((row) =>
-          fixedFields.length
-            ? fixedFields.map(({ key }) =>
-              fetch("/api/gradebook", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  studentId: row.id,
-                  divisionId: divisionName,
-                  subject,
-                  teacherId: actorId,
-                  updatedBy: actorId,
-                  field: key,
-                  value: row[key as keyof GradebookStudent] ?? null,
-                  customScores: customScoresToSave[row.id] ?? {},
-                }),
-              }),
-            )
-          : [
-                fetch("/api/gradebook", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  studentId: row.id,
-                  divisionId: divisionName,
-                  subject,
-                  teacherId: actorId,
-                  updatedBy: actorId,
-                  customScores: customScoresToSave[row.id] ?? {},
-                }),
-                }),
-              ],
-        ),
-      );
+      responses = [await fetch("/api/gradebook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          divisionId: divisionName,
+          subject,
+          teacherId: actorId,
+          updatedBy: actorId,
+          entries: rowsToSave.map((row) => ({
+            studentId: row.id,
+            fields: Object.fromEntries(fixedFields.map(({ key }) => [key, row[key as keyof GradebookStudent] ?? null])),
+            customScores: customScoresToSave[row.id] ?? {},
+          })),
+        }),
+      })];
     } catch {
       showToast("error");
       setMessage(locale === "ar" ? "فشل في حفظ الدرجات، يرجى المحاولة مرة أخرى" : "Failed to save grades, please try again");
