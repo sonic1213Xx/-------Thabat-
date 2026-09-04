@@ -51,6 +51,12 @@ export function GatePassModal({
     if (!issuedPass?.qrToken) return;
     void QRCode.toDataURL(issuedPass.qrToken, { width: 150, margin: 1 }).then(setQrImage).catch(() => setQrImage(""));
   }, [issuedPass]);
+  useEffect(() => {
+    if (!initialPass && students.length === 1) {
+      setStudentId(students[0].id);
+      setSearch(students[0].fullName);
+    }
+  }, [initialPass, students]);
   const matchingStudentGroups = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
     const matches = query
@@ -96,16 +102,6 @@ export function GatePassModal({
     const saved = await response.json() as { data: { id: string; qrToken: string; createdAt: string; status: string } };
     const pass: GatePass = { id: saved.data.id, studentId, studentName: student.fullName, divisionCode: student.divisionCode ?? "غير معين", parentName: form.parentName, reason, departureDate: form.departureDate, departureTime: form.departureTime, createdAt: saved.data.createdAt, qrToken: saved.data.qrToken, status: saved.data.status };
     saveGatePass(pass);
-    await fetch("/api/attendance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-thabat-user-id": session.id },
-      body: JSON.stringify({
-        date: form.departureDate,
-        records: [
-          { studentId, status: "ABSENT_EXCUSED", notes: "استئذان بعذر" },
-        ],
-      }),
-    });
     onSaved?.(pass);
     setIssuedPass(pass);
   };

@@ -19,6 +19,8 @@ const border = {
 const statusLabel = (status?: string) =>
   status === "PRESENT"
     ? "حاضر"
+    : status === "LEFT_WITH_PERMISSION"
+      ? "مستأذن"
     : status === "ABSENT_EXCUSED" || status === "ABSENT_UNEXCUSED"
       ? "غائب"
       : status === "LATE"
@@ -237,7 +239,9 @@ export async function exportAttendanceWorkbook(
           student.notes ||
             (statusLabel(student.status) === "غائب"
               ? "لم يحضر - يتم التواصل مع ولي الأمر"
-              : "حضور منتظم"),
+              : statusLabel(student.status) === "مستأذن"
+                ? "خرج بإذن بعد التحقق من تصريح الخروج"
+                : "حضور منتظم"),
         ]);
       });
     styleTable(sheet, [5]);
@@ -298,7 +302,9 @@ export async function exportAttendanceWorkbook(
             student.notes ||
               (status === "غائب"
                 ? "لم يحضر - يتم التواصل مع ولي الأمر"
-                : "حضور منتظم"),
+                : status === "مستأذن"
+                  ? "خرج بإذن بعد التحقق من تصريح الخروج"
+                  : "حضور منتظم"),
           ]);
           const number = row.number;
           sheet.getCell(`J${number}`).value = {

@@ -4,8 +4,10 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarCheck, Check, FileText, Loader2, Save, X } from "lucide-react";
 import { AttendanceStatusSelect } from "@/components/ui/attendance-status-select";
+import { GatePassModal } from "@/components/gate-pass-modal";
 import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import { exportAttendanceWorkbook } from "@/lib/export-attendance-fixed";
 import { useToast } from "@/components/toast-provider";
 import { notifyPdfComingSoon, runExport } from "@/lib/export-feedback";
@@ -73,11 +75,17 @@ export default function AttendancePage() {
   const [isExporting, setIsExporting] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [selectedLogStudent, setSelectedLogStudent] = useState<AttendanceLogRow | null>(null);
+  const [gatePassStudent, setGatePassStudent] = useState<Student | null>(null);
   const studentsRequestRef = useRef<string | null>(null);
   const attendanceRequestRef = useRef<string | null>(null);
   const hasFetchedRef = useRef<string | null>(null);
   const [attendanceLoadedKey, setAttendanceLoadedKey] = useState<string | null>(null);
   const initialAttendanceMapRef = useRef<Map<string, { status: Status; note: string }>>(new Map());
+  useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(() => setMessage(""), 3000);
+    return () => window.clearTimeout(timer);
+  }, [message]);
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     if (saving) document.body.style.overflow = "hidden";
@@ -220,6 +228,13 @@ export default function AttendancePage() {
       ...current,
       ...Object.fromEntries(students.map((student) => [student.id, status])),
     }));
+  const openGatePass = (student: Student) => {
+    if (!hasPermission(session?.role, "gate_passes", "create")) {
+      setMessage(english ? "You do not have permission to issue a gate pass. Contact an authorized staff member." : "لا تملك صلاحية إصدار تصريح خروج. تواصل مع المسؤول المخول.");
+      return;
+    }
+    setGatePassStudent(student);
+  };
   const save = async () => {
     if (!session?.id) return;
     const currentRecords = divisions.flatMap((group) =>
@@ -541,6 +556,7 @@ export default function AttendancePage() {
       )}
       <AttendanceLogsModal open={logsOpen} onClose={() => setLogsOpen(false)} english={english} onStudentClick={(student) => { setLogsOpen(false); setSelectedLogStudent(student); }} />
       {selectedLogStudent && <StudentAttendanceModal open={true} onClose={() => setSelectedLogStudent(null)} studentId={selectedLogStudent.studentId} studentName={selectedLogStudent.studentName} />}
+      {gatePassStudent && <GatePassModal students={[gatePassStudent]} onClose={() => setGatePassStudent(null)} />}
       <main className={`space-y-8 ${isLoading ? "hidden" : ""}`}>
         {visibleDivisions.map((group) => (
           <section
@@ -583,7 +599,8 @@ export default function AttendancePage() {
                   <tr>
                     <th className="w-[24%] px-4 py-3 text-start">{text.student}</th>
                     <th className="w-[48%] px-4 py-3 text-start">{text.status}</th>
-                    <th className="w-[28%] px-4 py-3 text-start">{text.notes}</th>
+                    <th className="w-[20%] px-4 py-3 text-start">{text.notes}</th>
+                    <th className="w-[8%] px-4 py-3 text-start">{english ? "Action" : "الإجراء"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -604,7 +621,7 @@ export default function AttendancePage() {
                           variant="buttons"
                         />
                       </td>
-                      <td className="w-[28%] min-w-[220px] px-4 py-3">
+                      <td className="w-[20%] min-w-[220px] px-4 py-3">
                         <input
                           value={notes[student.id] ?? ""}
                           onChange={(event) =>
@@ -615,6 +632,11 @@ export default function AttendancePage() {
                           }
                           className="block w-full min-w-[220px] overflow-x-auto whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm leading-6 dark:bg-slate-900"
                         />
+                      </td>
+                      <td className="w-[8%] min-w-[7rem] px-4 py-3">
+                        <button type="button" onClick={() => openGatePass(student)} className="whitespace-nowrap rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950/30">
+                          {english ? "Gate pass" : "مستأذن"}
+                        </button>
                       </td>
                     </tr>
                   ))}
