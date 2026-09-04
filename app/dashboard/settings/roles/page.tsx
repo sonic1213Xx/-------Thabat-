@@ -87,7 +87,7 @@ export default function RolesPage() {
       try {
         const response = await fetch('/api/users', { cache: 'no-store' });
         if (!response.ok) return;
-        const json = await response.json() as { data?: Array<{ id: string; name: string; role: AppRole; assigned_divisions?: string[]; subjectsTaught?: string[] }> };
+        const json = await response.json() as { data?: Array<{ id: string; name: string; role: AppRole; assigned_divisions?: string[]; subjectsTaught?: string[]; teachingAssignments?: TeachingAssignment[] }> };
         const localProfiles = getProfiles();
         const databaseProfiles: Profile[] = (json.data ?? []).map((item) => ({
           id: item.id,
@@ -98,6 +98,7 @@ export default function RolesPage() {
           lastActivity: '',
           assigned_divisions: item.assigned_divisions ?? [],
           subjectsTaught: item.subjectsTaught ?? [],
+          teachingAssignments: item.teachingAssignments ?? [],
           subject: item.subjectsTaught?.[0] ?? '',
         }));
         const localOnlyProfiles = localProfiles.filter((localProfile) => !databaseProfiles.some((databaseProfile) => databaseProfile.id === localProfile.id));
@@ -191,7 +192,7 @@ export default function RolesPage() {
       assigned_divisions: Array.from(new Set(teachingAssignments.flatMap((assignment) => assignment.divisions))),
       subjectsTaught: teachingAssignments.map((assignment) => assignment.subject),
     };
-    const response = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, name: nextProfile.name, password: nextProfile.password, role, divisions: nextProfile.assigned_divisions, subjectsTaught: nextProfile.subjectsTaught }) });
+    const response = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, name: nextProfile.name, password: nextProfile.password, role, divisions: nextProfile.assigned_divisions, subjectsTaught: nextProfile.subjectsTaught, teachingAssignments }) });
     if (!response.ok) {
       alert(locale === 'ar' ? 'تعذر حفظ الملف في قاعدة البيانات.' : 'Unable to save the profile to the database.');
       return;
@@ -238,7 +239,7 @@ export default function RolesPage() {
       teachingAssignments,
       subjectsTaught: teachingAssignments.map((assignment) => assignment.subject),
     };
-    const response = await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: nextProfile.id, name: nextProfile.name, password: nextProfile.password, role: nextProfile.role, divisions: nextProfile.assigned_divisions, subjectsTaught: nextProfile.subjectsTaught }) });
+    const response = await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: nextProfile.id, name: nextProfile.name, password: nextProfile.password, role: nextProfile.role, divisions: nextProfile.assigned_divisions, subjectsTaught: nextProfile.subjectsTaught, teachingAssignments }) });
     if (!response.ok) return;
     saveProfile(nextProfile);
     setProfiles(getProfiles());
