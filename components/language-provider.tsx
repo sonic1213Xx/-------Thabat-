@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { translations, type Locale, type TranslationKey } from '@/lib/translations'
+import { getSession } from '@/lib/auth'
 
 const LANGUAGE_STORAGE_KEY = 'thabat-locale'
 
@@ -15,20 +16,26 @@ type LanguageContextValue = {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null)
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
+export function LanguageProvider({ children, initialLocale = 'ar' }: { children: React.ReactNode; initialLocale?: Locale }) {
   const pathname = usePathname()
-  const [locale, setLocale] = useState<Locale>('ar')
+  const [locale, setLocale] = useState<Locale>(initialLocale)
   const [isChanging, setIsChanging] = useState(false)
 
   useEffect(() => {
     const savedLocale = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
-    if (savedLocale === 'en') setLocale('en')
+    const hasLocaleCookie = document.cookie.split('; ').some((cookie) => cookie.startsWith('NEXT_LOCALE='))
+    if (!hasLocaleCookie && (savedLocale === 'ar' || savedLocale === 'en')) setLocale(savedLocale)
   }, [])
 
   useEffect(() => {
     document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'
     document.documentElement.lang = locale
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, locale)
+    document.cookie = `NEXT_LOCALE=${locale}; Max-Age=31536000; Path=/; SameSite=Lax`
+    const session = getSession()
+    if (session) {
+      void fetch('/api/users/locale', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: session.id, locale }) }).catch(() => undefined)
+    }
   }, [locale])
 
   const value = useMemo<LanguageContextValue>(() => ({

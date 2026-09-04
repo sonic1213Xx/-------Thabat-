@@ -1,8 +1,11 @@
+import type { Locale } from '@/lib/translations'
+
 export type AppRole = 'CREATOR' | 'CURATOR' | 'PRINCIPAL' | 'VP_STUDENT_AFFAIRS' | 'VP_ACADEMIC_AFFAIRS' | 'VP_OPERATIONS' | 'VICE_PRINCIPAL' | 'TEACHER' | 'COUNSELOR' | 'ACTIVITIES_COORDINATOR' | 'GATE_SECURITY' | 'TRANSPORTATION_SUPERVISOR'
 
 export type SessionUser = { id: string; name: string; role: AppRole }
 export type TeachingAssignment = { id: string; subject: string; gradeLevel: number | null; divisions: string[]; attendance: boolean; gradebook: boolean }
 export type Profile = SessionUser & {
+  locale?: Locale
   password: string
   createdAt: string
   lastActivity: string
@@ -116,4 +119,5 @@ export function clearSession(): void {
   localStorage.removeItem(AUTH_STORAGE_KEY)
   localStorage.removeItem(AUTH_PERSISTENCE_KEY)
   sessionStorage.removeItem(AUTH_STORAGE_KEY)
+  document.cookie = 'THABAT_USER_ID=; Max-Age=0; Path=/; SameSite=Lax'
 }

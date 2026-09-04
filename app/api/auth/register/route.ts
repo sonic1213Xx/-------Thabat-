@@ -6,7 +6,7 @@ import type { TeachingAssignment } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { id?: string; name?: string; password?: string; divisions?: string[]; subjectsTaught?: string[]; teachingAssignments?: TeachingAssignment[] }
+    const body = await request.json() as { id?: string; name?: string; password?: string; locale?: 'ar' | 'en'; divisions?: string[]; subjectsTaught?: string[]; teachingAssignments?: TeachingAssignment[] }
     const username = body.id?.trim()
     const name = body.name?.trim()
     if (!username || !name || !body.password) return NextResponse.json({ error: 'Name, ID, and password are required' }, { status: 400 })
@@ -20,12 +20,16 @@ export async function POST(request: NextRequest) {
         name,
         password: await bcrypt.hash(body.password, 12),
         role: getRoleDefinition('TEACHER')?.key ?? 'TEACHER',
+        locale: body.locale === 'en' ? 'en' : 'ar',
         assignedDivisions: JSON.stringify(body.divisions ?? []),
         subjectsTaught: JSON.stringify(body.subjectsTaught ?? []),
         teachingAssignments: JSON.stringify(body.teachingAssignments ?? []),
       },
     })
-    return NextResponse.json({ data: { id: user.id, name: user.name, role: user.role, assigned_divisions: body.divisions ?? [], subjectsTaught: body.subjectsTaught ?? [], teachingAssignments: body.teachingAssignments ?? [] } }, { status: 201 })
+    const response = NextResponse.json({ data: { id: user.id, name: user.name, role: user.role, locale: user.locale, assigned_divisions: body.divisions ?? [], subjectsTaught: body.subjectsTaught ?? [], teachingAssignments: body.teachingAssignments ?? [] } }, { status: 201 })
+    response.cookies.set('NEXT_LOCALE', user.locale, { maxAge: 31536000, path: '/', sameSite: 'lax' })
+    response.cookies.set('THABAT_USER_ID', user.id, { maxAge: 31536000, path: '/', sameSite: 'lax' })
+    return response
   } catch (error) {
     console.error('Registration error:', error)
     return NextResponse.json({ error: 'Unable to create account' }, { status: 500 })
