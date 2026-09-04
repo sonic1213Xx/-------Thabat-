@@ -3,7 +3,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarCheck, Check, FileText, Loader2, Save, X } from "lucide-react";
-import { StyledSelect } from "@/components/ui/styled-select";
+import { AttendanceStatusSelect } from "@/components/ui/attendance-status-select";
 import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
 import { exportAttendanceWorkbook } from "@/lib/export-attendance-fixed";
@@ -600,7 +600,7 @@ export default function AttendancePage() {
                         {student.fullName}
                       </td>
                       <td className="w-64 px-4 py-3">
-                        <StyledSelect
+                        <AttendanceStatusSelect
                           value={statuses[student.id] ?? ""}
                           onValueChange={(value) =>
                             setStatuses((current) => ({
@@ -608,8 +608,8 @@ export default function AttendancePage() {
                               [student.id]: value as Status,
                             }))
                           }
-                          placeholder={text.choose}
                           options={options(english)}
+                          english={english}
                         />
                       </td>
                       <td className="min-w-56 px-4 py-3">
