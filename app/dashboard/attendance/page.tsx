@@ -574,12 +574,12 @@ export default function AttendancePage() {
               </div>
             </div>
             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-              <table className="min-w-full text-sm">
+              <table className="min-w-[58rem] w-full table-fixed text-sm">
                 <thead className="bg-slate-50 dark:bg-slate-800">
                   <tr>
-                    <th className="px-4 py-3 text-start">{text.student}</th>
-                    <th className="px-4 py-3 text-start">{text.status}</th>
-                    <th className="px-4 py-3 text-start">{text.notes}</th>
+                    <th className="w-[24%] px-4 py-3 text-start">{text.student}</th>
+                    <th className="w-[48%] px-4 py-3 text-start">{text.status}</th>
+                    <th className="w-[28%] px-4 py-3 text-start">{text.notes}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -588,10 +588,10 @@ export default function AttendancePage() {
                       key={student.id}
                       className="border-t border-slate-200 dark:border-slate-800"
                     >
-                      <td className="px-4 py-3 font-medium">
+                      <td className="w-[24%] px-4 py-3 font-medium">
                         {student.fullName}
                       </td>
-                      <td className="min-w-[22rem] px-4 py-3">
+                      <td className="w-[48%] min-w-[28rem] px-4 py-3">
                         <AttendanceStatusSelect
                           value={statuses[student.id] ?? ""}
                           onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))}
@@ -600,7 +600,7 @@ export default function AttendancePage() {
                           variant="buttons"
                         />
                       </td>
-                      <td className="w-40 max-w-[180px] px-4 py-3">
+                      <td className="w-[28%] min-w-[220px] px-4 py-3">
                         <input
                           value={notes[student.id] ?? ""}
                           onChange={(event) =>
@@ -609,7 +609,7 @@ export default function AttendancePage() {
                               [student.id]: event.target.value,
                             }))
                           }
-                          className="w-40 max-w-[180px] rounded-lg border px-3 py-2 dark:bg-slate-900"
+                          className="block w-full min-w-[220px] overflow-x-auto whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm leading-6 dark:bg-slate-900"
                         />
                       </td>
                     </tr>
