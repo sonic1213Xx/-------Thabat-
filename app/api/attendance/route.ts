@@ -1,17 +1,7 @@
-import { PrismaClient } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { ATTENDANCE_ESCALATIONS } from '@/lib/moe-rules'
 import { formatRelativeTimeArabic, getDateOnly, getTimeOnly } from '@/lib/utils'
-
-const globalForPrisma = globalThis as typeof globalThis & {
-  prisma?: PrismaClient
-}
-
-const prisma = globalForPrisma.prisma ?? new PrismaClient()
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+import { prisma } from '@/lib/prisma'
 
 const validStatuses = ['UNMARKED', 'PRESENT', 'ABSENT_UNEXCUSED', 'ABSENT_EXCUSED', 'LATE', 'OTHER']
 
@@ -202,7 +192,7 @@ export async function POST(request: NextRequest) {
 
     // Save or update attendance records
     if (user.role === 'TEACHER') return forbidden()
-    const escalations = []
+    const escalations: Array<{ studentId: string; days: number; warningId: string; action: string }> = []
     const actor = await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } }) ?? await prisma.user.create({ data: { username: 'system', name: 'نظام ثَبَت', password: 'system-managed', role: 'PRINCIPAL', isActive: true } })
     const existingAttendance = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: recordsToSave.map((record) => record.studentId) } }, select: { studentId: true } })
     const existingAttendanceIds = new Set(existingAttendance.map((record) => record.studentId))
@@ -217,20 +207,36 @@ export async function POST(request: NextRequest) {
       }
     }
     const saved = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: recordsToSave.map((record) => record.studentId) } }, select: { id: true, studentId: true, date: true, status: true, notes: true, markedBy: true, markedByName: true, updatedAt: true } })
-    for (const record of recordsToSave) {
-
-      if (record.status === 'ABSENT_UNEXCUSED') {
-        const absenceCount = await prisma.attendance.count({ where: { studentId: record.studentId, status: 'ABSENT_UNEXCUSED' } })
-        const escalation = ATTENDANCE_ESCALATIONS.find((item) => item.days === absenceCount)
-        if (escalation) {
-          const alreadyIssued = await prisma.warning.findFirst({ where: { studentId: record.studentId, type: 'ABSENCE', reason: { contains: `${absenceCount} أيام` } } })
-          if (!alreadyIssued) {
-            const now = new Date()
-            const warning = await prisma.warning.create({ data: { studentId: record.studentId, issuedBy: actor.id, issuedByName: actor.name, issuedByRole: actor.role, type: 'ABSENCE', reason: `إنذار مواظبة تلقائي: ${absenceCount} أيام غياب غير مبرر. الإجراء: ${escalation.action}`, deduction: 0, severity: `THRESHOLD_${absenceCount}`, isResolved: false, issuedAt: now, issuedDateOnly: getDateOnly(now), issuedTimeOnly: getTimeOnly(now) } })
-            escalations.push({ studentId: record.studentId, days: absenceCount, warningId: warning.id, action: escalation.action })
-          }
-        }
-      }
+    const absentStudentIds = Array.from(new Set(recordsToSave.filter((record) => record.status === 'ABSENT_UNEXCUSED').map((record) => record.studentId)))
+    if (absentStudentIds.length) {
+      const absenceCounts = await prisma.attendance.groupBy({
+        by: ['studentId'],
+        where: { studentId: { in: absentStudentIds }, status: 'ABSENT_UNEXCUSED' },
+        _count: { _all: true },
+      })
+      const absenceWarnings = await prisma.warning.findMany({
+        where: { studentId: { in: absentStudentIds }, type: 'ABSENCE' },
+        select: { id: true, studentId: true, reason: true },
+      })
+      const existingWarningKeys = new Set(absenceWarnings.map((warning) => `${warning.studentId}:${warning.reason}`))
+      const escalationCreates = absenceCounts.flatMap((entry) => {
+        const escalation = ATTENDANCE_ESCALATIONS.find((item) => item.days === entry._count._all)
+        if (!escalation) return []
+        const reason = `إنذار مواظبة تلقائي: ${entry._count._all} أيام غياب غير مبرر. الإجراء: ${escalation.action}`
+        if (absenceWarnings.some((warning) => warning.studentId === entry.studentId && existingWarningKeys.has(`${warning.studentId}:${reason}`))) return []
+        const now = new Date()
+        return [{
+          studentId: entry.studentId,
+          days: entry._count._all,
+          action: escalation.action,
+          data: { studentId: entry.studentId, issuedBy: actor.id, issuedByName: actor.name, issuedByRole: actor.role, type: 'ABSENCE', reason, deduction: 0, severity: `THRESHOLD_${entry._count._all}`, isResolved: false, issuedAt: now, issuedDateOnly: getDateOnly(now), issuedTimeOnly: getTimeOnly(now) },
+        }]
+      })
+      const createdWarnings = await prisma.$transaction(escalationCreates.map((item) => prisma.warning.create({ data: item.data })))
+      createdWarnings.forEach((warning, index) => {
+        const item = escalationCreates[index]
+        escalations.push({ studentId: item.studentId, days: item.days, warningId: warning.id, action: item.action })
+      })
     }
 
     const statusByDivision = new Map<string, Record<string, string>>()

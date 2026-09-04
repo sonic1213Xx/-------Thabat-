@@ -13,6 +13,8 @@ import {
 } from "@/lib/export-gradebook";
 import { getSession } from "@/lib/auth";
 import { useLanguage } from "@/components/language-provider";
+import { useToast } from "@/components/toast-provider";
+import { notifyPdfComingSoon, runExport } from "@/lib/export-feedback";
 
 export type GradebookRow = GradebookStudent;
 type GradeCategory = { key: string; label: string; max: number };
@@ -48,6 +50,7 @@ export function GradebookTable({
   readOnly?: boolean;
 }) {
   const { locale } = useLanguage();
+  const { showToast: exportToast, updateToast } = useToast();
   const labels =
     locale === "ar"
       ? {
@@ -419,15 +422,7 @@ export function GradebookTable({
           <button
             type="button"
             onClick={() =>
-              void exportGradebookToExcel(
-                divisionName,
-                rows,
-                [],
-                customScores,
-                finalMaximum,
-                categorySettings,
-                selectedPeriod,
-              )
+              void runExport(() => exportGradebookToExcel(divisionName, rows, [], customScores, finalMaximum, categorySettings, selectedPeriod), exportToast, updateToast)
             }
             className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
@@ -436,13 +431,7 @@ export function GradebookTable({
           <button
             type="button"
             onClick={() =>
-              exportGradebookToPdf(
-                divisionName,
-                rows,
-                categorySettings,
-                finalMaximum,
-                selectedPeriod,
-              )
+              notifyPdfComingSoon(exportToast)
             }
             className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
           >
@@ -452,7 +441,7 @@ export function GradebookTable({
             <button
               type="button"
               onClick={() =>
-                void exportEmptyGradebookTemplates(allDivisionCodes)
+                void runExport(() => exportEmptyGradebookTemplates(allDivisionCodes), exportToast, updateToast)
               }
               disabled={!allDivisionCodes.length}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"

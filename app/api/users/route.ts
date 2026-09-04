@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { getRoleDefinition } from '@/types/roles'
 
 type UserBody = { id?: string; name?: string; password?: string; role?: string; divisions?: string[]; subjectsTaught?: string[]; teachingAssignments?: unknown[] }

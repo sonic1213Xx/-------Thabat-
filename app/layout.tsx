@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { LanguageProvider } from '@/components/language-provider'
 import { STORAGE_KEYS } from '@/lib/storage'
 import { cn } from '@/lib/utils'
+import { ToastProvider } from '@/components/toast-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -34,7 +35,7 @@ export default function RootLayout({
           disableTransitionOnChange
           storageKey={STORAGE_KEYS.theme}
         >
-          <LanguageProvider>{children}</LanguageProvider>
+          <LanguageProvider><ToastProvider>{children}</ToastProvider></LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

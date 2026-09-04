@@ -20,7 +20,9 @@ import { getGradeLevelArabic } from '@/lib/utils'
 import { can } from '@/lib/roles'
 import { getProfiles, getSession, type TeachingAssignment } from '@/lib/auth'
 import { GradebookTable, type GradebookRow } from '@/components/gradebook-table'
-import { exportEmptyGradebookTemplates, exportEmptyGradebookTemplatesToPdf } from '@/lib/export-gradebook'
+import { exportEmptyGradebookTemplates as exportGradebookTemplates } from '@/lib/export-gradebook'
+import { useToast } from '@/components/toast-provider'
+import { notifyPdfComingSoon, runExport } from '@/lib/export-feedback'
 import { TeacherInspectionView, type TeacherProfile } from '@/components/teacher-inspection-view'
 
 interface StudentRecord {
@@ -42,6 +44,10 @@ interface StudentRecord {
 
 export default function StudentsPage() {
   const { t, locale } = useLanguage()
+  const { showToast, updateToast } = useToast()
+  const exportEmptyGradebookTemplates = (divisions: string[]) =>
+    runExport(() => exportGradebookTemplates(divisions), showToast, updateToast)
+  const exportEmptyGradebookTemplatesToPdf = (_divisions: string[]) => notifyPdfComingSoon(showToast)
   const [students, setStudents] = useState<StudentRecord[]>([])
   const [divisions, setDivisions] = useState<Array<{ id: string; code: string; name: string }>>([])
   const [availableDivisionCodes, setAvailableDivisionCodes] = useState<string[]>([])

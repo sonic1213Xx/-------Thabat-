@@ -1,9 +1,5 @@
-import { PrismaClient } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
-
-const globalForPrisma = globalThis as typeof globalThis & { prisma?: PrismaClient }
-const prisma = globalForPrisma.prisma ?? new PrismaClient()
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+import { prisma } from '@/lib/prisma'
 
 function previousDate(value?: string) {
   const date = value ? new Date(`${value}T00:00:00Z`) : new Date()

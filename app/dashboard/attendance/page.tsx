@@ -7,7 +7,8 @@ import { AttendanceStatusSelect } from "@/components/ui/attendance-status-select
 import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
 import { exportAttendanceWorkbook } from "@/lib/export-attendance-fixed";
-import { exportAttendancePdf } from "@/lib/export-attendance-pdf";
+import { useToast } from "@/components/toast-provider";
+import { notifyPdfComingSoon, runExport } from "@/lib/export-feedback";
 import { fetchCached, invalidateCached } from "@/lib/client-cache";
 import { AttendanceLogsModal, type AttendanceLogRow } from "@/components/attendance/attendance-logs-modal";
 import { StudentAttendanceModal } from "@/components/attendance/student-attendance-modal";
@@ -45,6 +46,7 @@ const options = (english: boolean) => [
 
 export default function AttendancePage() {
   const { dir, locale, t } = useLanguage();
+  const { showToast, updateToast } = useToast();
   const english = locale === "en";
   const session = getSession();
   const profile = getCurrentProfile();
@@ -291,7 +293,7 @@ export default function AttendancePage() {
     status: statuses[student.id] ?? "UNMARKED",
   });
   const exportExcel = () =>
-    void exportAttendanceWorkbook(
+    exportAttendanceWorkbook(
       attendanceTemplateDivisions,
       date,
       students.map(exportRecord),
@@ -302,20 +304,10 @@ export default function AttendancePage() {
       session?.id,
     );
   const exportEmptyAttendanceTemplates = exportExcel;
-  const exportPdf = () =>
-    exportAttendancePdf(
-      students.map(exportRecord),
-      attendanceTemplateDivisions,
-      date,
-      {
-        name: profile?.name || session?.name || "غير محدد",
-        role: profile?.role || session?.role || "TEACHER",
-      },
-    );
-  const runExport = () => {
+  const handleExport = () => {
     if (!attendanceTemplateDivisions.length) return;
-    if (exportType === "PDF") void exportPdf();
-    else void exportExcel();
+    if (exportType === "PDF") notifyPdfComingSoon(showToast);
+    else void runExport(exportExcel, showToast, updateToast);
     setExportPanelOpen(false);
   };
   const text = english
@@ -517,7 +509,7 @@ export default function AttendancePage() {
               </div>
               <div className="mt-6 flex justify-end gap-2 border-t border-border pt-4">
                 <button type="button" onClick={() => setExportPanelOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold">{english ? "Cancel" : "إلغاء"}</button>
-                <button type="button" onClick={runExport} disabled={!attendanceTemplateDivisions.length || (exportType === "PDF" && !students.length)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{english ? `Export ${exportType}` : `تصدير ${exportType === "PDF" ? "PDF" : "Excel"}`}</button>
+                <button type="button" onClick={handleExport} disabled={!attendanceTemplateDivisions.length || (exportType === "PDF" && !students.length)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{english ? `Export ${exportType}` : `تصدير ${exportType === "PDF" ? "PDF" : "Excel"}`}</button>
               </div>
             </div>
           </div>,

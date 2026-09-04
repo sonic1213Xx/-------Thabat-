@@ -1,30 +1,15 @@
 import { PrismaClient } from '@prisma/client'
 
-const getConnectionLimitedUrl = () => {
-  const databaseUrl = process.env.DATABASE_URL
-  if (!databaseUrl) return undefined
-
-  const url = new URL(databaseUrl)
-  url.searchParams.set('connection_limit', '1')
-  return url.toString()
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
 }
 
-// DATABASE_URL should be the pooled PgBouncer URL in production. Prisma CLI uses
-// POSTGRES_URL through the schema's directUrl for migrations and db push.
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  })
 
-const prismaClientSingleton = () => {
-  const databaseUrl = getConnectionLimitedUrl()
-  return databaseUrl
-    ? new PrismaClient({ datasources: { db: { url: databaseUrl } } })
-    : new PrismaClient()
-}
-
-const globalForPrisma = globalThis as typeof globalThis & {
-  prismaGlobal: ReturnType<typeof prismaClientSingleton>
-}
-
-const prisma = globalForPrisma.prismaGlobal ?? prismaClientSingleton()
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
 export default prisma
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prismaGlobal = prisma

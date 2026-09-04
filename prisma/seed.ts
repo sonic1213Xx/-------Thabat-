@@ -1,9 +1,7 @@
-import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 import { formatRelativeTimeArabic, getDateOnly, getTimeOnly } from '../lib/utils'
-
-const prisma = new PrismaClient()
+import { prisma } from '../lib/prisma'
 
 async function main() {
   await prisma.auditLog.deleteMany()

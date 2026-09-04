@@ -1,16 +1,7 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { formatRelativeTimeArabic } from '@/lib/utils'
-
-const globalForPrisma = globalThis as typeof globalThis & {
-  prisma?: PrismaClient
-}
-
-const prisma = globalForPrisma.prisma ?? new PrismaClient()
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma
-}
+import { prisma } from '@/lib/prisma'
 
 function normalizePositiveInteger(value: string | null, fallback: number, max?: number) {
   const parsed = Number(value ?? String(fallback))
