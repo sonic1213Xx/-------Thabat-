@@ -25,12 +25,13 @@ import { ConfirmModal } from "@/components/dashboard/confirm-modal";
 import { ROLE_DEFINITIONS } from "@/types/roles";
 import { useLanguage } from "@/components/language-provider";
 import { Modal } from "@/components/ui/modal";
+import { isCreatorRole } from "@/lib/permissions";
 
 export default function RolesPage() {
   const { t, locale } = useLanguage();
   const currentSession = getSession();
   const roleOptions: Array<{ value: AppRole; label: string }> =
-    ROLE_DEFINITIONS.filter(({ key }) => key !== "CURATOR" && (currentSession?.role !== "PRINCIPAL" || key !== "PRINCIPAL")).map((role) => ({
+    ROLE_DEFINITIONS.filter(({ key }) => !isCreatorRole(key) && (currentSession?.role !== "PRINCIPAL" || key !== "PRINCIPAL")).map((role) => ({
       value: role.key,
       label: locale === "ar" ? `${role.nameAr} / ${role.nameEn}` : role.nameEn,
     }));
@@ -42,7 +43,7 @@ export default function RolesPage() {
     can_edit_students: locale === "ar" ? "تعديل الطلاب" : "Edit students",
   };
   useEffect(() => {
-    if (getSession()?.role !== "CURATOR" && getSession()?.role !== "PRINCIPAL") window.location.href = "/dashboard";
+    if (!isCreatorRole(getSession()?.role) && getSession()?.role !== "PRINCIPAL") window.location.href = "/dashboard";
     void fetch("/api/divisions")
       .then((response) => response.json())
       .then((json) =>
@@ -70,7 +71,7 @@ export default function RolesPage() {
   }));
   const [adminId, setAdminId] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
-  const [verificationActive, setVerificationActive] = useState(currentSession?.role === "PRINCIPAL");
+  const [verificationActive, setVerificationActive] = useState(isCreatorRole(currentSession?.role) || currentSession?.role === "PRINCIPAL");
   const [verificationMessage, setVerificationMessage] = useState("");
   const [profile, setProfile] = useState({
     id: "",
@@ -115,8 +116,8 @@ export default function RolesPage() {
   const filteredDivisions = profile.gradeLevel
     ? divisions.filter((code) => code.startsWith(profile.gradeLevel))
     : [];
-  const authorized = currentSession?.role === "PRINCIPAL" || verificationActive;
-  const canEditPermissions = currentSession?.role === "CURATOR";
+  const authorized = isCreatorRole(currentSession?.role) || currentSession?.role === "PRINCIPAL" || verificationActive;
+  const canEditPermissions = isCreatorRole(currentSession?.role);
   const activateCreatorMode = () => {
     if (adminId === "10" && adminPassword === "admin123") {
       setVerificationActive(true);
@@ -151,7 +152,7 @@ export default function RolesPage() {
     saveRoles(next);
   };
   const toggle = (role: RoleDefinition, permission: Permission) =>
-    !canEditPermissions || role.key === "CURATOR" ? undefined : updateRoles(
+    !canEditPermissions || isCreatorRole(role.key) ? undefined : updateRoles(
       roles.map((item) =>
         item.key === role.key
           ? {
@@ -321,7 +322,7 @@ export default function RolesPage() {
               onClick={() => setPermissionRoleKey(role.key)}
               className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition ${permissionRole?.key === role.key ? "bg-emerald-600 text-white" : "bg-muted text-card-foreground/70 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40"}`}
             >
-              {role.key === "CURATOR"
+              {isCreatorRole(role.key)
                 ? locale === "ar"
                   ? "المُنشئ"
                   : "Creator"
@@ -336,7 +337,7 @@ export default function RolesPage() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="font-bold text-card-foreground">
-                  {permissionRole.key === "CURATOR"
+                  {isCreatorRole(permissionRole.key)
                     ? locale === "ar"
                       ? "المُنشئ"
                       : "Creator"
@@ -349,7 +350,7 @@ export default function RolesPage() {
                   {locale === "ar" ? "صلاحية مفعلة" : "enabled permissions"}
                 </p>
               </div>
-              {permissionRole.key === "CURATOR" && (
+              {isCreatorRole(permissionRole.key) && (
                 <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                   {locale === "ar" ? "صلاحيات كاملة" : "Full access"}
                 </span>
@@ -367,13 +368,13 @@ export default function RolesPage() {
                   <div className="space-y-2">
                     {PERMISSIONS.filter((permission) => resource === "general" ? !permission.key.includes(":") : permission.key.startsWith(`${resource}:`)).map((permission) => {
                       const enabled =
-                        permissionRole.key === "CURATOR" ||
+                          isCreatorRole(permissionRole.key) ||
                         permissionRole.permissions.includes(permission.key);
                       return (
                         <button
                           key={permission.key}
                           type="button"
-                          disabled={!canEditPermissions || permissionRole.key === "CURATOR"}
+                          disabled={!canEditPermissions || isCreatorRole(permissionRole.key)}
                           onClick={() => toggle(permissionRole, permission.key)}
                           aria-pressed={enabled}
                           className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-start text-sm transition ${enabled ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300" : "border-border bg-card text-card-foreground/60 hover:border-emerald-300"} disabled:cursor-default disabled:opacity-80`}

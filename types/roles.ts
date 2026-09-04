@@ -23,6 +23,7 @@ const principalPermissions: Permission[] = [
 ]
 
 export const ROLE_DEFINITIONS: readonly StaffRoleDefinition[] = [
+  { key: 'CREATOR', nameAr: 'المُنشئ', nameEn: 'Creator', descriptionAr: 'إدارة كاملة للنظام دون قيود.', descriptionEn: 'Unrestricted super-admin access.', permissions: principalPermissions, assignedDivisions: false },
   { key: 'CURATOR', nameAr: 'المُنشئ', nameEn: 'Creator', descriptionAr: 'إدارة كاملة للنظام.', descriptionEn: 'Full system administration.', permissions: principalPermissions, assignedDivisions: false },
   { key: 'PRINCIPAL', nameAr: 'مدير المدرسة', nameEn: 'Principal', descriptionAr: 'الإشراف العام والاعتمادات النهائية.', descriptionEn: 'Overall monitoring and final approvals.', permissions: principalPermissions, assignedDivisions: false },
   { key: 'VP_STUDENT_AFFAIRS', nameAr: 'وكيل شؤون الطلاب', nameEn: 'VP Student Affairs', descriptionAr: 'السلوك والحضور وتصاريح الخروج.', descriptionEn: 'Behavior, attendance, gate passes, and discipline.', permissions: [...readWrite('students'), ...readWrite('attendance'), ...readWrite('warnings'), ...readWrite('incidents'), ...readWrite('gate_passes'), 'gate_passes:approve', 'reports:read'], assignedDivisions: false },

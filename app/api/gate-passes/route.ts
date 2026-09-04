@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
-import { requirePermission } from '@/lib/permissions'
+import { isCreatorRole, requirePermission } from '@/lib/permissions'
 
 const globalForPrisma = globalThis as typeof globalThis & { prisma?: PrismaClient }
 const prisma = globalForPrisma.prisma ?? new PrismaClient()
@@ -8,7 +8,7 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
 export async function GET(request: NextRequest) {
   const role = request.headers.get('x-thabat-role')
-  if (role !== 'CURATOR' && role !== 'PRINCIPAL' && role !== 'VP_STUDENT_AFFAIRS' && role !== 'VICE_PRINCIPAL' && role !== 'GATE_SECURITY') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!isCreatorRole(role) && role !== 'PRINCIPAL' && role !== 'VP_STUDENT_AFFAIRS' && role !== 'VICE_PRINCIPAL' && role !== 'GATE_SECURITY') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const status = request.nextUrl.searchParams.get('status') ?? undefined
   const passes = await prisma.gatePass.findMany({ where: status ? { status } : undefined, include: { student: { select: { fullName: true, divisionCode: true, academicId: true } } }, orderBy: { createdAt: 'desc' }, take: 100 })
   return NextResponse.json({ data: passes })

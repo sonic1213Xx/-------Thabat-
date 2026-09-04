@@ -1,7 +1,12 @@
 import type { NextRequest } from 'next/server'
 import { getRoleDefinition, type Permission, type PermissionAction, type PermissionResource, type RoleKey } from '@/types/roles'
 
+export function isCreatorRole(userRole: string | null | undefined): boolean {
+  return userRole === 'CREATOR' || userRole === 'CURATOR'
+}
+
 export function hasPermission(userRole: RoleKey | string | null | undefined, resource: PermissionResource, action: PermissionAction): boolean {
+  if (isCreatorRole(userRole)) return true
   if (!userRole) return false
   return getRoleDefinition(userRole)?.permissions.includes(`${resource}:${action}`) ?? false
 }

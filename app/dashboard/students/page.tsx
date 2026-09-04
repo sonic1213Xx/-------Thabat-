@@ -175,7 +175,7 @@ export default function StudentsPage() {
         .includes(query),
     )
   }, [deferredStudentSearch, students])
-  const canInspectTeachers = currentRole === 'CURATOR' || currentRole === 'PRINCIPAL' || currentRole === 'VICE_PRINCIPAL'
+  const canInspectTeachers = currentRole === 'CREATOR' || currentRole === 'CURATOR' || currentRole === 'PRINCIPAL' || currentRole === 'VICE_PRINCIPAL'
   const isTeacher = currentRole === 'TEACHER'
   const canEditStudents = currentRole ? can(currentRole, 'can_edit_students') : false
   const canDeleteStudents = currentRole ? can(currentRole, 'can_delete_records') : false

@@ -1,5 +1,5 @@
 import type { AppRole } from './auth'
-import { hasPermission } from './permissions'
+import { hasPermission, isCreatorRole } from './permissions'
 import { ROLE_DEFINITIONS, type Permission as RbacPermission } from '@/types/roles'
 
 type LegacyPermission = 'can_issue_warnings' | 'can_approve_gate_passes' | 'can_delete_records' | 'can_export_data' | 'can_edit_students'
@@ -53,7 +53,7 @@ export function getRoles(): RoleDefinition[] {
     return DEFAULT_ROLES.map((definition) => {
       const stored = saved.find((item) => item.key === definition.key)
       const legacyOnly = stored && (stored.permissions.length === 0 || stored.permissions.every((permission) => typeof permission === 'string' && !permission.includes(':')))
-      return definition.key === 'CURATOR' || legacyOnly ? definition : stored ?? definition
+      return isCreatorRole(definition.key) || legacyOnly ? definition : stored ?? definition
     })
   } catch {
     return DEFAULT_ROLES
@@ -61,11 +61,11 @@ export function getRoles(): RoleDefinition[] {
 }
 
 export function saveRoles(roles: RoleDefinition[]): void {
-  if (typeof window !== 'undefined') localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(roles.map((role) => role.key === 'CURATOR' ? DEFAULT_ROLES.find((definition) => definition.key === 'CURATOR')! : role)))
+  if (typeof window !== 'undefined') localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(roles.map((role) => isCreatorRole(role.key) ? DEFAULT_ROLES.find((definition) => definition.key === role.key) ?? DEFAULT_ROLES.find((definition) => isCreatorRole(definition.key))! : role)))
 }
 
 export function can(role: AppRole | string, permission: Permission): boolean {
-  if (role === 'CURATOR') return true
+  if (isCreatorRole(role)) return true
   const permissionMap: Record<LegacyPermission, [Parameters<typeof hasPermission>[1], Parameters<typeof hasPermission>[2]]> = {
     can_issue_warnings: ['warnings', 'create'],
     can_approve_gate_passes: ['gate_passes', 'approve'],

@@ -22,7 +22,7 @@ const actionLabels: Record<string, { ar: string; en: string }> = {
   GRADEBOOK_SCORE_UPDATED: { ar: 'تحديث درجة', en: 'Grade updated' }, USER_LOGIN: { ar: 'تسجيل دخول', en: 'User signed in' }, BULK_IMPORT: { ar: 'استعادة من Excel', en: 'Bulk import' },
 }
 const typeLabels: Record<string, { ar: string; en: string }> = { Student: { ar: 'طلاب', en: 'Students' }, Warning: { ar: 'إنذارات', en: 'Warnings' }, Attendance: { ar: 'حضور', en: 'Attendance' }, Gradebook: { ar: 'درجات', en: 'Gradebook' }, Incident: { ar: 'وقائع', en: 'Incidents' }, GatePass: { ar: 'تصاريح', en: 'Gate passes' }, User: { ar: 'مستخدمون', en: 'Users' } }
-const roleLabels: Record<string, { ar: string; en: string }> = { PRINCIPAL: { ar: 'مدير المدرسة', en: 'Principal' }, VICE_PRINCIPAL: { ar: 'وكيل المدرسة', en: 'Vice principal' }, TEACHER: { ar: 'معلم', en: 'Teacher' }, CURATOR: { ar: 'المنشئ', en: 'Creator' } }
+ const roleLabels: Record<string, { ar: string; en: string }> = { PRINCIPAL: { ar: 'مدير المدرسة', en: 'Principal' }, VICE_PRINCIPAL: { ar: 'وكيل المدرسة', en: 'Vice principal' }, TEACHER: { ar: 'معلم', en: 'Teacher' }, CREATOR: { ar: 'المنشئ', en: 'Creator' }, CURATOR: { ar: 'المنشئ', en: 'Creator' } }
 
 function eventText(value: string | undefined, labels: Record<string, { ar: string; en: string }>, english: boolean, fallback: string) { return labels[value ?? '']?.[english ? 'en' : 'ar'] ?? value ?? fallback }
 function detailsText(value: string | undefined, english: boolean) {

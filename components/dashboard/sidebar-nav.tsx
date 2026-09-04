@@ -29,6 +29,7 @@ import { Modal } from '@/components/ui/modal'
 import { useLanguage } from '@/components/language-provider'
 import { getSession } from '@/lib/auth'
 import { can } from '@/lib/roles'
+import { isCreatorRole } from '@/lib/permissions'
 
 export function SidebarNav() {
   const { dir, t, locale } = useLanguage()
@@ -45,13 +46,13 @@ export function SidebarNav() {
     { label: t('warnings'), href: '/dashboard/warnings', icon: AlertCircle, visible: session?.role !== 'TEACHER' },
     { label: t('vicePrincipalCenter'), href: '/dashboard/vice-principal', icon: ShieldAlert, visible: Boolean(session && (can(session.role, 'can_approve_gate_passes') || session.role === 'GATE_SECURITY')) },
     { label: t('attendance'), href: '/dashboard/attendance', icon: CalendarCheck },
-    { label: t('teachersLounge'), href: '/dashboard/teachers-lounge', icon: Coffee, visible: session?.role === 'CURATOR' || session?.role === 'TEACHER' || session?.role === 'PRINCIPAL' || session?.role === 'VICE_PRINCIPAL' },
+    { label: t('teachersLounge'), href: '/dashboard/teachers-lounge', icon: Coffee, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'TEACHER' || session.role === 'PRINCIPAL' || session.role === 'VICE_PRINCIPAL')) },
     { label: t('auditLog'), href: '/dashboard/audit-log', icon: Clock },
     { label: t('reports'), href: '/dashboard/reports', icon: BarChart3 },
     { label: t('settings'), href: '/dashboard/settings', icon: Settings },
-    { label: t('rolesAndPermissions'), href: '/dashboard/settings/roles', icon: ShieldAlert, visible: session?.role === 'CURATOR' || session?.role === 'PRINCIPAL' },
-    { label: locale === 'ar' ? 'ماسح تصاريح الخروج' : 'Gate pass scanner', href: '/dashboard/gate-security', icon: ScanLine, visible: session?.role === 'CURATOR' || session?.role === 'PRINCIPAL' || session?.role === 'GATE_SECURITY' },
-    { label: locale === 'ar' ? 'عمليات النقل المدرسي' : 'Transportation', href: '/dashboard/transportation', icon: Bus, visible: session?.role === 'CURATOR' || session?.role === 'PRINCIPAL' || session?.role === 'TRANSPORTATION_SUPERVISOR' },
+    { label: t('rolesAndPermissions'), href: '/dashboard/settings/roles', icon: ShieldAlert, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL')) },
+    { label: locale === 'ar' ? 'ماسح تصاريح الخروج' : 'Gate pass scanner', href: '/dashboard/gate-security', icon: ScanLine, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL' || session.role === 'GATE_SECURITY')) },
+    { label: locale === 'ar' ? 'عمليات النقل المدرسي' : 'Transportation', href: '/dashboard/transportation', icon: Bus, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL' || session.role === 'TRANSPORTATION_SUPERVISOR')) },
   ]
 
   const helpContent = useMemo(() => {
