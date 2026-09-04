@@ -5,8 +5,25 @@ import { getRoleDefinition } from '@/types/roles'
 
 type UserBody = { id?: string; name?: string; password?: string; role?: string; divisions?: string[]; subjectsTaught?: string[] }
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 function responseUser(user: { id: string; name: string; role: string; assignedDivisions: string; subjectsTaught: string }) {
   return { id: user.id, name: user.name, role: user.role, assigned_divisions: JSON.parse(user.assignedDivisions || '[]'), subjectsTaught: JSON.parse(user.subjectsTaught || '[]') }
+}
+
+export async function GET() {
+  try {
+    const users = await prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true, role: true, assignedDivisions: true, subjectsTaught: true },
+    })
+    return NextResponse.json({ data: users.map(responseUser) }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (error) {
+    console.error('User list failed:', error)
+    return NextResponse.json({ error: 'Unable to load profiles.' }, { status: 500 })
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -20,7 +37,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: responseUser(user) }, { status: 201 })
   } catch (error) {
     console.error('User creation failed:', error)
-    return NextResponse.json({ error: 'Unable to create profile.' }, { status: 500 })
+    const duplicate = error instanceof Error && error.message.includes('Unique constraint')
+    return NextResponse.json({ error: duplicate ? 'This ID is already in use.' : 'Unable to create profile.' }, { status: duplicate ? 409 : 500 })
   }
 }
 

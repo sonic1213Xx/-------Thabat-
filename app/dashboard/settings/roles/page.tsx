@@ -82,6 +82,32 @@ export default function RolesPage() {
     assigned_divisions: [] as string[],
     teachingAssignments: [] as TeachingAssignment[],
   });
+  useEffect(() => {
+    const loadDatabaseProfiles = async () => {
+      try {
+        const response = await fetch('/api/users', { cache: 'no-store' });
+        if (!response.ok) return;
+        const json = await response.json() as { data?: Array<{ id: string; name: string; role: AppRole; assigned_divisions?: string[]; subjectsTaught?: string[] }> };
+        const localProfiles = getProfiles();
+        const databaseProfiles: Profile[] = (json.data ?? []).map((item) => ({
+          id: item.id,
+          name: item.name,
+          role: item.role,
+          password: localProfiles.find((localProfile) => localProfile.id === item.id)?.password ?? '',
+          createdAt: '',
+          lastActivity: '',
+          assigned_divisions: item.assigned_divisions ?? [],
+          subjectsTaught: item.subjectsTaught ?? [],
+          subject: item.subjectsTaught?.[0] ?? '',
+        }));
+        const localOnlyProfiles = localProfiles.filter((localProfile) => !databaseProfiles.some((databaseProfile) => databaseProfile.id === localProfile.id));
+        setProfiles([...databaseProfiles, ...localOnlyProfiles]);
+      } catch {
+        setProfiles(getProfiles());
+      }
+    };
+    void loadDatabaseProfiles();
+  }, []);
   const selectedRole = ROLE_DEFINITIONS.find(
     (role) => role.key === profile.role,
   );
