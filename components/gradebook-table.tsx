@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  Download, Maximize2, Plus, Printer, RefreshCw, Save, Settings, Trash2,
+  Download, Loader2, Maximize2, Plus, Printer, RefreshCw, Save, Settings, Trash2,
 } from "lucide-react";
 import {
   exportEmptyGradebookTemplates,
@@ -79,6 +79,7 @@ export function GradebookTable({
   const [rows, setRows] = useState(students);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<"success" | "error" | null>(null);
   const [finalMaximum, setFinalMaximum] = useState(100);
   const [categorySettings, setCategorySettings] =
     useState<GradeCategory[]>(defaultCategories);
@@ -207,37 +208,6 @@ export function GradebookTable({
     );
   };
 
-  const giveFullMarks = () => {
-    setRows(
-      (current) =>
-        current.map((row) =>
-          Object.fromEntries([
-            ["id", row.id],
-            ["fullName", row.fullName],
-            ...categorySettings
-              .filter((category) =>
-                scoreFields.some((field) => field.key === category.key),
-              )
-              .map((category) => [category.key, category.max]),
-          ]),
-        ) as GradebookStudent[],
-    );
-    setCustomScores((current) =>
-      Object.fromEntries(
-        rows.map((row) => [
-          row.id,
-          Object.fromEntries(
-            categorySettings
-              .filter(
-                (category) =>
-                  !scoreFields.some((field) => field.key === category.key),
-              )
-              .map((category) => [category.key, category.max]),
-          ),
-        ]),
-      ),
-    );
-  };
   const saveCustomization = () => {
     localStorage.setItem(
       settingsKey,
@@ -290,6 +260,28 @@ export function GradebookTable({
     (sum, category) => sum + category.max,
     0,
   );
+  const giveFullMarks = () => {
+    const nextRows = rows.map((row) => {
+      const nextRow = { ...row } as GradebookStudent;
+      visibleCategories.forEach((category) => {
+        if (scoreFields.some((field) => field.key === category.key))
+          (nextRow as unknown as Record<string, number | string | null>)[category.key] = category.max;
+      });
+      return nextRow;
+    });
+    const nextCustomScores = { ...customScores };
+    rows.forEach((row) => {
+      const nextCustom = { ...(nextCustomScores[row.id] ?? {}) };
+      visibleCategories.forEach((category) => {
+        if (!scoreFields.some((field) => field.key === category.key))
+          nextCustom[category.key] = category.max;
+      });
+      nextCustomScores[row.id] = nextCustom;
+    });
+    setRows(nextRows);
+    setCustomScores(nextCustomScores);
+    void saveScores(nextRows, nextCustomScores);
+  };
   const setColumnScore = (
     studentId: string,
     column: GradeCategory,
@@ -305,23 +297,35 @@ export function GradebookTable({
         [studentId]: { ...current[studentId], [column.key]: parsed },
       }));
   };
-  const saveScores = async () => {
+  const showToast = (kind: "success" | "error") => {
+    setToast(kind);
+    window.setTimeout(() => setToast(null), 3500);
+  };
+  const saveScores = async (
+    rowsToSave = rows,
+    customScoresToSave = customScores,
+  ): Promise<boolean> => {
     const actorId = teacherId ?? getSession()?.id;
-    if (!actorId) return;
+    if (!actorId) {
+      showToast("error");
+      return false;
+    }
     setSaving(true);
     setMessage("");
     localStorage.setItem(
       settingsKey,
       JSON.stringify({ finalMaximum, fields: categorySettings }),
     );
-    localStorage.setItem(scoresKey, JSON.stringify(customScores));
+    localStorage.setItem(scoresKey, JSON.stringify(customScoresToSave));
     const fixedFields = categorySettings.filter(({ key }) =>
       scoreFields.some((field) => field.key === key),
     );
-    const responses = await Promise.all(
-      rows.flatMap((row) =>
-        fixedFields.length
-          ? fixedFields.map(({ key }) =>
+    let responses: Response[] = [];
+    try {
+      responses = await Promise.all(
+        rowsToSave.flatMap((row) =>
+          fixedFields.length
+            ? fixedFields.map(({ key }) =>
               fetch("/api/gradebook", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -333,12 +337,12 @@ export function GradebookTable({
                   updatedBy: actorId,
                   field: key,
                   value: row[key as keyof GradebookStudent] ?? null,
-                  customScores: customScores[row.id] ?? {},
+                  customScores: customScoresToSave[row.id] ?? {},
                 }),
               }),
             )
           : [
-              fetch("/api/gradebook", {
+                fetch("/api/gradebook", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -347,12 +351,18 @@ export function GradebookTable({
                   subject,
                   teacherId: actorId,
                   updatedBy: actorId,
-                  customScores: customScores[row.id] ?? {},
+                  customScores: customScoresToSave[row.id] ?? {},
                 }),
-              }),
-            ],
-      ),
-    );
+                }),
+              ],
+        ),
+      );
+    } catch {
+      showToast("error");
+      setMessage(locale === "ar" ? "فشل في حفظ الدرجات، يرجى المحاولة مرة أخرى" : "Failed to save grades, please try again");
+      setSaving(false);
+      return false;
+    }
     const saved =
       responses.length > 0 && responses.every((response) => response.ok);
     if (saved) {
@@ -360,13 +370,10 @@ export function GradebookTable({
         `/api/gradebook?divisionId=${encodeURIComponent(divisionName)}&subject=${encodeURIComponent(subject)}&teacherId=${encodeURIComponent(actorId)}`,
       );
       if (!response.ok) {
-        setMessage(
-          locale === "ar"
-            ? "تعذر التحقق من حفظ الدرجات."
-            : "Unable to verify saved grades.",
-        );
+        showToast("error");
+        setMessage(locale === "ar" ? "فشل في حفظ الدرجات، يرجى المحاولة مرة أخرى" : "Failed to save grades, please try again");
         setSaving(false);
-        return;
+        return false;
       }
       const json = (await response.json()) as { data?: GradebookStudent[] };
       const persisted = new Map(
@@ -376,16 +383,15 @@ export function GradebookTable({
         current.map((row) => ({ ...row, ...(persisted.get(row.id) ?? {}) })),
       );
     }
-    setMessage(
-      saved
-        ? locale === "ar"
-          ? "تم حفظ الدرجات."
-          : "Grades saved."
-        : locale === "ar"
-          ? "تعذر حفظ الدرجات."
-          : "Unable to save grades.",
-    );
+    if (saved) {
+      showToast("success");
+      setMessage(locale === "ar" ? "تم حفظ الدرجات بنجاح" : "Grades saved successfully");
+    } else {
+      showToast("error");
+      setMessage(locale === "ar" ? "فشل في حفظ الدرجات، يرجى المحاولة مرة أخرى" : "Failed to save grades, please try again");
+    }
     setSaving(false);
+    return saved;
   };
 
   return (
@@ -407,9 +413,10 @@ export function GradebookTable({
             <button
               type="button"
               onClick={giveFullMarks}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
             >
-              <Maximize2 className="h-4 w-4" /> {labels.fullMarks}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Maximize2 className="h-4 w-4" />} {saving ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : labels.fullMarks}
             </button>
           )}
           {!readOnly && (
@@ -626,6 +633,11 @@ export function GradebookTable({
         >
           {message}
         </p>
+      )}
+      {toast && (
+        <div role="status" aria-live="polite" className={`fixed end-5 top-5 z-[1200] rounded-xl border px-4 py-3 text-sm font-semibold shadow-xl ${toast === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200" : "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/60 dark:text-red-200"}`}>
+          {toast === "success" ? (locale === "ar" ? "تم حفظ الدرجات بنجاح" : "Grades saved successfully") : (locale === "ar" ? "فشل في حفظ الدرجات، يرجى المحاولة مرة أخرى" : "Failed to save grades, please try again")}
+        </div>
       )}
       <div className="space-y-3 p-3 md:hidden">
         {rows.map((row, index) => {
