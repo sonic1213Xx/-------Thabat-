@@ -417,7 +417,7 @@ export default function AttendancePage() {
               <Save className="h-4 w-4" />
               {saving ? text.saving : text.save}
             </button>
-            <button type="button" onClick={() => setLogsOpen(true)} className="inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border border-emerald-600 px-2 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 md:gap-2 md:px-4 md:text-sm">
+            <button type="button" onClick={() => setLogsOpen(true)} className="-translate-y-1 inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border border-emerald-600 px-2 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 md:gap-2 md:px-4 md:text-sm">
               {english ? "Attendance logs" : "سجل الحضور"}
             </button>
           </div>
