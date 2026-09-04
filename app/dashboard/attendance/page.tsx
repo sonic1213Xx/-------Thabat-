@@ -9,6 +9,8 @@ import { getCurrentProfile, getSession } from "@/lib/auth";
 import { exportAttendanceWorkbook } from "@/lib/export-attendance-fixed";
 import { exportAttendancePdf } from "@/lib/export-attendance-pdf";
 import { fetchCached, invalidateCached } from "@/lib/client-cache";
+import { AttendanceLogsModal, type AttendanceLogRow } from "@/components/attendance/attendance-logs-modal";
+import { StudentAttendanceModal } from "@/components/attendance/student-attendance-modal";
 
 type Status =
   | "UNMARKED"
@@ -66,9 +68,12 @@ export default function AttendancePage() {
   const [templateSelectionReady, setTemplateSelectionReady] = useState(false);
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
   const [exportType, setExportType] = useState<"EXCEL" | "PDF">("EXCEL");
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [selectedLogStudent, setSelectedLogStudent] = useState<AttendanceLogRow | null>(null);
   const studentsRequestRef = useRef<string | null>(null);
   const attendanceRequestRef = useRef<string | null>(null);
   const hasFetchedRef = useRef<string | null>(null);
+  const [attendanceLoadedKey, setAttendanceLoadedKey] = useState<string | null>(null);
   const initialAttendanceMapRef = useRef<Map<string, { status: Status; note: string }>>(new Map());
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -162,14 +167,16 @@ export default function AttendancePage() {
   ]);
 
   useEffect(() => {
+    const requestKey = `${session?.id ?? "anonymous"}:${date}:${mode}:${divisionKey}`;
     if (!students.length || !session?.id || !divisions.length) {
       setLoadingAttendance(false);
+      setAttendanceLoadedKey(requestKey);
       return;
     }
-    const requestKey = `${session.id}:${date}:${mode}:${divisionKey}`;
     if (hasFetchedRef.current === requestKey || attendanceRequestRef.current === requestKey) return;
     hasFetchedRef.current = requestKey;
     attendanceRequestRef.current = requestKey;
+    setAttendanceLoadedKey(null);
     const load = async () => {
       setLoadingAttendance(true);
       try {
@@ -188,6 +195,7 @@ export default function AttendancePage() {
         }));
       } finally {
         setLoadingAttendance(false);
+        setAttendanceLoadedKey(requestKey);
       }
     };
     void load().catch(() => setMessage("تعذر تحميل الحضور."));
@@ -364,7 +372,8 @@ export default function AttendancePage() {
           loading: "جارٍ تحميل بيانات الحضور...",
       };
 
-        const isLoading = loadingStudents || loadingAttendance;
+        const attendanceKey = `${session?.id ?? "anonymous"}:${date}:${mode}:${divisionKey}`;
+        const isLoading = loadingStudents || loadingAttendance || (Boolean(students.length && divisions.length && session?.id) && attendanceLoadedKey !== attendanceKey);
 
   return (
     <div className="attendance-page space-y-6" dir={dir}>
@@ -411,6 +420,9 @@ export default function AttendancePage() {
             >
               <Save className="h-4 w-4" />
               {saving ? text.saving : text.save}
+            </button>
+            <button type="button" onClick={() => setLogsOpen(true)} className="inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border border-emerald-600 px-2 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 md:gap-2 md:px-4 md:text-sm">
+              {english ? "Attendance logs" : "سجل الحضور"}
             </button>
           </div>
         </div>
@@ -531,6 +543,8 @@ export default function AttendancePage() {
           <div className="w-full max-w-md space-y-3"><p className="font-semibold text-slate-700 dark:text-slate-200">{text.loading}</p><div className="h-3 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-3 w-4/5 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-3 w-3/5 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /></div>
         </div>
       )}
+      <AttendanceLogsModal open={logsOpen} onClose={() => setLogsOpen(false)} english={english} onStudentClick={(student) => { setLogsOpen(false); setSelectedLogStudent(student); }} />
+      {selectedLogStudent && <StudentAttendanceModal open={true} onClose={() => setSelectedLogStudent(null)} studentId={selectedLogStudent.studentId} studentName={selectedLogStudent.studentName} />}
       <main className={`space-y-8 ${isLoading ? "hidden" : ""}`}>
         {visibleDivisions.map((group) => (
           <section

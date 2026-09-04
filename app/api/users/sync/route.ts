@@ -8,12 +8,12 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { id?: string; name?: string; role?: string; assigned_divisions?: string[] }
+    const body = await request.json() as { id?: string; name?: string; role?: string; assigned_divisions?: string[]; subjectsTaught?: string[] }
     if (!body.id || !body.name || !body.role || !getRoleDefinition(body.role)) return NextResponse.json({ error: 'Invalid profile.' }, { status: 400 })
     const user = await prisma.user.upsert({
       where: { id: body.id },
-      update: { name: body.name, role: body.role, assignedDivisions: JSON.stringify(body.assigned_divisions ?? []) },
-      create: { id: body.id, username: body.id, name: body.name, password: 'local-profile', role: body.role, isActive: true, assignedDivisions: JSON.stringify(body.assigned_divisions ?? []) },
+      update: { name: body.name, role: body.role, assignedDivisions: JSON.stringify(body.assigned_divisions ?? []), subjectsTaught: JSON.stringify(body.subjectsTaught ?? []) },
+      create: { id: body.id, username: body.id.toLowerCase(), name: body.name, password: 'local-profile', role: body.role, isActive: true, assignedDivisions: JSON.stringify(body.assigned_divisions ?? []), subjectsTaught: JSON.stringify(body.subjectsTaught ?? []) },
     })
     return NextResponse.json({ data: { id: user.id, role: user.role } })
   } catch (error) {

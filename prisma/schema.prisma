@@ -25,6 +25,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   assignedDivisions String @default("[]")
+  subjectsTaught String @default("[]")
 
   // Relations
   warnings      Warning[]

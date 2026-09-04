@@ -13,6 +13,7 @@ export type Profile = SessionUser & {
   busRouteIds?: string[]
   defaultView?: string
   teachingAssignments?: TeachingAssignment[]
+  subjectsTaught?: string[]
 }
 
 export const DEFAULT_CREDENTIALS = { id: '10', password: 'admin123', role: 'CURATOR' as AppRole, name: 'حسين' }

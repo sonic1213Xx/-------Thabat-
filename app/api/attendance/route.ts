@@ -33,6 +33,18 @@ export async function GET(request: NextRequest) {
     if (!user?.isActive) return forbidden()
     const mode = request.nextUrl.searchParams.get('mode') ?? 'SCHOOL'
     const requestedDivision = request.nextUrl.searchParams.get('divisionId')
+    if (request.nextUrl.searchParams.get('logs') === 'true') {
+      const records = await prisma.attendance.findMany({
+        where: {
+          status: { in: ['ABSENT_EXCUSED', 'ABSENT_UNEXCUSED', 'LATE', 'OTHER'] },
+          ...(user.role === 'TEACHER' ? { student: { divisionCode: { in: assignedDivisions(user) } } } : {}),
+        },
+        orderBy: [{ date: 'desc' }, { student: { fullName: 'asc' } }],
+        take: 5000,
+        select: { id: true, date: true, status: true, notes: true, student: { select: { id: true, fullName: true, divisionCode: true } } },
+      })
+      return NextResponse.json({ data: records.map((record) => ({ ...record, studentId: record.student.id, studentName: record.student.fullName, divisionCode: record.student.divisionCode, hasDoctorNote: record.status === 'ABSENT_EXCUSED' || Boolean(record.notes?.trim()) })) })
+    }
     if (user.role === 'TEACHER' && mode !== 'CLASS') return forbidden()
     if (user.role === 'TEACHER' && (!requestedDivision || !assignedDivisions(user).includes(requestedDivision))) return forbidden()
     if (request.nextUrl.searchParams.get('history') === 'true') {

@@ -136,7 +136,7 @@ export default function RolesPage() {
           : item,
       ),
     );
-  const createProfile = () => {
+  const createProfile = async () => {
     const id = profile.id.trim();
     const role = profile.role;
     if (
@@ -152,7 +152,7 @@ export default function RolesPage() {
       return;
     }
     const teachingAssignments = profile.teachingAssignments.filter((assignment) => assignment.subject.trim()).map((assignment) => ({ ...assignment, subject: assignment.subject.trim() }));
-    saveProfile({
+    const nextProfile = {
       ...profile,
       id,
       role,
@@ -163,7 +163,14 @@ export default function RolesPage() {
       subject: teachingAssignments[0]?.subject ?? "",
       gradeLevel: teachingAssignments[0]?.gradeLevel ?? null,
       assigned_divisions: Array.from(new Set(teachingAssignments.flatMap((assignment) => assignment.divisions))),
-    });
+      subjectsTaught: teachingAssignments.map((assignment) => assignment.subject),
+    };
+    const response = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, name: nextProfile.name, password: nextProfile.password, role, divisions: nextProfile.assigned_divisions, subjectsTaught: nextProfile.subjectsTaught }) });
+    if (!response.ok) {
+      alert(locale === 'ar' ? 'تعذر حفظ الملف في قاعدة البيانات.' : 'Unable to save the profile to the database.');
+      return;
+    }
+    saveProfile(nextProfile);
     setProfiles(getProfiles());
     setProfile({
       id: "",
@@ -190,11 +197,11 @@ export default function RolesPage() {
       teachingAssignments: item.teachingAssignments ?? (item.subject ? [{ id: `assignment-${item.id}`, subject: item.subject, gradeLevel: item.gradeLevel ?? null, divisions: item.assigned_divisions ?? [], attendance: true, gradebook: true }] : []),
     });
   };
-  const saveEditedProfile = () => {
+  const saveEditedProfile = async () => {
     if (!authorized || !editingProfile || !profile.name.trim() || (currentSession?.role === "PRINCIPAL" && (editingProfile.role === "PRINCIPAL" || profile.role === "PRINCIPAL"))) return;
     if (!profile.role) return;
     const teachingAssignments = profile.teachingAssignments.filter((assignment) => assignment.subject.trim()).map((assignment) => ({ ...assignment, subject: assignment.subject.trim() }));
-    saveProfile({
+    const nextProfile = {
       ...editingProfile,
       name: profile.name.trim(),
       password: profile.password,
@@ -203,7 +210,11 @@ export default function RolesPage() {
       gradeLevel: teachingAssignments[0]?.gradeLevel ?? null,
       assigned_divisions: Array.from(new Set(teachingAssignments.flatMap((assignment) => assignment.divisions))),
       teachingAssignments,
-    });
+      subjectsTaught: teachingAssignments.map((assignment) => assignment.subject),
+    };
+    const response = await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: nextProfile.id, name: nextProfile.name, password: nextProfile.password, role: nextProfile.role, divisions: nextProfile.assigned_divisions, subjectsTaught: nextProfile.subjectsTaught }) });
+    if (!response.ok) return;
+    saveProfile(nextProfile);
     setProfiles(getProfiles());
     setEditingProfile(null);
   };
@@ -212,8 +223,10 @@ export default function RolesPage() {
     setResettingProfile(item);
     setNewPassword("");
   };
-  const saveResetPassword = () => {
+  const saveResetPassword = async () => {
     if (!authorized || !resettingProfile || !newPassword) return;
+    const response = await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: resettingProfile.id, name: resettingProfile.name, password: newPassword, role: resettingProfile.role, divisions: resettingProfile.assigned_divisions, subjectsTaught: resettingProfile.subjectsTaught ?? [] }) });
+    if (!response.ok) return;
     saveProfile({
       ...resettingProfile,
       password: newPassword,
