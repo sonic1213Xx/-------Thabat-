@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertCircle, BookOpen, Download, Edit3, Eye, FileText, Filter, Plus, Search, Trash2, Upload, UserCog, X } from 'lucide-react'
+import { AlertCircle, BookOpen, ChevronLeft, ChevronRight, Download, Edit3, Eye, FileText, Filter, Plus, Search, Trash2, Upload, UserCog, X } from 'lucide-react'
 import { ImportModal, type ImportResult } from '@/components/dashboard/import-modal'
 import { BulkStudentEditor } from '@/components/dashboard/bulk-student-editor'
 import { EditStudentModal } from '@/components/dashboard/edit-student-modal'
@@ -70,6 +70,8 @@ export default function StudentsPage() {
   const [teacherAssignments, setTeacherAssignments] = useState<Record<string, string[]>>({})
   const [studentSearch, setStudentSearch] = useState('')
   const deferredStudentSearch = useDeferredValue(studentSearch)
+  const [currentPage, setCurrentPage] = useState(1)
+  const studentsPerPage = 30
   const selectedStudents = students.filter((student) => selectedStudentIds.includes(student.id))
   const bulkEditStudents = (importResult?.students ?? selectedStudents).map((student) => ({ id: student.id, fullName: student.fullName, academicId: student.academicId ?? null, gpa: student.gpa ?? null, parentPhone: student.parentPhone ?? null, nationalId: student.nationalId ?? null, divisionCode: student.divisionCode ?? null }))
   const [newStudent, setNewStudent] = useState({
@@ -175,6 +177,24 @@ export default function StudentsPage() {
         .includes(query),
     )
   }, [deferredStudentSearch, students])
+  const totalPages = Math.max(1, Math.ceil(visibleStudents.length / studentsPerPage))
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * studentsPerPage
+    return visibleStudents.slice(start, start + studentsPerPage)
+  }, [currentPage, visibleStudents])
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [studentSearch, division])
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
+  const pageNumbers = totalPages <= 7
+    ? Array.from({ length: totalPages }, (_, index) => index + 1)
+    : currentPage <= 4
+      ? [1, 2, 3, 4, 5, -1, totalPages]
+      : currentPage >= totalPages - 3
+        ? [1, -1, totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+        : [1, -1, currentPage - 1, currentPage, currentPage + 1, -1, totalPages]
   const canInspectTeachers = currentRole === 'CREATOR' || currentRole === 'CURATOR' || currentRole === 'PRINCIPAL' || currentRole === 'VICE_PRINCIPAL'
   const isTeacher = currentRole === 'TEACHER'
   const canEditStudents = currentRole ? can(currentRole, 'can_edit_students') : false
@@ -401,7 +421,7 @@ export default function StudentsPage() {
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 ps-10 text-start text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
               />
             </div>
-            <StyledSelect value={division || ''} onValueChange={(val) => { setDivision(val || null); setStudentSearch('') }} placeholder={t('chooseDivisionOption')} options={[{ value: '', label: t('chooseDivisionOption') }, ...(currentRole === 'TEACHER' ? [] : [{ value: 'all', label: t('showAll') }]), ...assignedDivisionOptions.map((code) => ({ value: code, label: code }))]} className="min-w-44" />
+            <StyledSelect value={division || ''} onValueChange={(val) => { setDivision(val || null); setStudentSearch(''); setCurrentPage(1) }} placeholder={t('chooseDivisionOption')} options={[{ value: '', label: t('chooseDivisionOption') }, ...(currentRole === 'TEACHER' ? [] : [{ value: 'all', label: t('showAll') }]), ...assignedDivisionOptions.map((code) => ({ value: code, label: code }))]} className="min-w-44" />
           </div>
         </div>
       </div>
@@ -415,7 +435,7 @@ export default function StudentsPage() {
 
       {activeView === 'roster' && <>
       <div className="space-y-3 md:hidden">
-        {visibleStudents.map((student) => (
+        {paginatedStudents.map((student) => (
           <article key={student.id} onClick={() => canEditStudents && setEditingStudent(student)} className={`rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 ${canEditStudents ? 'cursor-pointer' : ''}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -472,10 +492,11 @@ export default function StudentsPage() {
                 </tr>
               ) : (
                 <AnimatePresence mode="sync" initial key={division ?? 'no-division'}>
-                {visibleStudents.map((student, index) => (
+                {paginatedStudents.map((student, index) => (
                   <motion.tr key={student.id} initial={index < 10 ? { opacity: 0, y: -8 } : false} animate={{ opacity: 1, y: 0 }} transition={{ duration: index < 10 ? 0.14 : 0, delay: index < 10 ? index * 0.02 : 0, ease: 'easeOut' }} onClick={() => canEditStudents && setEditingStudent(student)} className={`${canEditStudents ? 'cursor-pointer' : ''} border-t border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50`}>
                     {canEditStudents && <td className="px-3 py-3 text-center"><input type="checkbox" checked={selectedStudentIds.includes(student.id)} onChange={() => setSelectedStudentIds((current) => current.includes(student.id) ? current.filter((id) => id !== student.id) : [...current, student.id])} onClick={(event) => event.stopPropagation()} aria-label={`${locale === 'ar' ? 'تحديد' : 'Select'} ${student.fullName}`} /></td>}<td className="px-4 py-3">
                       <div>
+                      {activeView === 'roster' && visibleStudents.length > 0 && <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between"><span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:bg-zinc-800 dark:text-slate-300">{locale === 'ar' ? `عرض ${(currentPage - 1) * studentsPerPage + 1}–${Math.min(currentPage * studentsPerPage, visibleStudents.length)} من ${visibleStudents.length} طالب` : `Showing ${(currentPage - 1) * studentsPerPage + 1}-${Math.min(currentPage * studentsPerPage, visibleStudents.length)} of ${visibleStudents.length} students`}</span><div className="flex items-center justify-between gap-1" aria-label={locale === 'ar' ? 'صفحات الطلاب' : 'Student pages'}><button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1} aria-label={locale === 'ar' ? 'السابق' : 'Previous'} className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"><ChevronLeft className="h-4 w-4 rtl:rotate-180" /></button>{pageNumbers.map((page, index) => page === -1 ? <span key={`ellipsis-${index}`} className="px-2 text-slate-400">...</span> : <button key={page} type="button" onClick={() => setCurrentPage(page)} aria-current={currentPage === page ? 'page' : undefined} className={`min-w-9 rounded-lg px-2.5 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-emerald-500 ${currentPage === page ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>{page}</button>)}<button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages} aria-label={locale === 'ar' ? 'التالي' : 'Next'} className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"><ChevronRight className="h-4 w-4 rtl:rotate-180" /></button></div></div>}
                         <div className="font-semibold text-slate-900 dark:text-white">{student.fullName}</div>
                         <div className="text-xs text-slate-500">{student.arabicName || '—'}</div>
                       </div>

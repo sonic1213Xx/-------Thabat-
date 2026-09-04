@@ -21,7 +21,7 @@ export function AttendanceStatusSelect({ value, onValueChange, options, english 
   const labels: Record<string, string> = { UNMARKED: english ? 'Leave unmarked' : 'اتركه دون تحديد', PRESENT: english ? 'Present' : 'حاضر', ABSENT_UNEXCUSED: english ? 'Absent' : 'غائب', ABSENT_EXCUSED: english ? 'Excused' : 'غياب بعذر', LATE: english ? 'Late' : 'متأخر' }
   const label = labels[value] ?? selected.label
 
-  if (variant === 'buttons') return <div className={`grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap ${className}`} role="group" aria-label={english ? 'Attendance status' : 'الحالة'}>
+  if (variant === 'buttons') return <div className={`flex flex-row items-center gap-2 flex-nowrap overflow-x-auto ${className}`} role="group" aria-label={english ? 'Attendance status' : 'الحالة'}>
     {options.map((option) => {
       const palette = palettes[option.value] ?? palettes.UNMARKED
       const Icon = palette.icon
@@ -33,7 +33,7 @@ export function AttendanceStatusSelect({ value, onValueChange, options, english 
             ? 'border-amber-500 bg-amber-400 text-amber-950 shadow-[0_0_10px_rgba(245,158,11,0.35)]'
             : 'border-yellow-500 bg-yellow-400 text-yellow-950 shadow-[0_0_10px_rgba(234,179,8,0.35)]'
       const optionLabel = english ? (labels[option.value] ?? option.label ?? option.value) : (option.label ?? palette.label)
-      return <button key={option.value} type="button" aria-pressed={value === option.value} onClick={() => onValueChange(option.value)} className={`inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-bold transition-all duration-200 ${value === option.value ? activeClasses : 'border-transparent bg-gray-100 text-gray-500 hover:border-slate-300 hover:bg-gray-200 dark:bg-zinc-800 dark:text-gray-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-700'}`}><Icon className="h-3.5 w-3.5 shrink-0" />{optionLabel}</button>
+      return <button key={option.value} type="button" aria-pressed={value === option.value} onClick={() => onValueChange(option.value)} className={`inline-flex min-h-9 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border px-2 py-1.5 text-xs font-bold transition-all duration-200 ${value === option.value ? activeClasses : 'border-transparent bg-gray-100 text-gray-500 hover:border-slate-300 hover:bg-gray-200 dark:bg-zinc-800 dark:text-gray-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-700'}`}><Icon className="h-3.5 w-3.5 shrink-0" />{optionLabel}</button>
     })}
   </div>
 

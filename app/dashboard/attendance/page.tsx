@@ -55,7 +55,7 @@ export default function AttendancePage() {
     isTeacher ? "CLASS" : "SCHOOL",
   );
   const [students, setStudents] = useState<Student[]>([]);
-  const [statuses, setStatuses] = useState<Record<string, Status>>({});
+  const [statuses, setStatuses] = useState<Record<string, Status | null>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [selectedDivision, setSelectedDivision] = useState("ALL");
   const [saving, setSaving] = useState(false);
@@ -288,7 +288,7 @@ export default function AttendancePage() {
   const exportRecord = (student: Student) => ({
     ...student,
     id: student.academicId || student.nationalId || student.id,
-    status: statuses[student.id],
+    status: statuses[student.id] ?? "UNMARKED",
   });
   const exportExcel = () =>
     void exportAttendanceWorkbook(
@@ -599,21 +599,16 @@ export default function AttendancePage() {
                       <td className="px-4 py-3 font-medium">
                         {student.fullName}
                       </td>
-                      <td className="w-64 px-4 py-3">
+                      <td className="min-w-[22rem] px-4 py-3">
                         <AttendanceStatusSelect
                           value={statuses[student.id] ?? ""}
-                          onValueChange={(value) =>
-                            setStatuses((current) => ({
-                              ...current,
-                              [student.id]: value as Status,
-                            }))
-                          }
+                          onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))}
                           options={options(english)}
                           english={english}
                           variant="buttons"
                         />
                       </td>
-                      <td className="min-w-56 px-4 py-3">
+                      <td className="w-40 max-w-[180px] px-4 py-3">
                         <input
                           value={notes[student.id] ?? ""}
                           onChange={(event) =>
@@ -622,7 +617,7 @@ export default function AttendancePage() {
                               [student.id]: event.target.value,
                             }))
                           }
-                          className="w-full rounded-lg border px-3 py-2 dark:bg-slate-900"
+                          className="w-40 max-w-[180px] rounded-lg border px-3 py-2 dark:bg-slate-900"
                         />
                       </td>
                     </tr>
