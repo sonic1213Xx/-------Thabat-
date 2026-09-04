@@ -71,7 +71,7 @@ export default function RolesPage() {
   }));
   const [adminId, setAdminId] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
-  const [verificationActive, setVerificationActive] = useState(isCreatorRole(currentSession?.role) || currentSession?.role === "PRINCIPAL");
+  const [verificationActive, setVerificationActive] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState("");
   const [profile, setProfile] = useState({
     id: "",
@@ -116,15 +116,22 @@ export default function RolesPage() {
   const filteredDivisions = profile.gradeLevel
     ? divisions.filter((code) => code.startsWith(profile.gradeLevel))
     : [];
-  const authorized = isCreatorRole(currentSession?.role) || currentSession?.role === "PRINCIPAL" || verificationActive;
-  const canEditPermissions = isCreatorRole(currentSession?.role);
-  const activateCreatorMode = () => {
-    if (adminId === "10" && adminPassword === "admin123") {
-      setVerificationActive(true);
-      setVerificationMessage(locale === "ar" ? "تم تفعيل وضع المُنشئ." : "Creator mode activated.");
-    } else {
-      setVerificationMessage(locale === "ar" ? "تعذر التحقق من بيانات المُنشئ." : "Creator verification failed.");
+  const authorized = currentSession?.role === "PRINCIPAL" || verificationActive;
+  const canEditPermissions = isCreatorRole(currentSession?.role) && verificationActive;
+  const activateCreatorMode = async () => {
+    setVerificationActive(false);
+    try {
+      const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: adminId.trim(), password: adminPassword }) });
+      const result = await response.json() as { data?: { id: string; role: string } };
+      if (response.ok && result.data?.id === "10" && isCreatorRole(result.data.role)) {
+        setVerificationActive(true);
+        setVerificationMessage(locale === "ar" ? "تم تفعيل وضع المُنشئ." : "Creator mode activated.");
+        return;
+      }
+    } catch {
+      // Keep the permission matrix locked when verification cannot reach the server.
     }
+    setVerificationMessage(locale === "ar" ? "تعذر التحقق من بيانات المُنشئ." : "Creator verification failed.");
   };
   const permissionRole =
     roles.find((role) => role.key === permissionRoleKey) ?? roles[0];
@@ -296,7 +303,7 @@ export default function RolesPage() {
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"><Lock className="h-5 w-5" /></div>
             <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">{locale === "ar" ? "مركز الإدارة" : "Administration center"}</p><h2 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{t("creatorMode")}</h2></div>
           </div>
-          <span className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">{currentSession?.role === "PRINCIPAL" ? (locale === "ar" ? "صلاحية المدير مفعلة" : "Principal access active") : authorized ? (locale === "ar" ? "تم التحقق" : "Verified") : (locale === "ar" ? "يتطلب التحقق" : "Verification required")}</span>
+          <span className={`rounded-full px-3 py-1.5 text-xs font-bold text-white ${verificationActive ? "bg-emerald-600" : "bg-slate-500"}`}>{verificationActive ? (locale === "ar" ? "تم التحقق" : "Verified") : (locale === "ar" ? "يتطلب التحقق" : "Verification required")}</span>
         </div>
         <div className="p-5">
           <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">{currentSession?.role === "PRINCIPAL" ? (locale === "ar" ? "لديك صلاحية المدير لإدارة الأدوار وملفات الموظفين وإعدادات النظام." : "You have Principal access to manage roles, employee profiles, and system settings.") : t("creatorInstructions")}</p>
@@ -319,6 +326,7 @@ export default function RolesPage() {
             <button
               key={role.key}
               type="button"
+              disabled={!verificationActive}
               onClick={() => setPermissionRoleKey(role.key)}
               className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition ${permissionRole?.key === role.key ? "bg-emerald-600 text-white" : "bg-muted text-card-foreground/70 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40"}`}
             >
@@ -374,7 +382,7 @@ export default function RolesPage() {
                         <button
                           key={permission.key}
                           type="button"
-                          disabled={!canEditPermissions || isCreatorRole(permissionRole.key)}
+                          disabled={!verificationActive || !canEditPermissions || isCreatorRole(permissionRole.key)}
                           onClick={() => toggle(permissionRole, permission.key)}
                           aria-pressed={enabled}
                           className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-start text-sm transition ${enabled ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300" : "border-border bg-card text-card-foreground/60 hover:border-emerald-300"} disabled:cursor-default disabled:opacity-80`}
