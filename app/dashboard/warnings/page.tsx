@@ -11,6 +11,7 @@ import { useLanguage } from '@/components/language-provider'
 import { getGradeLevelArabic } from '@/lib/utils'
 import { IssueWarningModal } from '@/components/issue-warning-modal'
 import { getSession } from '@/lib/auth'
+import { fetchCached } from '@/lib/client-cache'
 
 interface WarningRecord {
   id: string
@@ -45,9 +46,10 @@ export default function WarningsPage() {
   useEffect(() => {
     async function loadWarnings() {
       try {
-        const [warningsRes, studentsRes] = await Promise.all([fetch('/api/warnings'), fetch('/api/students')])
-        const warningsJson = await warningsRes.json()
-        const studentsJson = await studentsRes.json()
+        const [warningsJson, studentsJson] = await Promise.all([
+          fetchCached<{ data?: WarningRecord[] }>('dashboard:warnings:all', '/api/warnings'),
+          fetchCached<{ data?: StudentOption[] }>('dashboard:students:all', '/api/students'),
+        ])
         setWarnings(warningsJson.data ?? [])
         setStudents((studentsJson.data ?? []).map((student: StudentOption) => ({ id: student.id, fullName: student.fullName, divisionCode: student.divisionCode, gradeLevel: student.gradeLevel })))
       } catch (error) {

@@ -17,6 +17,7 @@ import { getGradeLevelArabic } from "@/lib/utils";
 import { can } from "@/lib/roles";
 import { getSession } from "@/lib/auth";
 import { useLanguage } from "@/components/language-provider";
+import { fetchCached } from "@/lib/client-cache";
 
 type Student = {
   id: string;
@@ -38,8 +39,7 @@ export default function VicePrincipalPage() {
     if (!session || !can(session.role, "can_approve_gate_passes"))
       window.location.href = "/dashboard";
     else
-      void fetch("/api/students")
-        .then((response) => response.json())
+      void fetchCached<{ data?: Student[] }>("dashboard:students:all", "/api/students")
         .then((json) => setStudents(json.data ?? []));
   }, []);
   const matches = useMemo(

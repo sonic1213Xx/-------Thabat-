@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     if (recipients.length) {
       const studentSnapshot = [{ id: student.id, fullName: student.fullName, fromDivision: student.divisionCode ?? '', toDivision }]
       const gradeSnapshot = originalGrades.map((grade) => ({ ...grade, customScores: JSON.parse(grade.customScoresJson || '{}') }))
-      await Promise.all(recipients.map((recipient) => prisma.transferNotification.create({ data: { recipientId: recipient.id, createdBy: actor.id, fromDivision: student.divisionCode ?? '', toDivision, studentIdsJson: JSON.stringify([student.id]), studentSnapshotJson: JSON.stringify(studentSnapshot), gradeSnapshotJson: JSON.stringify(gradeSnapshot) } })))
+      await prisma.transferNotification.createMany({ data: recipients.map((recipient) => ({ recipientId: recipient.id, createdBy: actor.id, fromDivision: student.divisionCode ?? '', toDivision, studentIdsJson: JSON.stringify([student.id]), studentSnapshotJson: JSON.stringify(studentSnapshot), gradeSnapshotJson: JSON.stringify(gradeSnapshot) })) })
     }
     return NextResponse.json({ data: updated })
   } catch (error) {

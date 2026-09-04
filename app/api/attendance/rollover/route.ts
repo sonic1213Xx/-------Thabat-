@@ -32,12 +32,12 @@ export async function POST(request: NextRequest) {
       group.records[record.studentId] = record.status
       groups.set(key, group)
     }
-    const archived = await prisma.$transaction(Array.from(groups.entries()).map(([key, group]) => {
+    const archiveRows = Array.from(groups.entries()).map(([key, group]) => {
       const statuses = Object.values(group.records)
-      const data = { date, divisionId: key.split(':')[1], teacherId: group.teacherId, mode: group.mode, statusMap: JSON.stringify(group.records), recordsJson: JSON.stringify(group.records), presentCount: statuses.filter((status) => status === 'PRESENT').length, absentCount: statuses.filter((status) => status.startsWith('ABSENT')).length }
-      return prisma.attendanceLog.create({ data })
-    }))
-    return NextResponse.json({ date, archived: archived.length, reset: true })
+      return { date, divisionId: key.split(':')[1], teacherId: group.teacherId, mode: group.mode, statusMap: JSON.stringify(group.records), recordsJson: JSON.stringify(group.records), presentCount: statuses.filter((status) => status === 'PRESENT').length, absentCount: statuses.filter((status) => status.startsWith('ABSENT')).length }
+    })
+    const archived = archiveRows.length ? await prisma.attendanceLog.createMany({ data: archiveRows }) : { count: 0 }
+    return NextResponse.json({ date, archived: archived.count, reset: true })
   } catch (error) {
     console.error('Attendance rollover error:', error)
     return NextResponse.json({ error: 'Unable to roll over attendance' }, { status: 500 })

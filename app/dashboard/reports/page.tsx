@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { FileText, TrendingUp, Users } from 'lucide-react'
 import { useLanguage } from '@/components/language-provider'
 import { ReportExportButton } from '@/components/report-export-button'
+import { fetchCached } from '@/lib/client-cache'
 
 export default function ReportsPage() {
   const { t } = useLanguage()
@@ -15,11 +16,11 @@ export default function ReportsPage() {
     async function loadData() {
       try {
         const [studentsRes, warningsRes] = await Promise.all([
-          fetch('/api/students'),
-          fetch('/api/warnings'),
+          fetchCached<{ data?: any[] }>('dashboard:students:all', '/api/students'),
+          fetchCached<{ data?: any[] }>('dashboard:warnings:all', '/api/warnings'),
         ])
-        const studentsData = studentsRes.ok ? (await studentsRes.json()).data ?? [] : []
-        const warningsData = warningsRes.ok ? (await warningsRes.json()).data ?? [] : []
+        const studentsData = studentsRes.data ?? []
+        const warningsData = warningsRes.data ?? []
         setStudents(studentsData)
         setWarnings(warningsData)
       } catch (error) {

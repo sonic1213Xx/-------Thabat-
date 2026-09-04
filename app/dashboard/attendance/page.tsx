@@ -70,6 +70,7 @@ export default function AttendancePage() {
   const [templateSelectionReady, setTemplateSelectionReady] = useState(false);
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
   const [exportType, setExportType] = useState<"EXCEL" | "PDF">("EXCEL");
+  const [isExporting, setIsExporting] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [selectedLogStudent, setSelectedLogStudent] = useState<AttendanceLogRow | null>(null);
   const studentsRequestRef = useRef<string | null>(null);
@@ -307,7 +308,10 @@ export default function AttendancePage() {
   const handleExport = () => {
     if (!attendanceTemplateDivisions.length) return;
     if (exportType === "PDF") notifyPdfComingSoon(showToast);
-    else void runExport(exportExcel, showToast, updateToast);
+    else {
+      setIsExporting(true);
+      void runExport(exportExcel, showToast, updateToast).finally(() => setIsExporting(false));
+    }
     setExportPanelOpen(false);
   };
   const text = english
@@ -509,7 +513,7 @@ export default function AttendancePage() {
               </div>
               <div className="mt-6 flex justify-end gap-2 border-t border-border pt-4">
                 <button type="button" onClick={() => setExportPanelOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold">{english ? "Cancel" : "إلغاء"}</button>
-                <button type="button" onClick={handleExport} disabled={!attendanceTemplateDivisions.length || (exportType === "PDF" && !students.length)} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{english ? `Export ${exportType}` : `تصدير ${exportType === "PDF" ? "PDF" : "Excel"}`}</button>
+                <button type="button" onClick={handleExport} disabled={isExporting || !attendanceTemplateDivisions.length || (exportType === "PDF" && !students.length)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{isExporting && exportType === "EXCEL" && <Loader2 className="h-4 w-4 animate-spin" />}{english ? `Export ${exportType}` : `تصدير ${exportType === "PDF" ? "PDF" : "Excel"}`}</button>
               </div>
             </div>
           </div>,

@@ -246,7 +246,8 @@ export async function POST(request: NextRequest) {
       const divisionCode = studentDivisions.get(record.studentId)
       if (divisionCode) statusByDivision.set(divisionCode, { ...(statusByDivision.get(divisionCode) ?? {}), [record.studentId]: record.status })
     }
-    await prisma.$transaction(Array.from(statusByDivision.entries()).map(([divisionId, statusMap]) => prisma.attendanceLog.create({ data: { date: requestDate, divisionId, teacherId: body.markedBy || null, mode: 'SCHOOL', statusMap: JSON.stringify(statusMap) } })))
+    const logRows = Array.from(statusByDivision.entries()).map(([divisionId, statusMap]) => ({ date: requestDate, divisionId, teacherId: body.markedBy || null, mode: 'SCHOOL', statusMap: JSON.stringify(statusMap) }))
+    if (logRows.length) await prisma.attendanceLog.createMany({ data: logRows })
 
     return NextResponse.json({ data: saved, count: saved.length, date: requestDate, escalations })
   } catch (error) {

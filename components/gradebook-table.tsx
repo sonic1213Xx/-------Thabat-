@@ -51,6 +51,7 @@ export function GradebookTable({
 }) {
   const { locale } = useLanguage();
   const { showToast: exportToast, updateToast } = useToast();
+  const [isExporting, setIsExporting] = useState(false);
   const labels =
     locale === "ar"
       ? {
@@ -421,12 +422,14 @@ export function GradebookTable({
           )}
           <button
             type="button"
-            onClick={() =>
-              void runExport(() => exportGradebookToExcel(divisionName, rows, [], customScores, finalMaximum, categorySettings, selectedPeriod), exportToast, updateToast)
-            }
+            onClick={() => {
+              setIsExporting(true);
+              void runExport(() => exportGradebookToExcel(divisionName, rows, [], customScores, finalMaximum, categorySettings, selectedPeriod), exportToast, updateToast).finally(() => setIsExporting(false))
+            }}
+            disabled={isExporting}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
-            <Download className="h-4 w-4" /> {labels.export}
+            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {labels.export}
           </button>
           <button
             type="button"
@@ -440,13 +443,14 @@ export function GradebookTable({
           {!readOnly && (
             <button
               type="button"
-              onClick={() =>
-                void runExport(() => exportEmptyGradebookTemplates(allDivisionCodes), exportToast, updateToast)
-              }
-              disabled={!allDivisionCodes.length}
+              onClick={() => {
+                setIsExporting(true);
+                void runExport(() => exportEmptyGradebookTemplates(allDivisionCodes), exportToast, updateToast).finally(() => setIsExporting(false))
+              }}
+              disabled={isExporting || !allDivisionCodes.length}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"
             >
-              <Download className="h-4 w-4" />
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {labels.exportAll}
             </button>
           )}

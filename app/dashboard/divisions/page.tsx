@@ -9,6 +9,7 @@ import { ConfirmModal } from '@/components/dashboard/confirm-modal'
 import { DivisionsLoadingSkeleton } from '@/components/dashboard/tab-loading-skeleton'
 import { useTabLoading } from '@/components/dashboard/use-tab-loading'
 import { useLanguage } from '@/components/language-provider'
+import { fetchCached } from '@/lib/client-cache'
 
 interface DivisionRecord {
   id: string
@@ -36,15 +37,12 @@ export default function DivisionsPage() {
     await withMinimumDelay(async () => {
       try {
         const [divisionsRes, studentsRes] = await Promise.all([
-          fetch('/api/divisions'),
-          fetch('/api/students'),
+          fetchCached<{ data?: DivisionRecord[] }>('dashboard:divisions', '/api/divisions'),
+          fetchCached<{ data?: any[] }>('dashboard:students:all', '/api/students'),
         ])
 
-        const divisionsJson = await divisionsRes.json()
-        const studentsJson = await studentsRes.json()
-
-        setDivisions(divisionsJson.data ?? [])
-        setStudents(studentsJson.data ?? [])
+        setDivisions(divisionsRes.data ?? [])
+        setStudents(studentsRes.data ?? [])
       } catch (error) {
         console.error('Failed to load divisions:', error)
       }
