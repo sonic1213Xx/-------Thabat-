@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const username = body.id?.trim()
     if (!username || !body.password) return NextResponse.json({ error: 'Credentials are required' }, { status: 400 })
 
-    const user = await prisma.user.findUnique({ where: { username: username.toLowerCase() } })
+    const user = await prisma.user.findFirst({ where: { OR: [{ id: username }, { username: username.toLowerCase() }] } })
     if (!user || !user.isActive || !(await bcrypt.compare(body.password, user.password))) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }

@@ -121,13 +121,16 @@ export default function RolesPage() {
   const activateCreatorMode = async () => {
     setVerificationActive(false);
     try {
-      const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: adminId.trim(), password: adminPassword }) });
-      const result = await response.json() as { data?: { id: string; role: string } };
-      if (response.ok && result.data?.id === "10" && isCreatorRole(result.data.role)) {
+      const response = await fetch("/api/admin/verify-creator", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: adminId.trim(), password: adminPassword }) });
+      const result = await response.json() as { success?: boolean; error?: string };
+      if (response.ok && result.success) {
         setVerificationActive(true);
+        setVerificationMessage("");
         setVerificationMessage(locale === "ar" ? "تم تفعيل وضع المُنشئ." : "Creator mode activated.");
         return;
       }
+      setVerificationMessage(result.error ?? (locale === "ar" ? "كلمة المرور غير صحيحة" : "Incorrect password."));
+      return;
     } catch {
       // Keep the permission matrix locked when verification cannot reach the server.
     }

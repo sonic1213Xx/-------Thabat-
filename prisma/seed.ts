@@ -15,9 +15,9 @@ async function main() {
   await prisma.user.create({
     data: {
       id: '10',
-      username: 'curator',
+      username: '10',
       name: 'حسين',
-      password: 'admin123',
+      password: await bcrypt.hash('admin123', 10),
       role: 'CURATOR',
       isActive: true,
     },
