@@ -598,7 +598,7 @@ export default function RolesPage() {
               </td>
               <td />
             </tr>
-            {profiles.map((item) => (
+            {profiles.filter((item) => item.id !== "10" && !isCreatorRole(item.role)).map((item) => (
               <tr key={item.id} className="border-t">
                 <td className="p-4">
                   {item.name}
