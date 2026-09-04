@@ -610,6 +610,7 @@ export default function AttendancePage() {
                           }
                           options={options(english)}
                           english={english}
+                          variant="buttons"
                         />
                       </td>
                       <td className="min-w-56 px-4 py-3">

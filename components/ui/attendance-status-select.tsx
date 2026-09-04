@@ -12,14 +12,30 @@ const palettes: Record<string, { label: string; icon: typeof Circle; classes: st
   LATE: { label: 'متأخر', icon: AlertCircle, classes: 'text-yellow-600' },
 }
 
-type Props = { value: string; onValueChange: (value: string) => void; options: Array<{ value: string; label?: string }>; english?: boolean; className?: string }
+type Props = { value: string; onValueChange: (value: string) => void; options: Array<{ value: string; label?: string }>; english?: boolean; className?: string; variant?: 'dropdown' | 'buttons' }
 
-export function AttendanceStatusSelect({ value, onValueChange, options, english = false, className = '' }: Props) {
+export function AttendanceStatusSelect({ value, onValueChange, options, english = false, className = '', variant = 'dropdown' }: Props) {
   const [open, setOpen] = useState(false)
   const selected = palettes[value] ?? palettes.UNMARKED
   const SelectedIcon = selected.icon
   const labels: Record<string, string> = { UNMARKED: english ? 'Leave unmarked' : 'اتركه دون تحديد', PRESENT: english ? 'Present' : 'حاضر', ABSENT_UNEXCUSED: english ? 'Absent' : 'غائب', ABSENT_EXCUSED: english ? 'Excused' : 'غياب بعذر', LATE: english ? 'Late' : 'متأخر' }
   const label = labels[value] ?? selected.label
+
+  if (variant === 'buttons') return <div className={`grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap ${className}`} role="group" aria-label={english ? 'Attendance status' : 'الحالة'}>
+    {options.map((option) => {
+      const palette = palettes[option.value] ?? palettes.UNMARKED
+      const Icon = palette.icon
+      const activeClasses = option.value === 'PRESENT'
+        ? 'border-emerald-600 bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.35)]'
+        : option.value === 'ABSENT_UNEXCUSED'
+          ? 'border-red-600 bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.35)]'
+          : option.value === 'ABSENT_EXCUSED'
+            ? 'border-amber-500 bg-amber-400 text-amber-950 shadow-[0_0_10px_rgba(245,158,11,0.35)]'
+            : 'border-yellow-500 bg-yellow-400 text-yellow-950 shadow-[0_0_10px_rgba(234,179,8,0.35)]'
+      const optionLabel = english ? (labels[option.value] ?? option.label ?? option.value) : (option.label ?? palette.label)
+      return <button key={option.value} type="button" aria-pressed={value === option.value} onClick={() => onValueChange(option.value)} className={`inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-bold transition-all duration-200 ${value === option.value ? activeClasses : 'border-transparent bg-gray-100 text-gray-500 hover:border-slate-300 hover:bg-gray-200 dark:bg-zinc-800 dark:text-gray-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-700'}`}><Icon className="h-3.5 w-3.5 shrink-0" />{optionLabel}</button>
+    })}
+  </div>
 
   return <div className={`relative ${className}`}>
     <button type="button" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} className="flex h-10 w-full items-center justify-between rounded-xl border border-slate-200 bg-white/80 px-3 text-start text-sm shadow-sm transition hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-white">
