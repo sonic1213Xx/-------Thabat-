@@ -125,10 +125,11 @@ export function GatePassModal({
         </div>
         {issuedPass ? (
           <div className="space-y-4">
-            <div
-              id="gate-pass-print"
-              className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-6 dark:border-emerald-800 dark:bg-emerald-950/20"
-            >
+            <div className="printable-permit">
+              <div
+                id="gate-pass-print"
+                className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-6 dark:border-emerald-800 dark:bg-emerald-950/20"
+              >
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-bold tracking-widest text-emerald-700">
@@ -168,8 +169,9 @@ export function GatePassModal({
                 {locale === "ar" ? "ختم المدرسة الرسمي" : "Official school stamp"}
               </div>
               {qrImage && <div className="mt-4 flex flex-col items-center gap-2"><img src={qrImage} alt={locale === "ar" ? "رمز تصريح الخروج" : "Gate pass QR code"} className="h-32 w-32 rounded-lg bg-white p-2" /><span className="font-mono text-[10px] text-slate-400">{issuedPass.qrToken}</span></div>}
+              </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 print:hidden">
               <button
                 type="button"
                 onClick={() => window.print()}
