@@ -22,10 +22,12 @@ const inputClass =
 
 export function GatePassModal({
   students,
+  initialPass,
   onClose,
   onSaved,
 }: {
   students: Student[];
+  initialPass?: GatePass | null;
   onClose: () => void;
   onSaved?: (pass: GatePass) => void;
 }) {
@@ -35,7 +37,7 @@ export function GatePassModal({
   const [studentId, setStudentId] = useState("");
   const [search, setSearch] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [issuedPass, setIssuedPass] = useState<GatePass | null>(null);
+  const [issuedPass, setIssuedPass] = useState<GatePass | null>(initialPass ?? null);
   const [qrImage, setQrImage] = useState("");
   const [form, setForm] = useState({
     parentName: "",
