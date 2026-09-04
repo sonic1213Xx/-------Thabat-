@@ -73,7 +73,7 @@ export default function RolesPage() {
   const [adminPassword, setAdminPassword] = useState("");
   const [verificationActive, setVerificationActive] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState("");
-  const [profile, setProfile] = useState({
+  const emptyProfile = {
     id: "",
     name: "",
     password: "",
@@ -82,7 +82,9 @@ export default function RolesPage() {
     gradeLevel: "",
     assigned_divisions: [] as string[],
     teachingAssignments: [] as TeachingAssignment[],
-  });
+  };
+  const [profile, setProfile] = useState(emptyProfile);
+  const resetProfileForm = () => setProfile({ ...emptyProfile, assigned_divisions: [], teachingAssignments: [] });
   useEffect(() => {
     const loadDatabaseProfiles = async () => {
       try {
@@ -210,16 +212,7 @@ export default function RolesPage() {
     }
     saveProfile(nextProfile);
     setProfiles(getProfiles());
-    setProfile({
-      id: "",
-      name: "",
-      password: "",
-      role: "",
-      subject: "",
-      gradeLevel: "",
-      assigned_divisions: [],
-      teachingAssignments: [],
-    });
+    resetProfileForm();
   };
   const openEditProfile = (item: Profile) => {
     if (currentSession?.role === "PRINCIPAL" && item.role === "PRINCIPAL") return;
@@ -434,6 +427,7 @@ export default function RolesPage() {
         </div>
         <div className="grid gap-3 p-4 sm:grid-cols-2">
           <input
+            autoComplete="off"
             value={profile.name}
             onChange={(event) =>
               setProfile({ ...profile, name: event.target.value })
@@ -442,6 +436,7 @@ export default function RolesPage() {
             className="rounded-lg border px-3 py-2"
           />
           <input
+            autoComplete="off"
             value={profile.id}
             onChange={(event) =>
               setProfile({ ...profile, id: event.target.value })
@@ -450,6 +445,7 @@ export default function RolesPage() {
             className="rounded-lg border px-3 py-2"
           />
           <input
+            autoComplete="new-password"
             value={profile.password}
             onChange={(event) =>
               setProfile({ ...profile, password: event.target.value })
@@ -658,16 +654,17 @@ export default function RolesPage() {
       {editingProfile && (
         <Modal
           open={true}
-          onOpenChange={(open) => !open && setEditingProfile(null)}
+          onOpenChange={(open) => { if (!open) { setEditingProfile(null); resetProfileForm(); } }}
           className="max-w-lg"
         >
-          <div className="space-y-4" dir="rtl">
+          <form autoComplete="off" onSubmit={(event) => { event.preventDefault(); void saveEditedProfile(); }} className="space-y-4" dir="rtl">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">
                 {locale === "ar" ? "تعديل ملف المعلم" : "Edit teacher profile"}
               </h2>
             </div>
             <input
+              autoComplete="off"
               value={profile.name}
               onChange={(event) =>
                 setProfile({ ...profile, name: event.target.value })
@@ -733,13 +730,12 @@ export default function RolesPage() {
               </div>
             )}
             <button
-              type="button"
-              onClick={saveEditedProfile}
+              type="submit"
               className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white"
             >
               {locale === "ar" ? "حفظ التعيينات" : "Save assignments"}
             </button>
-          </div>
+          </form>
         </Modal>
       )}
       {resettingProfile && (
@@ -755,6 +751,7 @@ export default function RolesPage() {
             <p className="text-sm text-slate-500">{resettingProfile.name}</p>
             <input
               autoFocus
+              autoComplete="new-password"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
               type="password"
