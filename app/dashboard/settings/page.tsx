@@ -14,7 +14,7 @@ type SavedSettings = { schoolName: string; defaultAttendance: 'UNMARKED' | 'PRES
 const defaultSettings: SavedSettings = { schoolName: 'مدرسة السلمية الثانوية', defaultAttendance: 'UNMARKED', attendanceNotes: false, absenceAlerts: true, warningAlerts: true }
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
-  return <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-6 rtl:-translate-x-6' : 'translate-x-1 rtl:-translate-x-1'}`} /></button>
+  return <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-all duration-200 ${checked ? 'justify-end bg-emerald-600' : 'justify-start bg-slate-300 dark:bg-slate-700'}`}><span className="h-5 w-5 rounded-full bg-white shadow-md transition-all duration-200" /></button>
 }
 
 export default function SettingsPage() {
