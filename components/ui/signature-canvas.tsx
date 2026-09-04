@@ -1,5 +1,6 @@
 'use client'
 
+import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import { Eraser, X } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -10,10 +11,18 @@ export function SignatureCanvas({ initialSignature, onCancel, onSave, showDefaul
   const drawingRef = useRef(false)
   const [empty, setEmpty] = useState(true)
   const [saveAsDefault, setSaveAsDefault] = useState(true)
+  const [mounted, setMounted] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { locale } = useLanguage()
   const { resolvedTheme } = useTheme()
   const inkColor = resolvedTheme === 'dark' ? '#ffffff' : '#000000'
   const text = locale === 'ar' ? { title: 'التوقيع الرقمي', hint: 'ارسم توقيعك بالماوس أو اللمس أو القلم.', clear: 'مسح', cancel: 'إلغاء', save: 'حفظ التوقيع', defaultOption: 'حفظ كـ توقيع افتراضي لحسابي' } : { title: 'Digital signature', hint: 'Draw your signature with a mouse, touch, or pen.', clear: 'Clear', cancel: 'Cancel', save: 'Save signature', defaultOption: 'Save as my default account signature' }
+
+  useEffect(() => {
+    setMounted(true)
+    return () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current) }
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -33,6 +42,12 @@ export function SignatureCanvas({ initialSignature, onCancel, onSave, showDefaul
   const stop = () => { drawingRef.current = false }
   const clear = () => { const canvas = canvasRef.current!; canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height); setEmpty(true) }
   const save = () => { if (!empty) onSave(canvasRef.current!.toDataURL('image/png'), saveAsDefault) }
+  const close = () => {
+    if (closing) return
+    setClosing(true)
+    closeTimerRef.current = setTimeout(onCancel, 180)
+  }
 
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" dir={locale === 'ar' ? 'rtl' : 'ltr'}><div className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold">{text.title}</h2><p className="mt-1 text-sm text-slate-500">{text.hint}</p></div><button type="button" onClick={onCancel} className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={text.cancel}><X className="h-5 w-5" /></button></div><canvas ref={canvasRef} width={900} height={300} onPointerDown={start} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} className="mt-5 h-44 w-full touch-none rounded-xl border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900" />{showDefaultOption && <label className="mt-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="checkbox" checked={saveAsDefault} onChange={(event) => setSaveAsDefault(event.target.checked)} className="h-4 w-4 accent-emerald-600" />{text.defaultOption}</label>}<div className="mt-4 flex gap-3"><button type="button" onClick={clear} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-3 text-sm dark:border-slate-700"><Eraser className="h-4 w-4" />{text.clear}</button><button type="button" onClick={onCancel} className="flex-1 rounded-lg border border-slate-300 px-4 py-3 text-sm dark:border-slate-700">{text.cancel}</button><button type="button" onClick={save} disabled={empty} className="flex-1 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{text.save}</button></div></div></div>
+  if (!mounted) return null
+  return createPortal(<div className={`fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4 transition-opacity duration-200 ${closing ? 'opacity-0' : 'animate-[fadeIn_0.2s_ease-out]'}`} dir={locale === 'ar' ? 'rtl' : 'ltr'} onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}><div className={`relative z-10 w-[calc(100%-2rem)] max-w-lg rounded-2xl bg-white p-6 shadow-2xl transition-transform duration-200 dark:bg-slate-900 ${closing ? 'scale-95 opacity-0' : 'animate-[dialogEnter_0.25s_cubic-bezier(0.22,1,0.36,1)]'}`}><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold">{text.title}</h2><p className="mt-1 text-sm text-slate-500">{text.hint}</p></div><button type="button" onClick={close} className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={text.cancel}><X className="h-5 w-5" /></button></div><canvas ref={canvasRef} width={900} height={300} onPointerDown={start} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} className="mt-5 h-44 w-full touch-none rounded-xl border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900" />{showDefaultOption && <label className="mt-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="checkbox" checked={saveAsDefault} onChange={(event) => setSaveAsDefault(event.target.checked)} className="h-4 w-4 accent-emerald-600" />{text.defaultOption}</label>}<div className="mt-4 flex gap-3"><button type="button" onClick={clear} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-3 text-sm dark:border-slate-700"><Eraser className="h-4 w-4" />{text.clear}</button><button type="button" onClick={close} className="flex-1 rounded-lg border border-slate-300 px-4 py-3 text-sm dark:border-slate-700">{text.cancel}</button><button type="button" onClick={save} disabled={empty} className="flex-1 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{text.save}</button></div></div></div>, document.body)
 }

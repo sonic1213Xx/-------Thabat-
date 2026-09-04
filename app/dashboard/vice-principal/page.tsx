@@ -39,9 +39,17 @@ export default function VicePrincipalPage() {
     const session = getSession();
     if (!session || !can(session.role, "can_approve_gate_passes"))
       window.location.href = "/dashboard";
-    else
+    else {
       void fetchCached<{ data?: Student[] }>("dashboard:students:all", "/api/students")
         .then((json) => setStudents(json.data ?? []));
+      void fetch(`/api/gate-passes`, { headers: { "x-thabat-role": session.role } })
+        .then((response) => response.ok ? response.json() as Promise<{ data?: Array<{ id: string; studentId: string; issuedBy: string; parentName: string | null; reason: string; departureDate: string; departureTime: string; createdAt: string; qrToken: string; status: string; student: { fullName: string; divisionCode: string | null } }> }> : Promise.reject(new Error("Unable to load permits")))
+        .then((json) => setPasses((current) => {
+          const stored = (json.data ?? []).map((pass) => ({ id: pass.id, studentId: pass.studentId, studentName: pass.student.fullName, divisionCode: pass.student.divisionCode ?? "غير معين", parentName: pass.parentName ?? "", reason: pass.reason, departureDate: pass.departureDate, departureTime: pass.departureTime, createdAt: pass.createdAt, qrToken: pass.qrToken, status: pass.status }));
+          return [...stored, ...current.filter((localPass) => !stored.some((storedPass) => storedPass.id === localPass.id))];
+        }))
+        .catch(() => undefined);
+    }
   }, []);
   const matches = useMemo(
     () =>
