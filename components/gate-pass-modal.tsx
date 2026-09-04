@@ -23,11 +23,13 @@ const inputClass =
 export function GatePassModal({
   students,
   initialPass,
+  initialStudentId,
   onClose,
   onSaved,
 }: {
   students: Student[];
   initialPass?: GatePass | null;
+  initialStudentId?: string;
   onClose: () => void;
   onSaved?: (pass: GatePass) => void;
 }) {
@@ -52,11 +54,13 @@ export function GatePassModal({
     void QRCode.toDataURL(issuedPass.qrToken, { width: 150, margin: 1 }).then(setQrImage).catch(() => setQrImage(""));
   }, [issuedPass]);
   useEffect(() => {
-    if (!initialPass && students.length === 1) {
-      setStudentId(students[0].id);
-      setSearch(students[0].fullName);
+    if (!initialPass) {
+      const initialStudent = students.find((item) => item.id === initialStudentId) ?? (students.length === 1 ? students[0] : null);
+      if (!initialStudent) return;
+      setStudentId(initialStudent.id);
+      setSearch(initialStudent.fullName);
     }
-  }, [initialPass, students]);
+  }, [initialPass, initialStudentId, students]);
   const matchingStudentGroups = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
     const matches = query

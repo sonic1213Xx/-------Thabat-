@@ -1,10 +1,10 @@
 "use client";
 
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarCheck, Check, FileText, Loader2, Save, X } from "lucide-react";
 import { AttendanceStatusSelect } from "@/components/ui/attendance-status-select";
-import { GatePassModal } from "@/components/gate-pass-modal";
 import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
@@ -21,7 +21,8 @@ type Status =
   | "ABSENT_EXCUSED"
   | "ABSENT_UNEXCUSED"
   | "LATE"
-  | "OTHER";
+  | "OTHER"
+  | "LEFT_WITH_PERMISSION";
 type Student = {
   id: string;
   studentId?: string;
@@ -48,6 +49,7 @@ const options = (english: boolean) => [
 
 export default function AttendancePage() {
   const { dir, locale, t } = useLanguage();
+  const router = useRouter();
   const { showToast, updateToast } = useToast();
   const english = locale === "en";
   const session = getSession();
@@ -75,7 +77,6 @@ export default function AttendancePage() {
   const [isExporting, setIsExporting] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [selectedLogStudent, setSelectedLogStudent] = useState<AttendanceLogRow | null>(null);
-  const [gatePassStudent, setGatePassStudent] = useState<Student | null>(null);
   const studentsRequestRef = useRef<string | null>(null);
   const attendanceRequestRef = useRef<string | null>(null);
   const hasFetchedRef = useRef<string | null>(null);
@@ -230,10 +231,15 @@ export default function AttendancePage() {
     }));
   const openGatePass = (student: Student) => {
     if (!hasPermission(session?.role, "gate_passes", "create")) {
-      setMessage(english ? "You do not have permission to issue a gate pass. Contact an authorized staff member." : "لا تملك صلاحية إصدار تصريح خروج. تواصل مع المسؤول المخول.");
+      void fetchCached<{ data?: Array<{ name: string; role: string }> }>("dashboard:gate-pass-contacts", "/api/users")
+        .then((response) => {
+          const contacts = (response.data ?? []).filter((user) => hasPermission(user.role, "gate_passes", "create")).map((user) => user.name);
+          setMessage(english ? `You do not have permission. Contact: ${contacts.join(", ") || "an authorized staff member"}.` : `لا تملك صلاحية إصدار التصريح. تواصل مع: ${contacts.join("، ") || "المسؤول المخول"}.`);
+        })
+        .catch(() => setMessage(english ? "You do not have permission to issue a gate pass. Contact an authorized staff member." : "لا تملك صلاحية إصدار تصريح خروج. تواصل مع المسؤول المخول."));
       return;
     }
-    setGatePassStudent(student);
+    router.push(`/dashboard/vice-principal?studentId=${encodeURIComponent(student.id)}`);
   };
   const save = async () => {
     if (!session?.id) return;
@@ -556,7 +562,6 @@ export default function AttendancePage() {
       )}
       <AttendanceLogsModal open={logsOpen} onClose={() => setLogsOpen(false)} english={english} onStudentClick={(student) => { setLogsOpen(false); setSelectedLogStudent(student); }} />
       {selectedLogStudent && <StudentAttendanceModal open={true} onClose={() => setSelectedLogStudent(null)} studentId={selectedLogStudent.studentId} studentName={selectedLogStudent.studentName} />}
-      {gatePassStudent && <GatePassModal students={[gatePassStudent]} onClose={() => setGatePassStudent(null)} />}
       <main className={`space-y-8 ${isLoading ? "hidden" : ""}`}>
         {visibleDivisions.map((group) => (
           <section
@@ -607,7 +612,7 @@ export default function AttendancePage() {
                   {group.students.map((student) => (
                     <tr
                       key={student.id}
-                      className="border-t border-slate-200 dark:border-slate-800"
+                      className={`border-t border-slate-200 dark:border-slate-800 ${statuses[student.id] === "LEFT_WITH_PERMISSION" ? "bg-emerald-50 shadow-[inset_0_0_18px_rgba(16,185,129,0.25)] dark:bg-emerald-950/30" : ""}`}
                     >
                       <td className="w-[24%] px-4 py-3 font-medium">
                         {student.fullName}

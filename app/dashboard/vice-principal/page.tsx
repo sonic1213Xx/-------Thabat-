@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   FileWarning,
   LogOut,
@@ -29,12 +30,14 @@ type Student = {
 };
 export default function VicePrincipalPage() {
   const { t, locale } = useLanguage();
+  const searchParams = useSearchParams();
   const [students, setStudents] = useState<Student[]>([]);
   const [query, setQuery] = useState("");
   const [gateOpen, setGateOpen] = useState(false);
   const [selectedPass, setSelectedPass] = useState<GatePass | null>(null);
   const [incidentOpen, setIncidentOpen] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const requestedStudentId = searchParams.get("studentId");
   useEffect(() => {
     const session = getSession();
     if (!session || !can(session.role, "can_approve_gate_passes"))
@@ -51,6 +54,9 @@ export default function VicePrincipalPage() {
         .catch(() => undefined);
     }
   }, []);
+  useEffect(() => {
+    if (requestedStudentId && students.some((student) => student.id === requestedStudentId)) setGateOpen(true);
+  }, [requestedStudentId, students]);
   const matches = useMemo(
     () =>
       students.filter((student) =>
@@ -161,6 +167,7 @@ export default function VicePrincipalPage() {
         <GatePassModal
           students={students}
           initialPass={selectedPass}
+          initialStudentId={requestedStudentId ?? undefined}
           onClose={() => {
             setGateOpen(false);
             setSelectedPass(null);
