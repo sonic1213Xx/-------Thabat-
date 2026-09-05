@@ -492,6 +492,23 @@ textarea::placeholder {
   animation-name: signatureDialogEnter !important;
 }
 
+@media (max-width: 639px) {
+  main > div.space-y-6[dir="rtl"] > section:nth-of-type(2) > div.mt-4.flex.flex-wrap.gap-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  main > div.space-y-6[dir="rtl"] > section:nth-of-type(2) > div.mt-4.flex.flex-wrap.gap-2 > span {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    border-color: rgb(16 185 129 / 0.35);
+    background: rgb(16 185 129 / 0.08);
+    line-height: 1.7;
+  }
+}
+
 @keyframes dialogExit {
   from {
     opacity: 1;

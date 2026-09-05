@@ -23,6 +23,43 @@ const templateFields = headers.slice(5, 13)
 
 export type GradebookExportMetadata = { schoolName?: string; teacherName?: string; subject?: string; principalName?: string }
 export async function exportGradebookToExcel(divisionName: string, studentsData: GradebookStudent[], customCategories: GradebookCustomCategory[] = [], customScores: Record<string, Record<string, number | null>> = {}, finalMaximum = 60, configuredFields: GradebookCustomCategory[] = [], period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
+  const templatePath = period === 'period1' ? '/gradebook-templates/term-1.xlsx' : period === 'period2' ? '/gradebook-templates/term-2.xlsx' : '/gradebook-templates/both-terms.xlsx'
+  const templateResponse = await fetch(templatePath)
+  if (templateResponse.ok) {
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(await templateResponse.arrayBuffer())
+    const worksheet = workbook.worksheets[0]
+    worksheet.getCell('B2').value = `المادة : ${metadata.subject ?? ''}`
+    worksheet.getCell('C2').value = metadata.schoolName ?? ''
+    worksheet.getCell('B3').value = `المعلم : ${metadata.teacherName ?? ''}`
+    worksheet.getCell('C4').value = `مدير المدرسة : ${metadata.principalName ?? ''}`
+    const hasScore = (student: GradebookStudent, key: string) => customScores[student.id]?.[key] !== undefined || student[key as keyof GradebookStudent] !== undefined && student[key as keyof GradebookStudent] !== null
+    const score = (student: GradebookStudent, key: string) => Number(customScores[student.id]?.[key] ?? student[key as keyof GradebookStudent] ?? 0)
+    const writeTerm = (row: ExcelJS.Row, student: GradebookStudent, keys: string[], scoreColumns: string[], totalColumn: string) => {
+      const values = keys.map((key) => score(student, key))
+      values.forEach((value, index) => { row.getCell(scoreColumns[index]).value = hasScore(student, keys[index]) ? value : null })
+      row.getCell(totalColumn).value = keys.some((key) => hasScore(student, key)) ? values.reduce((sum, value) => sum + value, 0) : null
+    }
+    const period1Keys = ['participationPeriod1', 'performancePeriod1', 'quizPeriod1', 'practicalPeriod1']
+    const period2Keys = ['participationPeriod2', 'performancePeriod2', 'quizPeriod2', 'practicalPeriod2']
+    studentsData.forEach((student, index) => {
+      const row = index < 26 ? worksheet.getRow(11 + index) : worksheet.addRow([])
+      if (index >= 26) {
+        const templateRow = worksheet.getRow(36)
+        for (let column = 1; column <= worksheet.columnCount; column += 1) row.getCell(column).style = { ...templateRow.getCell(column).style }
+      }
+      row.getCell('A').value = index + 1
+      row.getCell('B').value = student.fullName
+      row.getCell('C').value = student.academicId ?? student.studentId ?? ''
+      row.getCell('D').value = student.nationalId ?? ''
+      row.getCell('E').value = student.divisionCode ?? divisionName
+      writeTerm(row, student, period === 'period2' ? period2Keys : period1Keys, ['F', 'G', 'H', 'I'], 'J')
+      if (period === 'both') writeTerm(row, student, period2Keys, ['K', 'L', 'M', 'N'], 'O')
+    })
+    const buffer = await workbook.xlsx.writeBuffer()
+    saveAs(new Blob([buffer]), `كشف_درجات_${divisionName}.xlsx`)
+    return
+  }
   const workbook = new ExcelJS.Workbook()
   const worksheet = workbook.addWorksheet(divisionName)
   worksheet.views = [{ rtl: true } as unknown as ExcelJS.WorksheetView]
