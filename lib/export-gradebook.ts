@@ -18,16 +18,17 @@ export type GradebookStudent = {
 export type GradebookCustomCategory = { key: string; label: string; max: number }
 export type GradebookPeriod = 'period1' | 'period2' | 'both'
 
-const headers = ['م', 'اسم الطالب', 'المعدل التراكمي', 'مهام فترة 1 (40)', 'مهام فترة 2 (40)', 'اختبار فترة 1 (20)', 'اختبار فترة 2 (20)', 'اختبار نهائي (40)', 'المجموع النهائي (100)']
+const headers = ['م', 'اسم الطلاب/ة', 'الرقم الأكاديمي', 'الهوية الوطنية', 'الشعبة', 'مشاركة - الفترة 1 (10)', 'مهام أدائية - الفترة 1 (30)', 'اختبار قصير - الفترة 1 (10)', 'جانب عملي - الفترة 1 (10)', 'مشاركة - الفترة 2 (10)', 'مهام أدائية - الفترة 2 (30)', 'اختبار قصير - الفترة 2 (10)', 'جانب عملي - الفترة 2 (10)', 'المجموع النهائي (60)']
+const templateFields = headers.slice(5, 13)
 
 export type GradebookExportMetadata = { schoolName?: string; teacherName?: string; subject?: string; principalName?: string }
-export async function exportGradebookToExcel(divisionName: string, studentsData: GradebookStudent[], customCategories: GradebookCustomCategory[] = [], customScores: Record<string, Record<string, number | null>> = {}, finalMaximum = 100, configuredFields: GradebookCustomCategory[] = [], period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
+export async function exportGradebookToExcel(divisionName: string, studentsData: GradebookStudent[], customCategories: GradebookCustomCategory[] = [], customScores: Record<string, Record<string, number | null>> = {}, finalMaximum = 60, configuredFields: GradebookCustomCategory[] = [], period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
   const workbook = new ExcelJS.Workbook()
   const worksheet = workbook.addWorksheet(divisionName)
   worksheet.views = [{ rtl: true } as unknown as ExcelJS.WorksheetView]
   const fields = configuredFields.length ? configuredFields : [
-    { key: 'taskPeriod1', label: 'مهام فترة 1', max: 40 }, { key: 'taskPeriod2', label: 'مهام فترة 2', max: 40 },
-    { key: 'examPeriod1', label: 'اختبار فترة 1', max: 20 }, { key: 'examPeriod2', label: 'اختبار فترة 2', max: 20 }, { key: 'finalExam', label: 'اختبار نهائي', max: 40 },
+    { key: 'participationPeriod1', label: 'مشاركة - الفترة 1', max: 10 }, { key: 'performancePeriod1', label: 'مهام أدائية - الفترة 1', max: 30 }, { key: 'quizPeriod1', label: 'اختبار قصير - الفترة 1', max: 10 }, { key: 'practicalPeriod1', label: 'جانب عملي - الفترة 1', max: 10 },
+    { key: 'participationPeriod2', label: 'مشاركة - الفترة 2', max: 10 }, { key: 'performancePeriod2', label: 'مهام أدائية - الفترة 2', max: 30 }, { key: 'quizPeriod2', label: 'اختبار قصير - الفترة 2', max: 10 }, { key: 'practicalPeriod2', label: 'جانب عملي - الفترة 2', max: 10 },
   ]
   const selectedFields = fields.filter((field) => period === 'both' || (period === 'period1' ? field.key.toLowerCase().includes('period1') || !field.key.toLowerCase().includes('period2') : field.key.toLowerCase().includes('period2') || !field.key.toLowerCase().includes('period1')))
   const exportHeaders = ['م', 'اسم الطلاب/ة', 'الرقم الأكاديمي', 'الهوية الوطنية', 'الشعبة', ...selectedFields.map((field) => `${field.label} (${field.max})`), ...customCategories.map((category) => `${category.label} (${category.max})`), `المجموع النهائي (${finalMaximum})`]
@@ -78,7 +79,7 @@ export async function exportGradebookToExcel(divisionName: string, studentsData:
   saveAs(new Blob([buffer]), `كشف_درجات_${divisionName}.xlsx`)
 }
 
-export function exportGradebookToPdf(divisionName: string, studentsData: GradebookStudent[], fields: GradebookCustomCategory[], finalMaximum = 100, period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
+export function exportGradebookToPdf(divisionName: string, studentsData: GradebookStudent[], fields: GradebookCustomCategory[], finalMaximum = 60, period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
   if (typeof window === 'undefined') return
   const selectedFields = fields.filter((field) => period === 'both' || (period === 'period1' ? field.key.toLowerCase().includes('period1') || !field.key.toLowerCase().includes('period2') : field.key.toLowerCase().includes('period2') || !field.key.toLowerCase().includes('period1')))
   const headers = ['م', 'اسم الطلاب/ة', 'الرقم الأكاديمي', 'الهوية الوطنية', 'الشعبة', ...selectedFields.map((field) => `${field.label} (${field.max})`), `المجموع النهائي (${finalMaximum})`]
@@ -94,34 +95,32 @@ export function exportGradebookToPdf(divisionName: string, studentsData: Gradebo
   printWindow.document.close()
 }
 
-export async function exportEmptyGradebookTemplates(divisionCodes: string[]) {
+export async function exportEmptyGradebookTemplates(divisionCodes: string[], period: GradebookPeriod = 'both') {
   const response = await fetch('/api/students')
   const json = await response.json() as { data?: GradebookStudent[] }
   const students = json.data ?? []
   let schoolName = ''
   try { schoolName = (JSON.parse(localStorage.getItem('thabat-settings') ?? '{}') as { schoolName?: string }).schoolName ?? '' } catch { schoolName = '' }
   const workbook = new ExcelJS.Workbook()
+  const selectedTemplateFields = templateFields.filter((field) => period === 'both' || (period === 'period1' ? field.includes('الفترة 1') : field.includes('الفترة 2')))
+  const exportHeaders = [...headers.slice(0, 5), ...selectedTemplateFields, 'المجموع النهائي']
   const uniqueCodes = Array.from(new Set(divisionCodes)).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
   uniqueCodes.forEach((divisionCode) => {
     const worksheet = workbook.addWorksheet(divisionCode)
     worksheet.views = [{ rtl: true } as unknown as ExcelJS.WorksheetView]
-    worksheet.columns = [
-      { key: 'sequence', width: 8 }, { key: 'name', width: 30 }, { key: 'gpa', width: 18 },
-      { key: 'taskPeriod1', width: 18 }, { key: 'taskPeriod2', width: 18 }, { key: 'examPeriod1', width: 18 },
-      { key: 'examPeriod2', width: 18 }, { key: 'finalExam', width: 18 }, { key: 'total', width: 18 },
-    ]
+    worksheet.columns = exportHeaders.map((header, index) => ({ width: index === 1 ? 30 : index >= 5 ? 18 : 20 }))
     worksheet.addRow([schoolName])
-    worksheet.mergeCells(1, 1, 1, headers.length)
+    worksheet.mergeCells(1, 1, 1, exportHeaders.length)
     worksheet.getRow(1).font = { bold: true, size: 14 }
     worksheet.getRow(1).alignment = { horizontal: 'center' }
     worksheet.addRow(['قالب كشف درجات الطلاب/ة'])
-    worksheet.mergeCells(2, 1, 2, headers.length)
+    worksheet.mergeCells(2, 1, 2, exportHeaders.length)
     worksheet.getRow(2).font = { bold: true, size: 13 }
     worksheet.getRow(2).alignment = { horizontal: 'center' }
-    const headerRow = worksheet.addRow(headers)
+    const headerRow = worksheet.addRow(exportHeaders)
     headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BBB59' } }; cell.font = { bold: true }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true } })
     headerRow.height = 34
-    students.filter((student) => student.divisionCode === divisionCode).forEach((student, index) => worksheet.addRow([index + 1, student.fullName, student.gpa ?? '', '', '', '', '', '', '']))
+    students.filter((student) => student.divisionCode === divisionCode).forEach((student, index) => worksheet.addRow([index + 1, student.fullName, student.academicId ?? student.studentId ?? '', student.nationalId ?? '', student.divisionCode ?? divisionCode, ...selectedTemplateFields.map(() => ''), '']))
   })
   const buffer = await workbook.xlsx.writeBuffer()
   saveAs(new Blob([buffer]), 'قوالب_الدرجات_جميع_الشعب.xlsx')
@@ -137,7 +136,7 @@ export async function exportEmptyGradebookTemplatesToPdf(divisionCodes: string[]
   let schoolName = ''
   try { schoolName = (JSON.parse(localStorage.getItem('thabat-settings') ?? '{}') as { schoolName?: string }).schoolName ?? '' } catch { schoolName = '' }
   const sections = Array.from(new Set(divisionCodes)).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })).map((divisionCode) => {
-    const rows = students.filter((student) => student.divisionCode === divisionCode).sort((left, right) => left.fullName.localeCompare(right.fullName, 'ar')).map((student, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(student.fullName)}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')
+    const rows = students.filter((student) => student.divisionCode === divisionCode).sort((left, right) => left.fullName.localeCompare(right.fullName, 'ar')).map((student, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(student.fullName)}</td><td>${escapeHtml(student.academicId ?? student.studentId ?? '')}</td><td>${escapeHtml(student.nationalId ?? '')}</td><td>${escapeHtml(student.divisionCode ?? divisionCode)}</td>${Array.from({ length: 9 }, () => '<td></td>').join('')}</tr>`).join('')
     return `<section><h2>الشعبة ${escapeHtml(divisionCode)}</h2><table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></section>`
   }).join('')
   const printWindow = window.open('', '_blank', 'width=1200,height=800')

@@ -20,11 +20,11 @@ import { notifyPdfComingSoon, runExport } from "@/lib/export-feedback";
 export type GradebookRow = GradebookStudent;
 type GradeCategory = { key: string; label: string; max: number };
 const defaultCategories: GradeCategory[] = [
-  { key: "participationPeriod1", label: "مشاركة - الفترة 1", max: 30 },
+  { key: "participationPeriod1", label: "مشاركة - الفترة 1", max: 10 },
   { key: "performancePeriod1", label: "مهام أدائية - الفترة 1", max: 30 },
   { key: "quizPeriod1", label: "اختبار قصير - الفترة 1", max: 10 },
   { key: "practicalPeriod1", label: "جانب عملي - الفترة 1", max: 10 },
-  { key: "participationPeriod2", label: "مشاركة - الفترة 2", max: 30 },
+  { key: "participationPeriod2", label: "مشاركة - الفترة 2", max: 10 },
   { key: "performancePeriod2", label: "مهام أدائية - الفترة 2", max: 30 },
   { key: "quizPeriod2", label: "اختبار قصير - الفترة 2", max: 10 },
   { key: "practicalPeriod2", label: "جانب عملي - الفترة 2", max: 10 },
@@ -88,7 +88,7 @@ export function GradebookTable({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [toast, setToast] = useState<"success" | "error" | null>(null);
-  const [finalMaximum, setFinalMaximum] = useState(100);
+  const [finalMaximum, setFinalMaximum] = useState(60);
   const [categorySettings, setCategorySettings] =
     useState<GradeCategory[]>(defaultCategories);
   const [customScores, setCustomScores] = useState<
@@ -165,16 +165,22 @@ export function GradebookTable({
         localStorage.getItem(draftKey) ?? "null",
       ) as Record<string, Partial<GradebookStudent>> | null;
       if (savedSettings) {
-        const fields = savedSettings.fields ?? [
+        const savedFields = savedSettings.fields ?? [
           ...defaultCategories,
           ...(savedSettings.categories ?? []),
         ];
-        setFinalMaximum(savedSettings.finalMaximum ?? 100);
+        const fields = savedFields.map((field) => {
+          const corrected = defaultCategories.find((item) => item.key === field.key);
+          return corrected && ((field.key.includes("participation") && field.max === 30) || field.max === 40 || field.max === 20) ? corrected : field;
+        });
+        const migrated = fields.some((field, index) => field !== savedFields[index]);
+        const finalMaximum = migrated && savedSettings.finalMaximum === 100 ? 60 : savedSettings.finalMaximum ?? 60;
+        setFinalMaximum(finalMaximum);
         setCategorySettings(fields);
         localStorage.setItem(
           settingsKey,
           JSON.stringify({
-            finalMaximum: savedSettings.finalMaximum ?? 100,
+            finalMaximum,
             fields,
           }),
         );
@@ -228,7 +234,7 @@ export function GradebookTable({
   };
   const syncCustomization = (useDefault = false) => {
     const fields = useDefault ? defaultCategories : categorySettings;
-    const maximum = useDefault ? 100 : finalMaximum;
+    const maximum = useDefault ? 60 : finalMaximum;
     if (useDefault) {
       setFinalMaximum(maximum);
       setCategorySettings(fields);
@@ -240,7 +246,7 @@ export function GradebookTable({
     setMessage(locale === "ar" ? `تمت مزامنة الإعداد مع ${divisions.length} شعبة.` : `Preset synced to ${divisions.length} divisions.`);
   };
   const useDefaultPreset = () => {
-    setFinalMaximum(100);
+    setFinalMaximum(60);
     setCategorySettings(defaultCategories);
     setCustomScores({});
   };

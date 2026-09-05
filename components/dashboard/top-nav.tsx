@@ -11,9 +11,12 @@ import { Modal } from '@/components/ui/modal'
 import { useLanguage } from '@/components/language-provider'
 import { clearSession } from '@/lib/auth'
 import { getSession, type SessionUser } from '@/lib/auth'
+import { isCreatorRole } from '@/lib/permissions'
 
 type DBTeam = { id: string; label: string }
 type TransferNotification = { id: string; fromDivision: string; toDivision: string; createdAt: string; readAt: string | null; reviewedAt: string | null; students: Array<{ id: string; fullName: string; fromDivision: string; toDivision: string }>; grades: Array<{ id?: string; studentId: string; divisionId: string; subject: string; teacherId: string; taskPeriod1?: number | null; taskPeriod2?: number | null; examPeriod1?: number | null; examPeriod2?: number | null; finalExam?: number | null; customScores?: Record<string, number | null> }> }
+
+const canUseTeamSwitcher = (role?: string) => Boolean(role && (isCreatorRole(role) || role === 'PRINCIPAL' || role === 'VICE_PRINCIPAL' || role.startsWith('VP_')))
 
 export function TopNav() {
   const { dir, t, toggleLocale, locale } = useLanguage()
@@ -42,14 +45,15 @@ export function TopNav() {
   }
 
   useEffect(() => {
-    setSessionUser(getSession())
-    void loadTeams()
+    const currentSession = getSession()
+    setSessionUser(currentSession)
+    if (canUseTeamSwitcher(currentSession?.role)) void loadTeams()
     const syncTeam = () => {
       setTeamId(getStoredTeamId())
-      void loadTeams()
+      if (canUseTeamSwitcher(currentSession?.role)) void loadTeams()
     }
     const handleTeamsChange = () => {
-      void loadTeams()
+      if (canUseTeamSwitcher(currentSession?.role)) void loadTeams()
       setTeamId(getStoredTeamId())
     }
     window.addEventListener('thabat-team-changed', syncTeam)
@@ -189,7 +193,7 @@ export function TopNav() {
           <div className="flex items-center gap-2">
             {sessionUser && <button type="button" onClick={() => setNotificationsOpen(true)} className="relative inline-flex items-center justify-center rounded-lg p-2 text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300" aria-label={locale === 'ar' ? 'الإشعارات' : 'Notifications'}><Bell className="h-5 w-5" />{unreadNotifications > 0 && <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{unreadNotifications > 9 ? '9+' : unreadNotifications}</span>}</button>}
             {sessionUser && <Link href="/dashboard/profile" prefetch={false} className="hidden items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300 sm:flex"><User className="h-4 w-4" /><span>{sessionUser.name}</span></Link>}
-            <div className="relative hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-900 sm:flex">
+            {canUseTeamSwitcher(sessionUser?.role) && <div className="relative hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-900 sm:flex">
               <Users className="h-4 w-4 text-emerald-school-600" />
               <Select.Root value={teamId} onValueChange={handleTeamChange} dir={dir}>
                 <Select.Trigger className="flex items-center gap-2 bg-transparent text-sm text-slate-700 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 data-[state=open]:bg-transparent data-[state=open]:outline-none data-[state=open]:ring-0 dark:text-slate-200">
@@ -225,7 +229,7 @@ export function TopNav() {
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
-            </div>
+            </div>}
 
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
