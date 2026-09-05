@@ -69,6 +69,12 @@ export function TopNav() {
     void fetch('/api/transfer-notifications', { headers: { 'x-thabat-user-id': sessionUser.id } }).then((response) => response.json()).then((json: { data?: TransferNotification[] }) => setTransferNotifications(json.data ?? [])).catch(() => setTransferNotifications([]))
   }, [sessionUser])
 
+  useEffect(() => {
+    const openNotifications = () => setNotificationsOpen(true)
+    window.addEventListener('thabat-open-notifications', openNotifications)
+    return () => window.removeEventListener('thabat-open-notifications', openNotifications)
+  }, [])
+
   const unreadNotifications = transferNotifications.filter((notification) => !notification.readAt).length
   const openNotification = async (notification: TransferNotification) => {
     setSelectedNotification(notification)
@@ -191,7 +197,7 @@ export function TopNav() {
           </div>
 
           <div className="flex items-center gap-2">
-            {sessionUser && <button type="button" onClick={() => setNotificationsOpen(true)} className="relative inline-flex items-center justify-center rounded-lg p-2 text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300" aria-label={locale === 'ar' ? 'الإشعارات' : 'Notifications'}><Bell className="h-5 w-5" />{unreadNotifications > 0 && <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{unreadNotifications > 9 ? '9+' : unreadNotifications}</span>}</button>}
+            {sessionUser && <button type="button" onClick={() => setNotificationsOpen(true)} className="relative hidden items-center justify-center rounded-lg p-2 text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 sm:inline-flex dark:text-slate-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300" aria-label={locale === 'ar' ? 'الإشعارات' : 'Notifications'}><Bell className="h-5 w-5" />{unreadNotifications > 0 && <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{unreadNotifications > 9 ? '9+' : unreadNotifications}</span>}</button>}
             {sessionUser && <Link href="/dashboard/profile" prefetch={false} className="hidden items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300 sm:flex"><User className="h-4 w-4" /><span>{sessionUser.name}</span></Link>}
             {canUseTeamSwitcher(sessionUser?.role) && <div className="relative hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-900 sm:flex">
               <Users className="h-4 w-4 text-emerald-school-600" />

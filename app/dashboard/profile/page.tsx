@@ -17,7 +17,8 @@ export default function ProfilePage() {
   const [assignmentsEditing, setAssignmentsEditing] = useState(false)
   const [assignmentsSaving, setAssignmentsSaving] = useState(false)
   const [assignmentsMessage, setAssignmentsMessage] = useState('')
-    const { t, locale } = useLanguage()
+    const { t: translate, locale } = useLanguage()
+    const t = (key: Parameters<typeof translate>[0]) => key === 'addStudent' ? (locale === 'ar' ? 'إضافة توقيعك' : 'Add your signature') : translate(key)
   useEffect(() => { const sync = () => { const nextProfile = getCurrentProfile(); setProfile(nextProfile); setAssignments(nextProfile?.teachingAssignments ?? []); setSignature(getProfileSignature()) }; window.addEventListener('thabat-profile-signature-changed', sync); void fetch('/api/divisions').then((response) => response.json()).then((json) => setDivisions((json.data ?? []).map((item: { code: string }) => item.code))).catch(() => setDivisions([])); return () => window.removeEventListener('thabat-profile-signature-changed', sync) }, [])
   const saveAssignments = async () => {
     if (!profile) return

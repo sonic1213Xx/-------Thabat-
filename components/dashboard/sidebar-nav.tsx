@@ -23,6 +23,8 @@ import {
   ScanLine,
   Bus,
   Loader2,
+  Bell,
+  User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
@@ -141,6 +143,14 @@ export function SidebarNav() {
           </button>
         </div>
       </div>
+
+      {session && <div className="border-b border-slate-200/80 px-3 py-4 dark:border-slate-800/80 md:hidden">
+        <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-800/70">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"><User className="h-5 w-5" /></div>
+          <Link href="/dashboard/profile" prefetch={false} onClick={() => setMobileOpen(false)} className="min-w-0 flex-1 text-start"><span className="block truncate text-sm font-bold text-slate-900 dark:text-white">{session.name}</span><span className="block truncate text-xs text-slate-500 dark:text-slate-400">{session.role}</span></Link>
+          <button type="button" onClick={() => { setMobileOpen(false); window.dispatchEvent(new CustomEvent('thabat-open-notifications')) }} className="relative rounded-xl p-2 text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700" aria-label={locale === 'ar' ? 'الإشعارات' : 'Notifications'}><Bell className="h-5 w-5" /></button>
+        </div>
+      </div>}
 
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-3 py-4">
         {navItems.filter((item) => item.visible !== false).map((item) => {

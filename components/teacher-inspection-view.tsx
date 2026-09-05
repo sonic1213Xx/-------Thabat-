@@ -39,7 +39,7 @@ export function TeacherInspectionView({
           <button key={teacher.id} type="button" onClick={() => setSelectedTeacher(teacher)} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-start transition hover:border-emerald-400 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <span className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"><Users className="h-5 w-5" /></span>
-              <span><span className="block font-semibold text-slate-900 dark:text-white">{teacher.name}</span><span className="block text-xs text-slate-500">{assignments[teacher.id]?.length ?? 0} {locale === "ar" ? "شعبة مسندة" : "assigned divisions"}</span></span>
+              <span><span className="block font-semibold text-slate-900 dark:text-white">{teacher.name}</span>{teacher.subject && <span className="block text-xs font-medium text-emerald-700 dark:text-emerald-300">{teacher.subject}</span>}<span className="block text-xs text-slate-500">{assignments[teacher.id]?.length ? assignments[teacher.id].join("، ") : (locale === "ar" ? "لا توجد شعب مسندة" : "No assigned divisions")}</span></span>
             </span>
             <Eye className="h-4 w-4 text-emerald-600" />
           </button>
