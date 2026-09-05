@@ -1,5 +1,30 @@
 # 🎯 ثَبَت v1.1 - Complete Enhancement Implementation Summary
 
+## Update - September 5, 2026
+
+### Gate Scanner
+- Removed scanner audio completely; QR scanning no longer creates or plays any sound.
+- Added Arabic and English handling for unknown and previously used QR codes.
+- Added a full-screen animated verification checkmark rendered above the dashboard layout.
+- Preserved theme and RTL/LTR behavior.
+
+### Term-Based Gradebook
+- Matched the supplied Saudi workbooks with period 1 and period 2 assessment columns:
+  - Participation (30)
+  - Performance tasks (30)
+  - Short quiz (10)
+  - Practical component (10)
+- Added visible subject selection for teachers assigned to multiple subjects.
+- Kept scores, drafts, settings, API requests, cache keys, and database records isolated by subject.
+- Custom grade columns now appear in the table, totals, persistence, and Excel export.
+- Exports now populate student name, academic number, national ID, division, selected subject, teacher name, school name, and principal name when available.
+- School name is also included in empty Excel and PDF gradebook templates.
+- Gradebook API reads select only required score fields, while saves remain batched in one database transaction and cached by division, subject, and teacher.
+
+### Validation
+- `npx tsc --noEmit` passes.
+- `npm run build` passes and all application routes compile successfully.
+
 > **Current status (September 2, 2026):** The date/time and attribution enhancement is integrated with the current dashboard and API routes. In addition, the application now includes attendance tracking, reports, chat, teams/divisions management, and partial Arabic/English localization with a verified 500 ms language wave. Authentication remains a pending production concern.
 
 ## 📅 Implementation Date: September 1, 2026

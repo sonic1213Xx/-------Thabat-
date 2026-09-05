@@ -8,10 +8,11 @@ import {
   exportEmptyGradebookTemplates,
   exportGradebookToExcel,
   exportGradebookToPdf,
+  type GradebookExportMetadata,
   type GradebookPeriod,
   type GradebookStudent,
 } from "@/lib/export-gradebook";
-import { getSession } from "@/lib/auth";
+import { getProfiles, getSession } from "@/lib/auth";
 import { useLanguage } from "@/components/language-provider";
 import { useToast } from "@/components/toast-provider";
 import { notifyPdfComingSoon, runExport } from "@/lib/export-feedback";
@@ -19,11 +20,14 @@ import { notifyPdfComingSoon, runExport } from "@/lib/export-feedback";
 export type GradebookRow = GradebookStudent;
 type GradeCategory = { key: string; label: string; max: number };
 const defaultCategories: GradeCategory[] = [
-  { key: "taskPeriod1", label: "مهام فترة 1", max: 40 },
-  { key: "taskPeriod2", label: "مهام فترة 2", max: 40 },
-  { key: "examPeriod1", label: "اختبار فترة 1", max: 20 },
-  { key: "examPeriod2", label: "اختبار فترة 2", max: 20 },
-  { key: "finalExam", label: "اختبار نهائي", max: 40 },
+  { key: "participationPeriod1", label: "مشاركة - الفترة 1", max: 30 },
+  { key: "performancePeriod1", label: "مهام أدائية - الفترة 1", max: 30 },
+  { key: "quizPeriod1", label: "اختبار قصير - الفترة 1", max: 10 },
+  { key: "practicalPeriod1", label: "جانب عملي - الفترة 1", max: 10 },
+  { key: "participationPeriod2", label: "مشاركة - الفترة 2", max: 30 },
+  { key: "performancePeriod2", label: "مهام أدائية - الفترة 2", max: 30 },
+  { key: "quizPeriod2", label: "اختبار قصير - الفترة 2", max: 10 },
+  { key: "practicalPeriod2", label: "جانب عملي - الفترة 2", max: 10 },
 ];
 
 const scoreFields: Array<{ key: keyof GradebookStudent; max: number }> = [
@@ -240,6 +244,18 @@ export function GradebookTable({
     setCategorySettings(defaultCategories);
     setCustomScores({});
   };
+  const getExportMetadata = (): GradebookExportMetadata => {
+    let schoolName = "";
+    try {
+      schoolName = (JSON.parse(localStorage.getItem("thabat-settings") ?? "{}") as { schoolName?: string }).schoolName ?? "";
+    } catch {
+      schoolName = "";
+    }
+    const profiles = getProfiles();
+    const teacherProfile = profiles.find((profile) => profile.id === teacherId);
+    const principalProfile = profiles.find((profile) => profile.role === "PRINCIPAL");
+    return { schoolName, teacherName: teacherProfile?.name, subject, principalName: principalProfile?.name };
+  };
   const addColumn = () =>
     setCategorySettings((current) => [
       ...current,
@@ -250,16 +266,17 @@ export function GradebookTable({
       },
     ]);
   const visibleCategories = categorySettings
-    .filter((category) =>
-      scoreFields.some((field) => field.key === category.key),
-    )
     .filter(
       (category) =>
         selectedPeriod === "both" ||
         (selectedPeriod === "period1"
-          ? category.key.endsWith("Period1") || category.key === "finalExam"
-          : category.key.endsWith("Period2") || category.key === "finalExam"),
+          ? category.key.toLowerCase().includes("period1") || !category.key.toLowerCase().includes("period2")
+          : category.key.toLowerCase().includes("period2") || !category.key.toLowerCase().includes("period1")),
     );
+  const getCategoryScore = (row: GradebookStudent, category: GradeCategory) =>
+    scoreFields.some((field) => field.key === category.key)
+      ? row[category.key as keyof GradebookStudent]
+      : customScores[row.id]?.[category.key];
   const configuredMaximum = visibleCategories.reduce(
     (sum, category) => sum + category.max,
     0,
@@ -424,7 +441,7 @@ export function GradebookTable({
             type="button"
             onClick={() => {
               setIsExporting(true);
-              void runExport(() => exportGradebookToExcel(divisionName, rows, [], customScores, finalMaximum, categorySettings, selectedPeriod), exportToast, updateToast).finally(() => setIsExporting(false))
+              void runExport(() => exportGradebookToExcel(divisionName, rows, [], customScores, finalMaximum, categorySettings, selectedPeriod, getExportMetadata()), exportToast, updateToast).finally(() => setIsExporting(false))
             }}
             disabled={isExporting}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -614,7 +631,7 @@ export function GradebookTable({
       )}
       <div className="space-y-3 p-3 md:hidden">
         {rows.map((row, index) => {
-          const rawTotal = visibleCategories.reduce((sum, category) => sum + Number(row[category.key as keyof GradebookStudent] ?? 0), 0);
+          const rawTotal = visibleCategories.reduce((sum, category) => sum + Number(getCategoryScore(row, category) ?? 0), 0);
           const total = configuredMaximum ? Math.round((rawTotal / configuredMaximum) * finalMaximum * 100) / 100 : 0;
           return (
             <article key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
@@ -676,8 +693,7 @@ export function GradebookTable({
             {rows.map((row, index) => {
               const rawTotal = visibleCategories.reduce(
                 (sum, category) =>
-                  sum +
-                  Number(row[category.key as keyof GradebookStudent] ?? 0),
+                  sum + Number(getCategoryScore(row, category) ?? 0),
                 0,
               );
               const total =

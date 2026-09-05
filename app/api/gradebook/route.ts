@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const cacheKey = `thabat:gradebook:${divisionId}:${subject}:${teacherId}`
   const cached = await getCached<unknown[]>(cacheKey)
   if (cached) return NextResponse.json({ data: cached })
-  const scores = await prisma.gradebookScore.findMany({ where: { divisionId, subject, teacherId } })
+  const scores = await prisma.gradebookScore.findMany({ where: { divisionId, subject, teacherId }, select: { studentId: true, taskPeriod1: true, taskPeriod2: true, examPeriod1: true, examPeriod2: true, finalExam: true, customScoresJson: true } })
   const data = scores.map((score) => ({ ...score, customScores: JSON.parse(score.customScoresJson || '{}') }))
   await setCached(cacheKey, data, 15)
   return NextResponse.json({ data })

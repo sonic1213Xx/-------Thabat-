@@ -205,7 +205,7 @@ export default function StudentsPage() {
   const isTeacher = currentRole === 'TEACHER'
   const canEditStudents = currentRole ? can(currentRole, 'can_edit_students') : false
   const canDeleteStudents = currentRole ? can(currentRole, 'can_delete_records') : false
-  const gradebookRows: GradebookRow[] = visibleStudents.map((student) => ({ id: student.id, fullName: student.fullName, divisionCode: student.divisionCode, gpa: student.gpa }))
+  const gradebookRows: GradebookRow[] = visibleStudents.map((student) => ({ id: student.id, fullName: student.fullName, academicId: student.academicId, nationalId: student.nationalId, divisionCode: student.divisionCode, gpa: student.gpa }))
   const updateTeacherAssignments = (next: Record<string, string[]>) => {
     setTeacherAssignments(next)
     localStorage.setItem('thabat-teacher-divisions', JSON.stringify(next))
@@ -214,6 +214,9 @@ export default function StudentsPage() {
     ? teacherAssignments[currentUserId ?? ''] ?? []
     : divisionOptions
   const availableSubjects = Array.from(new Set(teachingAssignments.filter((assignment) => assignment.gradebook && (!division || assignment.divisions.length === 0 || assignment.divisions.includes(division))).map((assignment) => assignment.subject))).filter(Boolean)
+  useEffect(() => {
+    if (availableSubjects.length > 0 && !availableSubjects.includes(currentSubject)) setCurrentSubject(availableSubjects[0])
+  }, [availableSubjects.join('|'), currentSubject])
 
   const refreshStudents = async (selectedDivision = division) => {
     if (!selectedDivision) return
@@ -434,7 +437,7 @@ export default function StudentsPage() {
 
       {isTeacher && activeView === 'gradebook' && division && division !== 'all' && <>
         {gradebookRows.length > 0 ? <>
-          {availableSubjects.length > 1 && <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20"><span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{locale === 'ar' ? 'المادة:' : 'Subject:'}</span>{availableSubjects.map((subject) => <button key={subject} type="button" onClick={() => setCurrentSubject(subject)} className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${currentSubject === subject ? 'bg-emerald-600 text-white' : 'border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-slate-900 dark:text-emerald-300'}`}>{subject}</button>)}</div>}
+          {availableSubjects.length > 0 && <div className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20"><span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{locale === 'ar' ? 'مادة كشف الدرجات:' : 'Gradebook subject:'}</span><StyledSelect aria-label={locale === 'ar' ? 'مادة كشف الدرجات' : 'Gradebook subject'} value={currentSubject || availableSubjects[0]} onValueChange={setCurrentSubject} options={availableSubjects.map((subject) => ({ value: subject, label: subject }))} className="min-w-52" /></div>}
           <GradebookTable divisionName={division} subject={currentSubject || availableSubjects[0] || 'Unassigned subject'} teacherId={currentUserId ?? undefined} students={gradebookRows} allDivisionCodes={assignedDivisionOptions} readOnly={false} />
         </> : <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">{locale === 'ar' ? 'لا يوجد طلاب في هذه الشعبة بعد.' : 'No students are assigned to this division yet.'}</div>}
       </>}

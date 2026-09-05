@@ -8,7 +8,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (permission) return permission
   if (!body.action || !body.actorId) return NextResponse.json({ error: 'action and actorId are required.' }, { status: 400 })
   const pass = await prisma.gatePass.findFirst({ where: { OR: [{ id: params.id }, { qrToken: params.id }] } })
-  if (!pass) return NextResponse.json({ error: 'Gate pass not found.' }, { status: 404 })
+  if (!pass) return NextResponse.json({ code: 'QR_UNKNOWN', error: 'Gate pass not found.' }, { status: 404 })
   if (body.action === 'approve') {
     if (pass.status !== 'PENDING') return NextResponse.json({ error: 'Only pending passes can be approved.' }, { status: 409 })
     return NextResponse.json({ data: await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'APPROVED', approvedBy: body.actorId, approvedAt: new Date() } }) })
@@ -17,6 +17,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (pass.status !== 'PENDING') return NextResponse.json({ error: 'Only pending passes can be rejected.' }, { status: 409 })
     return NextResponse.json({ data: await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'REJECTED' } }) })
   }
+  if (pass.status === 'USED') return NextResponse.json({ code: 'QR_USED', error: 'Gate pass has already been used.' }, { status: 409 })
   if (pass.status !== 'APPROVED') return NextResponse.json({ error: 'Pass must be approved before scanning.' }, { status: 409 })
   if (pass.expiresAt && pass.expiresAt < new Date()) return NextResponse.json({ error: 'Gate pass has expired.' }, { status: 409 })
   const now = new Date()
