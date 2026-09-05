@@ -598,7 +598,19 @@ export default function AttendancePage() {
                 </button>
               </div>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900 md:hidden">
+              {group.students.map((student) => (
+                <article key={student.id} className={`rounded-lg border p-3 ${statuses[student.id] === "LEFT_WITH_PERMISSION" ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30" : "border-slate-200 dark:border-slate-700"}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 truncate font-semibold">{student.fullName}</p>
+                    <button type="button" onClick={() => openGatePass(student)} className="shrink-0 rounded-lg border border-blue-300 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:border-blue-700 dark:text-blue-300">{english ? "Gate pass" : "مستأذن"}</button>
+                  </div>
+                  <div className="mt-3"><AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))} options={options(english)} english={english} variant="buttons" /></div>
+                  <input value={notes[student.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [student.id]: event.target.value }))} placeholder={text.notes} aria-label={`${text.notes} ${student.fullName}`} className="mt-3 block w-full rounded-lg border px-3 py-2 text-sm leading-6 dark:bg-slate-900" />
+                </article>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:block">
               <table className="min-w-[58rem] w-full table-fixed text-sm">
                 <thead className="bg-slate-50 dark:bg-slate-800">
                   <tr>

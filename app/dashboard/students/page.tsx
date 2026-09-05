@@ -450,7 +450,7 @@ export default function StudentsPage() {
       {activeView === 'roster' && <>
       <div className="space-y-3 md:hidden">
         {paginatedStudents.map((student) => (
-          <article key={student.id} onClick={() => canEditStudents && setEditingStudent(student)} className={`rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 ${canEditStudents ? 'cursor-pointer' : ''}`}>
+          <article key={student.id} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="truncate font-bold text-slate-900 dark:text-white">{student.fullName}</h2>
