@@ -188,10 +188,11 @@ export async function POST(request: NextRequest) {
       if (user.role === 'TEACHER' && Array.from(groups.keys()).some((divisionId) => !assignedDivisions(user).includes(divisionId))) return forbidden()
       const studentIds = body.records.map((record) => record.studentId)
       const departed = await prisma.attendance.findMany({ where: { date: requestDate, status: 'LEFT_WITH_PERMISSION', studentId: { in: studentIds } }, select: { studentId: true } })
-      if (departed.length) return NextResponse.json({ error: 'Students with accepted gate passes cannot be edited.' }, { status: 409 })
-      const studentsInDivision = await prisma.student.findMany({ where: { id: { in: studentIds }, divisionCode: { in: Array.from(groups.keys()) } }, select: { id: true, divisionCode: true } })
-      if (studentsInDivision.length !== new Set(studentIds).size) return forbidden()
-      const recordsToSave = body.records.filter((record) => record.status !== 'UNMARKED')
+      const departedIds = new Set(departed.map((record) => record.studentId))
+      const writableRecords = body.records.filter((record) => !departedIds.has(record.studentId))
+      const studentsInDivision = await prisma.student.findMany({ where: { id: { in: writableRecords.map((record) => record.studentId) }, divisionCode: { in: Array.from(groups.keys()) } }, select: { id: true, divisionCode: true } })
+      if (studentsInDivision.length !== new Set(writableRecords.map((record) => record.studentId)).size) return forbidden()
+      const recordsToSave = writableRecords.filter((record) => record.status !== 'UNMARKED')
       for (let index = 0; index < recordsToSave.length; index += 50) {
         const operations = recordsToSave.slice(index, index + 50).map((record) => {
           const divisionId = record.divisionId || body.divisionId!
@@ -200,7 +201,9 @@ export async function POST(request: NextRequest) {
         await prisma.$transaction(operations)
       }
       for (const [divisionId, group] of groups) {
-        const statusMap = Object.fromEntries(group.map((record) => [record.studentId, record.status]))
+        const writableGroup = group.filter((record) => !departedIds.has(record.studentId))
+        if (!writableGroup.length) continue
+        const statusMap = Object.fromEntries(writableGroup.map((record) => [record.studentId, record.status]))
         const existing = await prisma.attendanceLog.findFirst({ where: { date: requestDate, divisionId, teacherId, mode: 'CLASS' }, orderBy: { createdAt: 'desc' } })
         let previous: Record<string, string> = {}
         try { previous = JSON.parse(existing?.statusMap || '{}') as Record<string, string> } catch { previous = {} }
@@ -232,23 +235,25 @@ export async function POST(request: NextRequest) {
     // Save or update attendance records
     if (user.role === 'TEACHER') return forbidden()
     const departed = await prisma.attendance.findMany({ where: { date: requestDate, status: 'LEFT_WITH_PERMISSION', studentId: { in: recordsToSave.map((record) => record.studentId) } }, select: { studentId: true } })
-    if (departed.length) return NextResponse.json({ error: 'Students with accepted gate passes cannot be edited.' }, { status: 409 })
+    const departedIds = new Set(departed.map((record) => record.studentId))
+    const writableRecords = recordsToSave.filter((record) => !departedIds.has(record.studentId))
+    if (!writableRecords.length) return NextResponse.json({ count: 0, skipped: departed.length, date: requestDate, escalations: [] })
     const escalations: Array<{ studentId: string; days: number; warningId: string; action: string }> = []
     const actor = await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } }) ?? await prisma.user.create({ data: { username: 'system', name: 'نظام ثَبَت', password: 'system-managed', role: 'PRINCIPAL', isActive: true } })
-    const existingAttendance = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: recordsToSave.map((record) => record.studentId) } }, select: { studentId: true } })
+    const existingAttendance = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: writableRecords.map((record) => record.studentId) } }, select: { studentId: true } })
     const existingAttendanceIds = new Set(existingAttendance.map((record) => record.studentId))
-    const newAttendance = recordsToSave.filter((record) => !existingAttendanceIds.has(record.studentId))
+    const newAttendance = writableRecords.filter((record) => !existingAttendanceIds.has(record.studentId))
     if (newAttendance.length) {
       await prisma.attendance.createMany({ data: newAttendance.map((record) => ({ studentId: record.studentId, date: requestDate, status: record.status, notes: record.notes || null, markedBy: body.markedBy || null, markedByName: body.markedByName || null })), skipDuplicates: true })
     }
     for (let index = 0; index < recordsToSave.length; index += 50) {
-      const batch = recordsToSave.slice(index, index + 50).filter((record) => existingAttendanceIds.has(record.studentId))
+      const batch = writableRecords.slice(index, index + 50).filter((record) => existingAttendanceIds.has(record.studentId))
       if (batch.length) {
         await prisma.$transaction(batch.map((record) => prisma.attendance.update({ where: { studentId_date: { studentId: record.studentId, date: requestDate } }, data: { status: record.status, notes: record.notes || null, markedBy: body.markedBy || null, markedByName: body.markedByName || null, updatedAt: new Date() } })))
       }
     }
-    const saved = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: recordsToSave.map((record) => record.studentId) } }, select: { id: true, studentId: true, date: true, status: true, notes: true, markedBy: true, markedByName: true, updatedAt: true } })
-    const absentStudentIds = Array.from(new Set(recordsToSave.filter((record) => record.status === 'ABSENT_UNEXCUSED').map((record) => record.studentId)))
+    const saved = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: writableRecords.map((record) => record.studentId) } }, select: { id: true, studentId: true, date: true, status: true, notes: true, markedBy: true, markedByName: true, updatedAt: true } })
+    const absentStudentIds = Array.from(new Set(writableRecords.filter((record) => record.status === 'ABSENT_UNEXCUSED').map((record) => record.studentId)))
     if (absentStudentIds.length) {
       const absenceCounts = await prisma.attendance.groupBy({
         by: ['studentId'],
@@ -281,9 +286,9 @@ export async function POST(request: NextRequest) {
     }
 
     const statusByDivision = new Map<string, Record<string, string>>()
-    const students = await prisma.student.findMany({ where: { id: { in: body.records.map((record) => record.studentId) } }, select: { id: true, divisionCode: true } })
+    const students = await prisma.student.findMany({ where: { id: { in: writableRecords.map((record) => record.studentId) } }, select: { id: true, divisionCode: true } })
     const studentDivisions = new Map(students.map((student) => [student.id, student.divisionCode]))
-    for (const record of body.records) {
+    for (const record of writableRecords) {
       const divisionCode = studentDivisions.get(record.studentId)
       if (divisionCode) statusByDivision.set(divisionCode, { ...(statusByDivision.get(divisionCode) ?? {}), [record.studentId]: record.status })
     }

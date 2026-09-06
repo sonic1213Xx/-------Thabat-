@@ -247,6 +247,7 @@ export default function AttendancePage() {
     );
     const initialMap = initialAttendanceMapRef.current;
     const changedRecords = currentRecords.filter((record) => {
+      if (statuses[record.studentId] === "LEFT_WITH_PERMISSION") return false;
       const initial = initialMap.get(record.studentId);
       return record.status !== initial?.status || record.note !== initial?.note;
     });
@@ -606,7 +607,7 @@ export default function AttendancePage() {
                     <p className={`min-w-0 truncate rounded-md px-2 py-1 font-semibold ${statusOverlay(statuses[student.id] ?? undefined)}`}>{student.fullName}</p>
                   </div>
                   <div className="mt-3">{statuses[student.id] === "LEFT_WITH_PERMISSION" ? <button type="button" disabled className="w-full cursor-not-allowed rounded-lg border border-blue-400 bg-blue-100 px-3 py-2 text-sm font-bold text-blue-800 shadow-[0_0_18px_rgba(59,130,246,0.45)] dark:bg-blue-950/50 dark:text-blue-200">{english ? "Left with permission" : "خرج بإذن"}</button> : <AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))} options={options(english)} english={english} variant="buttons" />}</div>
-                  <textarea value={notes[student.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [student.id]: event.target.value }))} placeholder={text.notes} aria-label={`${text.notes} ${student.fullName}`} rows={2} className="mt-3 block min-h-16 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-6 dark:bg-slate-900" />
+                  <textarea value={notes[student.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [student.id]: event.target.value }))} disabled={statuses[student.id] === "LEFT_WITH_PERMISSION"} placeholder={text.notes} aria-label={`${text.notes} ${student.fullName}`} rows={2} className="mt-3 block min-h-16 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-6 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-900" />
                 </article>
               ))}
             </div>
@@ -634,6 +635,7 @@ export default function AttendancePage() {
                       <td className="w-[30%] min-w-[18rem] max-w-[30rem] overflow-hidden px-4 py-3">
                         <textarea
                           value={notes[student.id] ?? ""}
+                          disabled={statuses[student.id] === "LEFT_WITH_PERMISSION"}
                           onChange={(event) =>
                             setNotes((current) => ({
                               ...current,
