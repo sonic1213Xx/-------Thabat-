@@ -155,6 +155,7 @@ export async function exportAttendanceWorkbook(
   suppliedStudents: AttendanceExportStudent[],
   profile: AttendanceExportProfile,
   userId?: string,
+  dailyOnly = false,
 ) {
   const records = suppliedStudents.filter(
     (student) =>
@@ -172,7 +173,7 @@ export async function exportAttendanceWorkbook(
     return day.toISOString().slice(0, 10);
   });
   const weeklyStatuses = new Map<string, Map<string, string>>();
-  if (userId) {
+  if (!dailyOnly && userId) {
     await Promise.all(weekDates.flatMap((weekDate) => divisionCodes.map(async (divisionCode) => {
       const params = new URLSearchParams({ date: weekDate, divisionId: divisionCode, mode: profile.role === "TEACHER" ? "CLASS" : "SCHOOL" });
       if (profile.role === "TEACHER") params.set("teacherId", userId);
@@ -246,7 +247,22 @@ export async function exportAttendanceWorkbook(
       });
     styleTable(sheet, [5]);
   });
-  ["الحالة الأسبوعية (الجميع)", "الغائبون أسبوعياً فقط"].forEach(
+  if (dailyOnly) {
+    const sheet = workbook.addWorksheet("الحالة اليومية المحددة");
+    setup(sheet, false, images, profile, divisionCodes);
+    sheet.columns = [{ width: 3 }, { width: 18 }, { width: 30 }, { width: 18 }, { width: 18 }, { width: 42 }];
+    sheet.getRow(9).values = ["", "رقم الطالب", "اسم الطالب", "الشعبة / الفصل", "حالة الحضور", "ملاحظات المعلم / الإجراء"];
+    let currentDivision = "";
+    records.forEach((student) => {
+      if (student.divisionCode !== currentDivision) {
+        currentDivision = student.divisionCode ?? "";
+        addDivisionHeader(sheet, currentDivision, "F");
+      }
+      sheet.addRow(["", student.id, student.fullName, `الشعبة ${student.divisionCode}`, statusLabel(student.status), student.notes || ""]);
+    });
+    styleTable(sheet, [5]);
+  }
+  if (!dailyOnly) ["الحالة الأسبوعية (الجميع)", "الغائبون أسبوعياً فقط"].forEach(
     (name, index) => {
       const sheet = workbook.addWorksheet(name);
       setup(sheet, true, images, profile, divisionCodes);

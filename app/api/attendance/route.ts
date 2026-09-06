@@ -24,19 +24,48 @@ export async function GET(request: NextRequest) {
     const mode = request.nextUrl.searchParams.get('mode') ?? 'SCHOOL'
     const requestedDivision = request.nextUrl.searchParams.get('divisionId')
     if (request.nextUrl.searchParams.get('logs') === 'true') {
-      const records = await prisma.attendance.findMany({
-        where: {
-          status: { in: ['ABSENT_EXCUSED', 'ABSENT_UNEXCUSED', 'LATE', 'OTHER'] },
-          ...(user.role === 'TEACHER' ? { student: { divisionCode: { in: assignedDivisions(user) } } } : {}),
-        },
-        orderBy: [{ date: 'desc' }, { student: { fullName: 'asc' } }],
-        take: 5000,
-        select: { id: true, date: true, status: true, notes: true, student: { select: { id: true, fullName: true, divisionCode: true } } },
+      const date = request.nextUrl.searchParams.get('date')
+      const divisionId = request.nextUrl.searchParams.get('divisionId')
+      const allowedDivisions = user.role === 'TEACHER' ? assignedDivisions(user) : undefined
+      if (user.role === 'TEACHER' && divisionId && divisionId !== 'ALL' && !allowedDivisions?.includes(divisionId)) return forbidden()
+      const divisionFilter = divisionId && divisionId !== 'ALL' ? [divisionId] : allowedDivisions
+      if (!date) {
+        const month = request.nextUrl.searchParams.get('month')
+        const sessions = await prisma.attendanceLog.findMany({
+          where: {
+            ...(month ? { date: { startsWith: month } } : {}),
+            ...(divisionFilter?.length ? { divisionId: { in: divisionFilter } } : {}),
+            ...(user.role === 'TEACHER' ? { teacherId: user.id } : {}),
+          },
+          orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+          take: 200,
+          select: { id: true, date: true, divisionId: true, teacherId: true, mode: true, presentCount: true, absentCount: true, createdAt: true },
+        })
+        const latestSessions = new Map<string, typeof sessions[number]>()
+        for (const session of sessions) {
+          const key = `${session.date}:${session.divisionId}:${session.mode}`
+          if (!latestSessions.has(key)) latestSessions.set(key, session)
+        }
+        return NextResponse.json({ data: Array.from(latestSessions.values()) })
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'A valid date is required' }, { status: 400 })
+      const students = await prisma.student.findMany({
+        where: { isActive: true, ...(divisionFilter?.length ? { divisionCode: { in: divisionFilter } } : {}) },
+        select: { id: true, fullName: true, divisionCode: true },
+        orderBy: { fullName: 'asc' },
       })
-      return NextResponse.json({ data: records.map((record) => ({ ...record, studentId: record.student.id, studentName: record.student.fullName, divisionCode: record.student.divisionCode, hasDoctorNote: record.status === 'ABSENT_EXCUSED' || Boolean(record.notes?.trim()) })) })
+      const records = await prisma.attendance.findMany({
+        where: { date, ...(divisionFilter?.length ? { student: { divisionCode: { in: divisionFilter } } } : {}) },
+        select: { id: true, studentId: true, date: true, status: true, notes: true },
+      })
+      const recordMap = new Map(records.map((record) => [record.studentId, record]))
+      return NextResponse.json({ data: students.map((student) => {
+        const record = recordMap.get(student.id)
+        return { id: record?.id ?? `temp-${student.id}`, studentId: student.id, studentName: student.fullName, divisionCode: student.divisionCode, date, status: record?.status ?? 'UNMARKED', notes: record?.notes ?? null, hasDoctorNote: record?.status === 'ABSENT_EXCUSED' || Boolean(record?.notes?.trim()) }
+      }) })
     }
     if (user.role === 'TEACHER' && mode !== 'CLASS') return forbidden()
-    if (user.role === 'TEACHER' && (!requestedDivision || !assignedDivisions(user).includes(requestedDivision))) return forbidden()
+    if (user.role === 'TEACHER' && requestedDivision && !assignedDivisions(user).includes(requestedDivision)) return forbidden()
     if (request.nextUrl.searchParams.get('history') === 'true') {
       const logs = await prisma.attendanceLog.findMany({
         where: {
@@ -68,8 +97,10 @@ export async function GET(request: NextRequest) {
       if (user.role === 'TEACHER' && divisionIds?.some((divisionId) => !assignedDivisions(user).includes(divisionId))) return forbidden()
       const students = await prisma.student.findMany({ where: { isActive: true, ...(divisionIds ? { divisionCode: { in: divisionIds } } : {}) }, select: { id: true, fullName: true, divisionCode: true }, orderBy: { fullName: 'asc' } })
       const records = await prisma.classAttendance.findMany({ where: { date, ...(divisionIds ? { divisionId: { in: divisionIds } } : {}), teacherId }, select: { studentId: true, status: true, updatedAt: true } })
+      const departed = await prisma.attendance.findMany({ where: { date, status: 'LEFT_WITH_PERMISSION', studentId: { in: students.map((student) => student.id) } }, select: { studentId: true } })
+      const departedIds = new Set(departed.map((record) => record.studentId))
       const recordMap = new Map(records.map((record) => [record.studentId, record]))
-      return NextResponse.json({ data: students.map((student) => ({ ...student, studentId: student.id, status: recordMap.get(student.id)?.status ?? 'UNMARKED' })), date, mode })
+      return NextResponse.json({ data: students.map((student) => ({ ...student, studentId: student.id, status: departedIds.has(student.id) ? 'LEFT_WITH_PERMISSION' : recordMap.get(student.id)?.status ?? 'UNMARKED' })), date, mode })
     }
 
     // Get all active students for campus entry attendance.
@@ -156,6 +187,8 @@ export async function POST(request: NextRequest) {
       if (!teacherId) return NextResponse.json({ error: 'teacherId is required for class attendance' }, { status: 400 })
       if (user.role === 'TEACHER' && Array.from(groups.keys()).some((divisionId) => !assignedDivisions(user).includes(divisionId))) return forbidden()
       const studentIds = body.records.map((record) => record.studentId)
+      const departed = await prisma.attendance.findMany({ where: { date: requestDate, status: 'LEFT_WITH_PERMISSION', studentId: { in: studentIds } }, select: { studentId: true } })
+      if (departed.length) return NextResponse.json({ error: 'Students with accepted gate passes cannot be edited.' }, { status: 409 })
       const studentsInDivision = await prisma.student.findMany({ where: { id: { in: studentIds }, divisionCode: { in: Array.from(groups.keys()) } }, select: { id: true, divisionCode: true } })
       if (studentsInDivision.length !== new Set(studentIds).size) return forbidden()
       const recordsToSave = body.records.filter((record) => record.status !== 'UNMARKED')
@@ -167,9 +200,15 @@ export async function POST(request: NextRequest) {
         await prisma.$transaction(operations)
       }
       for (const [divisionId, group] of groups) {
-          await prisma.attendanceLog.create({ data: { date: requestDate, divisionId, teacherId, mode: 'CLASS', statusMap: JSON.stringify(Object.fromEntries(group.map((record) => [record.studentId, record.status]))), recordsJson: JSON.stringify(Object.fromEntries(group.map((record) => [record.studentId, record.status]))), presentCount: group.filter((record) => record.status === 'PRESENT').length, absentCount: group.filter((record) => record.status.startsWith('ABSENT')).length } })
-        }
-        return NextResponse.json({ data: recordsToSave, count: recordsToSave.length, date: requestDate, mode: 'CLASS' })
+        const statusMap = Object.fromEntries(group.map((record) => [record.studentId, record.status]))
+        const existing = await prisma.attendanceLog.findFirst({ where: { date: requestDate, divisionId, teacherId, mode: 'CLASS' }, orderBy: { createdAt: 'desc' } })
+        let previous: Record<string, string> = {}
+        try { previous = JSON.parse(existing?.statusMap || '{}') as Record<string, string> } catch { previous = {} }
+        const merged = { ...previous, ...statusMap }
+        await prisma.attendanceLog.deleteMany({ where: { date: requestDate, divisionId, teacherId, mode: 'CLASS' } })
+        await prisma.attendanceLog.create({ data: { date: requestDate, divisionId, teacherId, mode: 'CLASS', statusMap: JSON.stringify(merged), recordsJson: JSON.stringify(merged), presentCount: Object.values(merged).filter((status) => status === 'PRESENT').length, absentCount: Object.values(merged).filter((status) => status.startsWith('ABSENT')).length } })
+      }
+        return NextResponse.json({ count: recordsToSave.length, date: requestDate, mode: 'CLASS' })
     }
 
     // Validate date format
@@ -192,6 +231,8 @@ export async function POST(request: NextRequest) {
 
     // Save or update attendance records
     if (user.role === 'TEACHER') return forbidden()
+    const departed = await prisma.attendance.findMany({ where: { date: requestDate, status: 'LEFT_WITH_PERMISSION', studentId: { in: recordsToSave.map((record) => record.studentId) } }, select: { studentId: true } })
+    if (departed.length) return NextResponse.json({ error: 'Students with accepted gate passes cannot be edited.' }, { status: 409 })
     const escalations: Array<{ studentId: string; days: number; warningId: string; action: string }> = []
     const actor = await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } }) ?? await prisma.user.create({ data: { username: 'system', name: 'نظام ثَبَت', password: 'system-managed', role: 'PRINCIPAL', isActive: true } })
     const existingAttendance = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: recordsToSave.map((record) => record.studentId) } }, select: { studentId: true } })
@@ -246,10 +287,17 @@ export async function POST(request: NextRequest) {
       const divisionCode = studentDivisions.get(record.studentId)
       if (divisionCode) statusByDivision.set(divisionCode, { ...(statusByDivision.get(divisionCode) ?? {}), [record.studentId]: record.status })
     }
-    const logRows = Array.from(statusByDivision.entries()).map(([divisionId, statusMap]) => ({ date: requestDate, divisionId, teacherId: body.markedBy || null, mode: 'SCHOOL', statusMap: JSON.stringify(statusMap) }))
-    if (logRows.length) await prisma.attendanceLog.createMany({ data: logRows })
+    for (const [divisionId, statusMap] of statusByDivision.entries()) {
+      const teacherId = body.markedBy || null
+      const existing = await prisma.attendanceLog.findFirst({ where: { date: requestDate, divisionId, teacherId, mode: 'SCHOOL' }, orderBy: { createdAt: 'desc' } })
+      let previous: Record<string, string> = {}
+      try { previous = JSON.parse(existing?.statusMap || '{}') as Record<string, string> } catch { previous = {} }
+      const merged = { ...previous, ...statusMap }
+      await prisma.attendanceLog.deleteMany({ where: { date: requestDate, divisionId, teacherId, mode: 'SCHOOL' } })
+      await prisma.attendanceLog.create({ data: { date: requestDate, divisionId, teacherId, mode: 'SCHOOL', statusMap: JSON.stringify(merged), recordsJson: JSON.stringify(merged), presentCount: Object.values(merged).filter((status) => status === 'PRESENT').length, absentCount: Object.values(merged).filter((status) => status.startsWith('ABSENT')).length } })
+    }
 
-    return NextResponse.json({ data: saved, count: saved.length, date: requestDate, escalations })
+    return NextResponse.json({ count: saved.length, date: requestDate, escalations })
   } catch (error) {
     console.error('Attendance POST error:', error)
     return NextResponse.json({ error: 'Unable to save attendance records' }, { status: 500 })

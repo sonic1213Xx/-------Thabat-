@@ -1,19 +1,16 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarCheck, Check, FileText, Loader2, Save, X } from "lucide-react";
 import { AttendanceStatusSelect } from "@/components/ui/attendance-status-select";
 import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
 import { exportAttendanceWorkbook } from "@/lib/export-attendance-fixed";
 import { useToast } from "@/components/toast-provider";
 import { notifyPdfComingSoon, runExport } from "@/lib/export-feedback";
 import { fetchCached, invalidateCached } from "@/lib/client-cache";
-import { AttendanceLogsModal, type AttendanceLogRow } from "@/components/attendance/attendance-logs-modal";
-import { StudentAttendanceModal } from "@/components/attendance/student-attendance-modal";
+import { AttendanceLogsModal } from "@/components/attendance/attendance-logs-modal";
 
 type Status =
   | "UNMARKED"
@@ -49,16 +46,18 @@ const options = (english: boolean) => [
 
 export default function AttendancePage() {
   const { dir, locale, t } = useLanguage();
-  const router = useRouter();
   const { showToast, updateToast } = useToast();
   const english = locale === "en";
   const session = getSession();
   const profile = getCurrentProfile();
   const isTeacher = session?.role === "TEACHER";
+  const teachingDivisions = Array.from(new Set(profile?.teachingAssignments?.filter((assignment) => assignment.attendance !== false).flatMap((assignment) => assignment.divisions) ?? []));
+  const isClassOnly = isTeacher;
+  const canClassAttendance = isTeacher || teachingDivisions.length > 0;
   const canExportAttendanceTemplates = Boolean(session);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [mode, setMode] = useState<"SCHOOL" | "CLASS">(
-    isTeacher ? "CLASS" : "SCHOOL",
+    canClassAttendance ? "CLASS" : "SCHOOL",
   );
   const [students, setStudents] = useState<Student[]>([]);
   const [statuses, setStatuses] = useState<Record<string, Status | null>>({});
@@ -76,7 +75,6 @@ export default function AttendancePage() {
   const [exportType, setExportType] = useState<"EXCEL" | "PDF">("EXCEL");
   const [isExporting, setIsExporting] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
-  const [selectedLogStudent, setSelectedLogStudent] = useState<AttendanceLogRow | null>(null);
   const studentsRequestRef = useRef<string | null>(null);
   const attendanceRequestRef = useRef<string | null>(null);
   const hasFetchedRef = useRef<string | null>(null);
@@ -104,7 +102,7 @@ export default function AttendancePage() {
             .filter((code): code is string => Boolean(code)),
         ),
       )
-        .filter((code) => !isTeacher || assigned.includes(code))
+            .filter((code) => !canClassAttendance || teachingDivisions.includes(code) || (isTeacher && assigned.includes(code)))
         .sort((a, b) => a.localeCompare(b, "en", { numeric: true }))
         .map((code) => ({
           code,
@@ -113,7 +111,7 @@ export default function AttendancePage() {
               ?.gradeLevel ?? null,
           students: students.filter((student) => student.divisionCode === code),
         })),
-    [students, isTeacher, assigned],
+    [students, canClassAttendance, teachingDivisions.join(","), isTeacher, assigned],
   );
   const divisionKey = divisions.map((group) => group.code).join(",");
 
@@ -132,6 +130,7 @@ export default function AttendancePage() {
     const headers = session?.id
       ? { "x-thabat-user-id": session.id }
       : undefined;
+    const allowedTeachingDivisions = teachingDivisions.length ? teachingDivisions : assigned;
     const load = async () => {
       setLoadingStudents(true);
       try {
@@ -147,9 +146,9 @@ export default function AttendancePage() {
               assigned_divisions: profile.assigned_divisions ?? [],
             }),
           }).then(() => { if (syncKey) window.sessionStorage.setItem(syncKey, "true"); });
-        const responses = isTeacher
+        const responses = canClassAttendance
           ? await Promise.all(
-              assigned.map((code) =>
+            allowedTeachingDivisions.map((code) =>
                 fetchCached<{ data?: Student[] }>(`students:${code}`, `/api/students?division=${encodeURIComponent(code)}`, {
                   headers,
                 }),
@@ -164,13 +163,15 @@ export default function AttendancePage() {
         setLoadingStudents(false);
       }
     };
-    if (isTeacher && !assigned.length) {
+    if (canClassAttendance && !allowedTeachingDivisions.length) {
       setStudents([]);
       setLoadingStudents(false);
     }
     else void load().catch(() => setMessage("تعذر تحميل الحضور."));
   }, [
     isTeacher,
+    canClassAttendance,
+    teachingDivisions.join(","),
     assigned.join(","),
     session?.id,
     session?.role,
@@ -214,33 +215,22 @@ export default function AttendancePage() {
   }, [date, mode, divisionKey, session?.id]);
 
   const setStudentStatus = (studentId: string, status: Status) =>
-    setStatuses((current) => ({ ...current, [studentId]: status }));
+    setStatuses((current) => current[studentId] === "LEFT_WITH_PERMISSION" ? current : ({ ...current, [studentId]: status }));
   const setDivisionStatus = (code: string, status: Status) =>
     setStatuses((current) => ({
       ...current,
       ...Object.fromEntries(
         students
           .filter((student) => student.divisionCode === code)
+          .filter((student) => statuses[student.id] !== "LEFT_WITH_PERMISSION")
           .map((student) => [student.id, status]),
       ),
     }));
   const setMasterStatus = (status: Status) =>
     setStatuses((current) => ({
       ...current,
-      ...Object.fromEntries(students.map((student) => [student.id, status])),
+      ...Object.fromEntries(students.filter((student) => statuses[student.id] !== "LEFT_WITH_PERMISSION").map((student) => [student.id, status])),
     }));
-  const openGatePass = (student: Student) => {
-    if (!hasPermission(session?.role, "gate_passes", "create")) {
-      void fetchCached<{ data?: Array<{ name: string; role: string }> }>("dashboard:gate-pass-contacts", "/api/users")
-        .then((response) => {
-          const contacts = (response.data ?? []).filter((user) => hasPermission(user.role, "gate_passes", "create")).map((user) => user.name);
-          setMessage(english ? `You do not have permission. Contact: ${contacts.join(", ") || "an authorized staff member"}.` : `لا تملك صلاحية إصدار التصريح. تواصل مع: ${contacts.join("، ") || "المسؤول المخول"}.`);
-        })
-        .catch(() => setMessage(english ? "You do not have permission to issue a gate pass. Contact an authorized staff member." : "لا تملك صلاحية إصدار تصريح خروج. تواصل مع المسؤول المخول."));
-      return;
-    }
-    router.push(`/dashboard/vice-principal?studentId=${encodeURIComponent(student.id)}`);
-  };
   const save = async () => {
     if (!session?.id) return;
     const currentRecords = divisions.flatMap((group) =>
@@ -389,6 +379,18 @@ export default function AttendancePage() {
           loading: "جارٍ تحميل بيانات الحضور...",
       };
 
+  const statusOverlay = (status?: Status) => status === "PRESENT"
+    ? "border-emerald-300 bg-emerald-50/80 shadow-[inset_0_0_22px_rgba(16,185,129,0.16)] dark:bg-emerald-950/20"
+    : status === "ABSENT_UNEXCUSED"
+      ? "border-red-300 bg-red-50/80 shadow-[inset_0_0_22px_rgba(239,68,68,0.16)] dark:bg-red-950/20"
+      : status === "ABSENT_EXCUSED"
+        ? "border-amber-300 bg-amber-50/80 shadow-[inset_0_0_22px_rgba(245,158,11,0.16)] dark:bg-amber-950/20"
+        : status === "LATE"
+          ? "border-yellow-300 bg-yellow-50/80 shadow-[inset_0_0_22px_rgba(234,179,8,0.18)] dark:bg-yellow-950/20"
+          : status === "LEFT_WITH_PERMISSION"
+            ? "border-blue-300 bg-blue-50/80 shadow-[inset_0_0_24px_rgba(59,130,246,0.22)] dark:bg-blue-950/25"
+            : "border-slate-200 dark:border-slate-700";
+
         const attendanceKey = `${session?.id ?? "anonymous"}:${date}:${mode}:${divisionKey}`;
         const isLoading = loadingStudents || loadingAttendance || (Boolean(students.length && divisions.length && session?.id) && attendanceLoadedKey !== attendanceKey);
 
@@ -408,13 +410,13 @@ export default function AttendancePage() {
               onChange={(event) => setDate(event.target.value)}
               className="col-span-2 min-w-0 rounded-lg border px-3 py-2 text-sm dark:bg-slate-900 md:col-span-1"
             />
-            <button
+            {!isClassOnly && <button
               type="button"
               onClick={() => setMode(mode === "SCHOOL" ? "CLASS" : "SCHOOL")}
               className="min-w-0 rounded-lg border border-slate-300 px-2 py-2 text-xs dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 md:px-3 md:text-sm"
             >
               {mode === "SCHOOL" ? text.school : text.class}
-            </button>
+            </button>}
             <button
               type="button"
               onClick={() => setMasterStatus("PRESENT")}
@@ -560,8 +562,7 @@ export default function AttendancePage() {
           <div className="w-full max-w-md space-y-3"><p className="font-semibold text-slate-700 dark:text-slate-200">{text.loading}</p><div className="h-3 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-3 w-4/5 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-3 w-3/5 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /></div>
         </div>
       )}
-      <AttendanceLogsModal open={logsOpen} onClose={() => setLogsOpen(false)} english={english} onStudentClick={(student) => { setLogsOpen(false); setSelectedLogStudent(student); }} />
-      {selectedLogStudent && <StudentAttendanceModal open={true} onClose={() => setSelectedLogStudent(null)} studentId={selectedLogStudent.studentId} studentName={selectedLogStudent.studentName} />}
+      <AttendanceLogsModal open={logsOpen} onClose={() => setLogsOpen(false)} english={english} />
       <main className={`space-y-8 ${isLoading ? "hidden" : ""}`}>
         {visibleDivisions.map((group) => (
           <section
@@ -600,46 +601,38 @@ export default function AttendancePage() {
             </div>
             <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900 md:hidden">
               {group.students.map((student) => (
-                <article key={student.id} className={`rounded-lg border p-3 ${statuses[student.id] === "LEFT_WITH_PERMISSION" ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30" : "border-slate-200 dark:border-slate-700"}`}>
+                <article key={student.id} className={`[content-visibility:auto] [contain-intrinsic-size:0_132px] rounded-lg border p-3 ${statusOverlay(statuses[student.id] ?? undefined)}`}>
                   <div className="flex items-start justify-between gap-3">
-                    <p className="min-w-0 truncate font-semibold">{student.fullName}</p>
-                    <button type="button" onClick={() => openGatePass(student)} className="shrink-0 rounded-lg border border-blue-300 px-2.5 py-1.5 text-xs font-semibold text-blue-700 dark:border-blue-700 dark:text-blue-300">{english ? "Gate pass" : "مستأذن"}</button>
+                    <p className={`min-w-0 truncate rounded-md px-2 py-1 font-semibold ${statusOverlay(statuses[student.id] ?? undefined)}`}>{student.fullName}</p>
                   </div>
-                  <div className="mt-3"><AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))} options={options(english)} english={english} variant="buttons" /></div>
-                  <input value={notes[student.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [student.id]: event.target.value }))} placeholder={text.notes} aria-label={`${text.notes} ${student.fullName}`} className="mt-3 block w-full rounded-lg border px-3 py-2 text-sm leading-6 dark:bg-slate-900" />
+                  <div className="mt-3">{statuses[student.id] === "LEFT_WITH_PERMISSION" ? <button type="button" disabled className="w-full cursor-not-allowed rounded-lg border border-blue-400 bg-blue-100 px-3 py-2 text-sm font-bold text-blue-800 shadow-[0_0_18px_rgba(59,130,246,0.45)] dark:bg-blue-950/50 dark:text-blue-200">{english ? "Left with permission" : "خرج بإذن"}</button> : <AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))} options={options(english)} english={english} variant="buttons" />}</div>
+                  <textarea value={notes[student.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [student.id]: event.target.value }))} placeholder={text.notes} aria-label={`${text.notes} ${student.fullName}`} rows={2} className="mt-3 block min-h-16 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-6 dark:bg-slate-900" />
                 </article>
               ))}
             </div>
             <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:block">
-              <table className="min-w-[58rem] w-full table-fixed text-sm">
+              <table className="min-w-[64rem] w-full table-fixed text-sm">
                 <thead className="bg-slate-50 dark:bg-slate-800">
                   <tr>
-                    <th className="w-[24%] px-4 py-3 text-start">{text.student}</th>
-                    <th className="w-[48%] px-4 py-3 text-start">{text.status}</th>
-                    <th className="w-[20%] px-4 py-3 text-start">{text.notes}</th>
-                    <th className="w-[8%] px-4 py-3 text-start">{english ? "Action" : "الإجراء"}</th>
+                    <th className="w-[25%] px-4 py-3 text-start">{text.student}</th>
+                    <th className="w-[45%] px-4 py-3 text-start">{text.status}</th>
+                    <th className="w-[30%] px-4 py-3 text-start">{text.notes}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {group.students.map((student) => (
                     <tr
                       key={student.id}
-                      className={`border-t border-slate-200 dark:border-slate-800 ${statuses[student.id] === "LEFT_WITH_PERMISSION" ? "bg-emerald-50 shadow-[inset_0_0_18px_rgba(16,185,129,0.25)] dark:bg-emerald-950/30" : ""}`}
+                      className={`[content-visibility:auto] [contain-intrinsic-size:0_72px] border-t ${statusOverlay(statuses[student.id] ?? undefined)}`}
                     >
-                      <td className="w-[24%] px-4 py-3 font-medium">
-                        {student.fullName}
+                      <td className="w-[25%] px-4 py-3 font-medium">
+                        <span className={`inline-block rounded-md px-2 py-1 ${statusOverlay(statuses[student.id] ?? undefined)}`}>{student.fullName}</span>
                       </td>
-                      <td className="w-[48%] min-w-[28rem] px-4 py-3">
-                        <AttendanceStatusSelect
-                          value={statuses[student.id] ?? ""}
-                          onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))}
-                          options={options(english)}
-                          english={english}
-                          variant="buttons"
-                        />
+                      <td className="w-[45%] min-w-[28rem] px-4 py-3">
+                        {statuses[student.id] === "LEFT_WITH_PERMISSION" ? <button type="button" disabled className="cursor-not-allowed rounded-lg border border-blue-400 bg-blue-100 px-4 py-2 text-sm font-bold text-blue-800 shadow-[0_0_18px_rgba(59,130,246,0.45)] dark:bg-blue-950/50 dark:text-blue-200">{english ? "Left with permission" : "خرج بإذن"}</button> : <AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))} options={options(english)} english={english} variant="buttons" />}
                       </td>
-                      <td className="w-[20%] min-w-[220px] px-4 py-3">
-                        <input
+                      <td className="w-[30%] min-w-[18rem] max-w-[30rem] overflow-hidden px-4 py-3">
+                        <textarea
                           value={notes[student.id] ?? ""}
                           onChange={(event) =>
                             setNotes((current) => ({
@@ -647,13 +640,9 @@ export default function AttendancePage() {
                               [student.id]: event.target.value,
                             }))
                           }
-                          className="block w-full min-w-[220px] overflow-x-auto whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm leading-6 dark:bg-slate-900"
+                          rows={2}
+                          className="block min-h-16 w-full max-w-full resize-y rounded-lg border px-3 py-1.5 text-sm leading-6 break-words dark:bg-slate-900"
                         />
-                      </td>
-                      <td className="w-[8%] min-w-[7rem] px-4 py-3">
-                        <button type="button" onClick={() => openGatePass(student)} className="whitespace-nowrap rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950/30">
-                          {english ? "Gate pass" : "مستأذن"}
-                        </button>
                       </td>
                     </tr>
                   ))}

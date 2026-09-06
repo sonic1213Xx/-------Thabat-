@@ -10,6 +10,7 @@ import { DivisionsLoadingSkeleton } from '@/components/dashboard/tab-loading-ske
 import { useTabLoading } from '@/components/dashboard/use-tab-loading'
 import { useLanguage } from '@/components/language-provider'
 import { fetchCached } from '@/lib/client-cache'
+import { getCurrentProfile, getSession } from '@/lib/auth'
 
 interface DivisionRecord {
   id: string
@@ -32,6 +33,11 @@ export default function DivisionsPage() {
   const [editingDivision, setEditingDivision] = useState<DivisionRecord | null>(null)
   const [newDivision, setNewDivision] = useState({ code: '', name: '' })
   const [deletingDivision, setDeletingDivision] = useState<DivisionRecord | null>(null)
+  const session = getSession()
+  const profile = getCurrentProfile()
+  const teachingCodes = Array.from(new Set(profile?.teachingAssignments?.flatMap((assignment) => assignment.divisions) ?? profile?.assigned_divisions ?? []))
+  const readOnlyTeachingView = session?.role === 'TEACHER' || teachingCodes.length > 0
+  const canManageDivisions = !readOnlyTeachingView
 
   const loadData = async () => {
     await withMinimumDelay(async () => {
@@ -41,8 +47,9 @@ export default function DivisionsPage() {
           fetchCached<{ data?: any[] }>('dashboard:students:all', '/api/students'),
         ])
 
-        setDivisions(divisionsRes.data ?? [])
-        setStudents(studentsRes.data ?? [])
+        const loadedDivisions = divisionsRes.data ?? []
+        setDivisions(readOnlyTeachingView ? loadedDivisions.filter((division) => teachingCodes.includes(division.code)) : loadedDivisions)
+        setStudents(readOnlyTeachingView ? (studentsRes.data ?? []).filter((student) => teachingCodes.includes(student.divisionCode)) : (studentsRes.data ?? []))
       } catch (error) {
         console.error('Failed to load divisions:', error)
       }
@@ -51,7 +58,7 @@ export default function DivisionsPage() {
 
   useEffect(() => {
     void loadData()
-  }, [])
+  }, [readOnlyTeachingView, teachingCodes.join(',')])
 
   const divisionSummaries: DivisionSummary[] = (divisions.length ? divisions : []).map((division) => {
     const filtered = students.filter((student) => student.divisionCode === division.code)
@@ -90,12 +97,12 @@ export default function DivisionsPage() {
       const response = isEditing
         ? await fetch(`/api/divisions/${editingDivision!.id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(session?.id ? { 'x-thabat-user-id': session.id } : {}) },
             body: JSON.stringify({ code, name }),
           })
         : await fetch('/api/divisions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(session?.id ? { 'x-thabat-user-id': session.id } : {}) },
             body: JSON.stringify({ code, name }),
           })
 
@@ -119,7 +126,7 @@ export default function DivisionsPage() {
     if (!deletingDivision) return
 
     try {
-      const response = await fetch(`/api/divisions/${deletingDivision.id}`, { method: 'DELETE' })
+      const response = await fetch(`/api/divisions/${deletingDivision.id}`, { method: 'DELETE', headers: session?.id ? { 'x-thabat-user-id': session.id } : undefined })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) {
         throw new Error(result.error || t('divisionDeleted'))
@@ -145,9 +152,9 @@ export default function DivisionsPage() {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('divisions')}</h1>
           <p className="text-slate-600 dark:text-slate-400">{t('divisionManagementDescription')}</p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button type="button" onClick={openCreateModal} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">
+            {canManageDivisions && <button type="button" onClick={openCreateModal} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white">
               <Plus className="h-4 w-4" /> {t('addDivision')}
-            </button>
+            </button>}
             <a href="/dashboard/students" className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm dark:border-slate-700">
               <Upload className="h-4 w-4" /> {t('importFromExcel')}
             </a>
@@ -189,9 +196,9 @@ export default function DivisionsPage() {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('divisions')}</h1>
           <p className="text-slate-600 dark:text-slate-400">{t('divisionManagementDescription')}</p>
         </div>
-        <button type="button" onClick={openCreateModal} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
+      {canManageDivisions && <button type="button" onClick={openCreateModal} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
           <Plus className="h-4 w-4" /> {t('addDivision')}
-        </button>
+        </button>}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -208,12 +215,12 @@ export default function DivisionsPage() {
                 <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{division.code}</h3>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => openEditModal(division)} aria-label={t('editDivision')} className="rounded-md p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+                {canManageDivisions && <button type="button" onClick={() => openEditModal(division)} aria-label={t('editDivision')} className="rounded-md p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
                   <Pencil className="h-4 w-4" />
-                </button>
-                <button type="button" onClick={() => setDeletingDivision(division)} aria-label={t('deleteDivision')} className="rounded-md p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
+                </button>}
+                {canManageDivisions && <button type="button" onClick={() => setDeletingDivision(division)} aria-label={t('deleteDivision')} className="rounded-md p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                   <Trash2 className="h-4 w-4" />
-                </button>
+                </button>}
               </div>
             </div>
 
@@ -264,12 +271,12 @@ export default function DivisionsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => openEditModal(division)} aria-label="تعديل الشعبة" className="rounded-md p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+                        {canManageDivisions && <button type="button" onClick={() => openEditModal(division)} aria-label="تعديل الشعبة" className="rounded-md p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
                           <Pencil className="h-4 w-4" />
-                        </button>
-                        <button type="button" onClick={() => setDeletingDivision(division)} aria-label="حذف الشعبة" className="rounded-md p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
+                        </button>}
+                        {canManageDivisions && <button type="button" onClick={() => setDeletingDivision(division)} aria-label="حذف الشعبة" className="rounded-md p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                           <Trash2 className="h-4 w-4" />
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>

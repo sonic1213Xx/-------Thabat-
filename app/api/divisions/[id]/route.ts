@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { invalidateCache } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 
+async function teacherDenied(request: NextRequest) {
+  const userId = request.headers.get('x-thabat-user-id')
+  if (!userId) return false
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+  return user?.role === 'TEACHER'
+}
+
 export async function PUT(request: NextRequest, context: { params: { id: string } }) {
   try {
+    if (await teacherDenied(request)) return NextResponse.json({ error: 'Teachers have read-only division access.' }, { status: 403 })
     const body = await request.json() as { code?: string; name?: string }
     const code = body.code?.trim()
 
@@ -46,8 +54,9 @@ export async function PATCH(request: NextRequest, context: { params: { id: strin
   return PUT(request, context)
 }
 
-export async function DELETE(_request: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, context: { params: { id: string } }) {
   try {
+    if (await teacherDenied(request)) return NextResponse.json({ error: 'Teachers have read-only division access.' }, { status: 403 })
     const current = await prisma.division.findUnique({ where: { id: context.params.id }, select: { id: true, code: true } })
     if (!current) {
       return NextResponse.json({ error: 'Division not found.' }, { status: 404 })

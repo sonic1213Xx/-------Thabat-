@@ -104,8 +104,7 @@ export default function RolesPage() {
           teachingAssignments: item.teachingAssignments ?? [],
           subject: item.subjectsTaught?.[0] ?? '',
         }));
-        const localOnlyProfiles = localProfiles.filter((localProfile) => !databaseProfiles.some((databaseProfile) => databaseProfile.id === localProfile.id));
-        setProfiles([...databaseProfiles, ...localOnlyProfiles]);
+        setProfiles(databaseProfiles);
       } catch {
         setProfiles(getProfiles());
       }
@@ -118,6 +117,7 @@ export default function RolesPage() {
   const filteredDivisions = profile.gradeLevel
     ? divisions.filter((code) => code.startsWith(profile.gradeLevel))
     : [];
+  const roleTeachesSubjects = profile.role === "TEACHER" || profile.role === "VP_ACADEMIC_AFFAIRS" || profile.role === "VP_STUDENT_AFFAIRS" || profile.role === "VICE_PRINCIPAL";
   const authorized = currentSession?.role === "PRINCIPAL" || verificationActive;
   const canEditPermissions = isCreatorRole(currentSession?.role) && verificationActive;
   const activateCreatorMode = async () => {
@@ -211,7 +211,7 @@ export default function RolesPage() {
       return;
     }
     saveProfile(nextProfile);
-    setProfiles(getProfiles());
+    setProfiles((current) => [nextProfile, ...current.filter((item) => item.id !== nextProfile.id)]);
     resetProfileForm();
   };
   const openEditProfile = (item: Profile) => {
@@ -246,7 +246,7 @@ export default function RolesPage() {
     const response = await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: nextProfile.id, name: nextProfile.name, password: nextProfile.password, role: nextProfile.role, divisions: nextProfile.assigned_divisions, subjectsTaught: nextProfile.subjectsTaught, teachingAssignments }) });
     if (!response.ok) return;
     saveProfile(nextProfile);
-    setProfiles(getProfiles());
+    setProfiles((current) => current.map((item) => item.id === nextProfile.id ? nextProfile : item));
     setEditingProfile(null);
   };
   const resetPassword = (item: Profile) => {
@@ -263,7 +263,7 @@ export default function RolesPage() {
       password: newPassword,
       lastActivity: `تم تحديث كلمة المرور ${new Date().toLocaleString()}`,
     });
-    setProfiles(getProfiles());
+    setProfiles((current) => current.map((item) => item.id === resettingProfile.id ? { ...item, password: newPassword } : item));
     setResettingProfile(null);
     setNewPassword("");
   };
@@ -318,7 +318,7 @@ export default function RolesPage() {
           </p>
         </div>
         <div className="flex gap-2 overflow-x-auto border-b border-border p-3">
-          {roles.map((role) => (
+          {roles.filter((role) => !isCreatorRole(role.key)).map((role) => (
             <button
               key={role.key}
               type="button"
@@ -480,7 +480,7 @@ export default function RolesPage() {
               </p>
             </div>
           )}
-          {profile.role === "TEACHER" && <TeachingAssignmentEditor assignments={profile.teachingAssignments} divisions={divisions} locale={locale} onChange={(teachingAssignments) => setProfile({ ...profile, teachingAssignments })} />}
+          {roleTeachesSubjects && <TeachingAssignmentEditor assignments={profile.teachingAssignments} divisions={divisions} locale={locale} onChange={(teachingAssignments) => setProfile({ ...profile, teachingAssignments })} />}
           {false && profile.role === "TEACHER" && (
             <div className="dropdown-animation col-span-2 grid gap-3 sm:grid-cols-2">
               <input
@@ -672,7 +672,7 @@ export default function RolesPage() {
               placeholder={locale === "ar" ? "اسم المعلم" : "Teacher name"}
               className="w-full rounded-lg border px-3 py-2"
             />
-            {profile.role === "TEACHER" && <TeachingAssignmentEditor assignments={profile.teachingAssignments} divisions={divisions} locale={locale} onChange={(teachingAssignments) => setProfile({ ...profile, teachingAssignments })} />}
+            {roleTeachesSubjects && <TeachingAssignmentEditor assignments={profile.teachingAssignments} divisions={divisions} locale={locale} onChange={(teachingAssignments) => setProfile({ ...profile, teachingAssignments })} />}
             {false && profile.role === "TEACHER" && (
               <div className="dropdown-animation space-y-4">
                 <StyledSelect

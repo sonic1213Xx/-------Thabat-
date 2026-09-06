@@ -34,7 +34,7 @@ export function GatePassModal({
   onSaved?: (pass: GatePass) => void;
 }) {
   const { locale } = useLanguage();
-  const text = locale === "ar" ? { management: "إدارة الخروج", title: "إصدار تصريح خروج", intro: "اختر الطالب، أدخل البيانات، ثم أصدر التصريح.", student: "الطالب", search: "ابحث بالاسم أو الرقم الأكاديمي أو الفصل", noMatches: "لا يوجد طلاب مطابقون", selected: "تم اختيار", parent: "اسم ولي الأمر", optional: "اختياري", parentPlaceholder: "اكتب اسم ولي الأمر", reason: "سبب الخروج", date: "تاريخ الخروج", time: "وقت الخروج", issue: "إصدار التصريح", print: "طباعة التصريح", close: "إغلاق", health: "حالة صحية", family: "سبب عائلي", emergency: "حالة طارئة", other: "سبب آخر", custom: "اكتب سبب الخروج", attendanceNote: "بعد الإصدار سيتم تحديث حضور الطالب تلقائياً إلى", excused: "استئذان بعذر" } : { management: "Gate pass management", title: "Issue gate pass", intro: "Choose a student, enter the details, then issue the pass.", student: "Student", search: "Search by name, academic ID, or division", noMatches: "No matching students", selected: "Selected", parent: "Parent name", optional: "optional", parentPlaceholder: "Enter parent name", reason: "Reason for leaving", date: "Departure date", time: "Departure time", issue: "Issue pass", print: "Print pass", close: "Close", health: "Health reason", family: "Family reason", emergency: "Emergency", other: "Other reason", custom: "Enter reason for leaving", attendanceNote: "After issuing, the student's attendance will automatically be updated to", excused: "Excused permission" };
+  const text = locale === "ar" ? { management: "إدارة الخروج", title: "إصدار تصريح خروج", intro: "اختر الطالب، أدخل البيانات، ثم أصدر التصريح.", student: "الطالب", search: "ابحث بالاسم أو الرقم الأكاديمي أو الفصل", noMatches: "لا يوجد طلاب مطابقون", selected: "تم اختيار", parent: "اسم ولي الأمر", optional: "اختياري", parentPlaceholder: "اكتب اسم ولي الأمر", reason: "سبب الخروج", date: "تاريخ الخروج", time: "وقت الخروج", issue: "إصدار التصريح", print: "طباعة التصريح", close: "إغلاق", health: "حالة صحية", family: "سبب عائلي", emergency: "حالة طارئة", other: "سبب آخر", custom: "اكتب سبب الخروج", attendanceNote: "يبقى التصريح معلقاً لمدة 30 دقيقة، ولا يتغير الحضور إلا بعد مسح رمز QR", excused: "استئذان بعذر" } : { management: "Gate pass management", title: "Issue gate pass", intro: "Choose a student, enter the details, then issue the pass.", student: "Student", search: "Search by name, academic ID, or division", noMatches: "No matching students", selected: "Selected", parent: "Parent name", optional: "optional", parentPlaceholder: "Enter parent name", reason: "Reason for leaving", date: "Departure date", time: "Departure time", issue: "Issue pass", print: "Print pass", close: "Close", health: "Health reason", family: "Family reason", emergency: "Emergency", other: "Other reason", custom: "Enter reason for leaving", attendanceNote: "The pass stays pending for 30 minutes; attendance changes only after the QR code is scanned", excused: "Excused permission" };
   const today = new Date().toISOString().slice(0, 10);
   const [studentId, setStudentId] = useState("");
   const [search, setSearch] = useState("");
@@ -109,6 +109,13 @@ export function GatePassModal({
     onSaved?.(pass);
     setIssuedPass(pass);
   };
+  const cancelPass = async () => {
+    if (!issuedPass) return;
+    const session = getSession();
+    if (!session) return;
+    const response = await fetch(`/api/gate-passes/${encodeURIComponent(issuedPass.id)}`, { method: "DELETE", headers: { "x-thabat-role": session.role, "x-thabat-user-id": session.id } });
+    if (response.ok) onClose();
+  };
   return (
     <Modal
       open={true}
@@ -173,7 +180,7 @@ export function GatePassModal({
               {qrImage && <div className="mt-4 flex flex-col items-center gap-2"><img src={qrImage} alt={locale === "ar" ? "رمز تصريح الخروج" : "Gate pass QR code"} className="h-32 w-32 rounded-lg bg-white p-2" /><span className="font-mono text-[10px] text-slate-400">{issuedPass.qrToken}</span></div>}
               </div>
             </div>
-            <div className="flex gap-3 print:hidden">
+            <div className="flex flex-wrap gap-3 print:hidden">
               <button
                 type="button"
                 onClick={() => window.print()}
@@ -189,6 +196,7 @@ export function GatePassModal({
               >
                 {text.close}
               </button>
+              {issuedPass.status !== "USED" && <button type="button" onClick={() => void cancelPass()} className="rounded-lg border border-red-300 px-4 py-3 text-red-700 dark:border-red-700 dark:text-red-300">{locale === "ar" ? "إلغاء التصريح" : "Cancel pass"}</button>}
             </div>
           </div>
         ) : (

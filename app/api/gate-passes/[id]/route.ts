@@ -18,11 +18,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ data: await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'REJECTED' } }) })
   }
   if (pass.status === 'USED') return NextResponse.json({ code: 'QR_USED', error: 'Gate pass has already been used.' }, { status: 409 })
-  if (pass.status !== 'APPROVED') return NextResponse.json({ error: 'Pass must be approved before scanning.' }, { status: 409 })
-  if (pass.expiresAt && pass.expiresAt < new Date()) return NextResponse.json({ error: 'Gate pass has expired.' }, { status: 409 })
+  if (pass.status === 'CANCELED' || pass.status === 'REJECTED') return NextResponse.json({ error: 'Gate pass is no longer valid.' }, { status: 409 })
+  if (pass.expiresAt && pass.expiresAt < new Date()) {
+    await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'CANCELED', attendanceState: 'CANCELED' } })
+    return NextResponse.json({ error: 'Gate pass has expired.' }, { status: 409 })
+  }
   const now = new Date()
   const date = pass.departureDate
-  await prisma.attendance.upsert({ where: { studentId_date: { studentId: pass.studentId, date } }, update: { status: 'LEFT_WITH_PERMISSION', notes: `Gate pass ${pass.id}`, markedBy: body.actorId }, create: { studentId: pass.studentId, date, status: 'LEFT_WITH_PERMISSION', notes: `Gate pass ${pass.id}`, markedBy: body.actorId } })
+  await prisma.attendance.upsert({ where: { studentId_date: { studentId: pass.studentId, date } }, update: { status: 'LEFT_WITH_PERMISSION', notes: `تصريح خروج: ${pass.reason}`, markedBy: body.actorId }, create: { studentId: pass.studentId, date, status: 'LEFT_WITH_PERMISSION', notes: `تصريح خروج: ${pass.reason}`, markedBy: body.actorId } })
   return NextResponse.json({ data: await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'USED', scannedBy: body.actorId, scannedAt: now, attendanceState: 'LEFT_WITH_PERMISSION' } }) })
 }
 
@@ -30,10 +33,11 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const permission = requirePermission(request, 'gate_passes', 'delete')
   if (permission) return permission
   try {
-    const pass = await prisma.gatePass.findUnique({ where: { id: params.id }, select: { id: true } })
+    const pass = await prisma.gatePass.findUnique({ where: { id: params.id }, select: { id: true, status: true, studentId: true, departureDate: true } })
     if (!pass) return NextResponse.json({ error: 'Gate pass not found.' }, { status: 404 })
-    await prisma.gatePass.delete({ where: { id: pass.id } })
-    return NextResponse.json({ data: { id: pass.id } })
+    await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'CANCELED', attendanceState: 'CANCELED' } })
+    if (pass.status === 'USED') await prisma.attendance.deleteMany({ where: { studentId: pass.studentId, date: pass.departureDate, status: 'LEFT_WITH_PERMISSION' } })
+    return NextResponse.json({ data: { id: pass.id, status: 'CANCELED' } })
   } catch (error) {
     console.error('Gate pass deletion failed:', error)
     return NextResponse.json({ error: 'Unable to delete gate pass.' }, { status: 500 })

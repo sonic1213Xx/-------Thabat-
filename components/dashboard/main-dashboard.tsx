@@ -19,8 +19,9 @@ import { RecentActivityCard } from './recent-activity-card'
 import { QuickActionCard } from './quick-action-card'
 import { TabLoadingSkeleton } from './tab-loading-skeleton'
 import { useLanguage } from '@/components/language-provider'
-import { getProfiles, getSession } from '@/lib/auth'
+import { getCurrentProfile, getSession } from '@/lib/auth'
 import { fetchCached, invalidateCached } from '@/lib/client-cache'
+import { Modal } from '@/components/ui/modal'
 
 type ApiStudent = {
   id: string
@@ -296,6 +297,7 @@ function TeamsTabView({ teams }: { teams: Array<{ id: string; label: string }> }
 
 function DivisionsTabView({ divisions, students }: { divisions: Array<{ id: string; code: string; name: string }>; students: ApiStudent[] }) {
   const { t } = useLanguage()
+  const [selectedDivision, setSelectedDivision] = useState<string | null>(null)
   const summary = divisions.length
     ? divisions.map((division) => {
         const filtered = students.filter((student) => student.divisionCode === division.code)
@@ -326,16 +328,19 @@ function DivisionsTabView({ divisions, students }: { divisions: Array<{ id: stri
       <p className="mt-2 text-slate-600 dark:text-slate-400">{t('currentDivisionMetrics')}</p>
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         {summary.map((division) => (
-          <div key={division.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+          <button type="button" key={division.id} onClick={() => setSelectedDivision(division.code)} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-start transition hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-md dark:border-slate-700 dark:bg-slate-800/60">
             <div className="flex items-center justify-between">
               <span className="text-lg font-bold text-slate-900 dark:text-white">{division.name || `الفصل ${division.code}`}</span>
               <span className="text-sm text-emerald-600">{t('active')}</span>
             </div>
             <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{t('studentCount')}: {division.count}</p>
             <p className="text-sm text-slate-600 dark:text-slate-300">{t('behaviorAverage')}: {division.averageBehavior}/100</p>
-          </div>
+          </button>
         ))}
       </div>
+      <Modal open={Boolean(selectedDivision)} onOpenChange={(open) => !open && setSelectedDivision(null)} className="max-w-3xl">
+        <div className="space-y-4"><div><h2 className="text-xl font-bold">{selectedDivision ? `${t('divisionLabel')} ${selectedDivision}` : ''}</h2><p className="text-sm text-slate-500">{t('divisionDetails')}</p></div><div className="max-h-[60vh] overflow-auto rounded-lg border"><table className="min-w-full text-sm"><thead className="bg-slate-50 dark:bg-slate-800"><tr><th className="p-3 text-start">{t('students')}</th><th className="p-3 text-start">{t('gradeLevel')}</th><th className="p-3 text-start">{t('behaviorScore')}</th><th className="p-3 text-start">{t('attendanceScore')}</th></tr></thead><tbody>{students.filter((student) => student.divisionCode === selectedDivision).map((student) => <tr key={student.id} className="border-t"><td className="p-3 font-semibold">{student.fullName}</td><td className="p-3">{student.gradeLevel}</td><td className="p-3">{student.behaviorScore}</td><td className="p-3">{student.attendanceScore}</td></tr>)}</tbody></table></div></div>
+      </Modal>
     </div>
   )
 }
@@ -418,24 +423,31 @@ export function MainDashboard() {
 
   const accessibleStudents = useMemo(() => {
     const session = getSession()
-    if (session?.role !== 'TEACHER') return students
-    const profile = getProfiles().find((item) => item.id === session.id)
-    const assignedDivisions = profile?.assigned_divisions ?? []
+    const profile = getCurrentProfile()
+    const assignedDivisions = session?.role === 'TEACHER'
+      ? profile?.assigned_divisions ?? []
+      : profile?.teachingAssignments?.flatMap((assignment) => assignment.divisions) ?? []
+    if (!assignedDivisions.length) return session?.role === 'TEACHER' ? [] : students
     return students.filter((student) => student.divisionCode && assignedDivisions.includes(student.divisionCode))
   }, [students])
 
+  const accessibleDivisions = useMemo(() => {
+    const profile = getCurrentProfile()
+    const assigned = profile?.assigned_divisions ?? []
+    const teaching = profile?.teachingAssignments?.flatMap((assignment) => assignment.divisions) ?? []
+    const codes = session?.role === 'TEACHER' ? assigned : teaching
+    return codes.length ? divisions.filter((division) => codes.includes(division.code)) : session?.role === 'TEACHER' ? [] : divisions
+  }, [divisions, session?.role])
+
   const dashboardStats = useMemo<DashboardStat[]>(() => {
     const totalStudents = accessibleStudents.length
-    const divisionsCount = divisions.length || new Set(accessibleStudents.map((student) => student.divisionCode)).size
+    const divisionsCount = accessibleDivisions.length || new Set(accessibleStudents.map((student) => student.divisionCode)).size
     const warningsToday = warnings.filter((warning) => {
       const issuedAt = warning.issuedAt ? new Date(warning.issuedAt) : null
       if (!issuedAt) return false
-      const today = new Date()
-      return issuedAt.toDateString() === today.toDateString()
+      return issuedAt.toDateString() === new Date().toDateString()
     }).length
     const operations = auditLogs.length
-    const presentAttendance = attendance.filter((record) => record.status === 'PRESENT').length
-    const attendanceRate = accessibleStudents.length ? Math.round((presentAttendance / accessibleStudents.length) * 100) : 0
 
     return [
       {
@@ -471,7 +483,7 @@ export function MainDashboard() {
         color: 'purple',
       },
     ]
-  }, [accessibleStudents, warnings, auditLogs, attendance, locale])
+  }, [accessibleStudents, accessibleDivisions, warnings, auditLogs, t])
 
   const recentActivities = useMemo(() => {
     return (auditLogs.slice(0, 3) || []).map((log, index) => ({
@@ -554,7 +566,7 @@ export function MainDashboard() {
           averageBehavior={averageBehavior}
           students={accessibleStudents}
           teams={teams}
-          divisions={divisions}
+          divisions={accessibleDivisions}
         />
       )}
     </div>

@@ -6,7 +6,10 @@ export async function GET(request: NextRequest) {
   const role = request.headers.get('x-thabat-role')
   if (!isCreatorRole(role) && role !== 'PRINCIPAL' && role !== 'VP_STUDENT_AFFAIRS' && role !== 'VICE_PRINCIPAL' && role !== 'GATE_SECURITY') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const status = request.nextUrl.searchParams.get('status') ?? undefined
-  const passes = await prisma.gatePass.findMany({ where: status ? { status } : undefined, include: { student: { select: { fullName: true, divisionCode: true, academicId: true } } }, orderBy: { createdAt: 'desc' }, take: 100 })
+  const now = new Date()
+  await prisma.gatePass.updateMany({ where: { status: { in: ['PENDING', 'APPROVED'] }, expiresAt: { lt: now } }, data: { status: 'CANCELED', attendanceState: 'CANCELED' } })
+  const departureDate = request.nextUrl.searchParams.get('date') ?? undefined
+  const passes = await prisma.gatePass.findMany({ where: { ...(status ? { status } : {}), ...(departureDate ? { departureDate } : {}) }, include: { student: { select: { fullName: true, divisionCode: true, academicId: true } } }, orderBy: { createdAt: 'desc' }, take: 100 })
   return NextResponse.json({ data: passes })
 }
 
@@ -17,6 +20,7 @@ export async function POST(request: NextRequest) {
   if (!body.studentId || !body.issuedBy || !body.reason || !body.departureDate || !body.departureTime) return NextResponse.json({ error: 'studentId, issuedBy, reason, departureDate, and departureTime are required.' }, { status: 400 })
   const student = await prisma.student.findUnique({ where: { id: body.studentId } })
   if (!student) return NextResponse.json({ error: 'Student not found.' }, { status: 404 })
-  const pass = await prisma.gatePass.create({ data: { studentId: student.id, issuedBy: body.issuedBy, parentName: body.parentName, reason: body.reason, departureDate: body.departureDate, departureTime: body.departureTime, expiresAt: body.expiresAt ? new Date(body.expiresAt) : null, qrToken: crypto.randomUUID(), status: 'APPROVED', approvedBy: body.issuedBy, approvedAt: new Date(), attendanceState: 'PENDING' }, include: { student: true } })
+  const expiresAt = body.expiresAt ? new Date(body.expiresAt) : new Date(Date.now() + 30 * 60 * 1000)
+  const pass = await prisma.gatePass.create({ data: { studentId: student.id, issuedBy: body.issuedBy, parentName: body.parentName, reason: body.reason, departureDate: body.departureDate, departureTime: body.departureTime, expiresAt, qrToken: crypto.randomUUID(), status: 'PENDING', attendanceState: 'PENDING' }, include: { student: true } })
   return NextResponse.json({ data: pass }, { status: 201 })
 }

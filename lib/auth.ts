@@ -35,12 +35,6 @@ let runtimeSession: SessionUser | null = null
 export function authenticate(id: string, password: string): SessionUser | null {
   const credentials = TEST_CREDENTIALS.find((item) => item.id === id.trim() && item.password === password)
   if (credentials) return { id: credentials.id, name: credentials.name, role: credentials.role }
-  if (typeof window !== 'undefined') {
-    try {
-      const profile = (JSON.parse(localStorage.getItem(PROFILES_STORAGE_KEY) ?? '[]') as Profile[]).find((item) => item.id === id.trim() && item.password === password && item.role !== 'CURATOR')
-      return profile ? { id: profile.id, name: profile.name, role: profile.role } : null
-    } catch { return null }
-  }
   return null
 }
 
