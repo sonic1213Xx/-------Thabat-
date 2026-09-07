@@ -25,7 +25,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (getSession()) router.replace('/dashboard')
-    void fetch('/api/divisions').then((response) => response.json()).then((json) => setDivisions((json.data ?? []).map((item: { code: string }) => item.code))).catch(() => setDivisions([]))
+    void fetch('/api/divisions/public').then((response) => response.json()).then((json) => setDivisions((json.data ?? []).map((item: { code: string }) => item.code))).catch(() => setDivisions([]))
   }, [router])
 
   const enterDashboard = (user: ReturnType<typeof authenticate>) => {

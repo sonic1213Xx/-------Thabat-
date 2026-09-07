@@ -9,10 +9,10 @@ import { AttendanceStatusSelect } from '@/components/ui/attendance-status-select
 import { Modal } from '@/components/ui/modal'
 import { getSession } from '@/lib/auth'
 import { isCreatorRole } from '@/lib/permissions'
+import { DEFAULT_SCHOOL_NAME, SETTINGS_KEY } from '@/lib/school-settings'
 
-const SETTINGS_KEY = 'thabat-settings'
 type SavedSettings = { schoolName: string; defaultAttendance: 'UNMARKED' | 'PRESENT'; attendanceNotes: boolean; absenceAlerts: boolean; warningAlerts: boolean }
-const defaultSettings: SavedSettings = { schoolName: 'مدرسة السلمية الثانوية', defaultAttendance: 'UNMARKED', attendanceNotes: false, absenceAlerts: true, warningAlerts: true }
+const defaultSettings: SavedSettings = { schoolName: DEFAULT_SCHOOL_NAME, defaultAttendance: 'UNMARKED', attendanceNotes: false, absenceAlerts: true, warningAlerts: true }
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
   return <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-all duration-200 ${checked ? 'justify-end bg-emerald-600' : 'justify-start bg-slate-300 dark:bg-slate-700'}`}><span className="h-5 w-5 rounded-full bg-white shadow-md transition-all duration-200" /></button>

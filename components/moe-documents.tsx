@@ -8,6 +8,7 @@ import {
   getSession,
   saveProfileSignature,
 } from "@/lib/auth";
+import { getConfiguredSchoolName } from '@/lib/school-settings';
 import { SignatureCanvas } from "@/components/ui/signature-canvas";
 
 type DocumentData = {
@@ -38,7 +39,7 @@ export function MoeDocument({
     incident: "محضر ضبط واقعة",
     summon: "استدعاء ولي أمر",
   };
-  const [schoolName, setSchoolName] = useState("المدرسة الثانوية");
+  const [schoolName, setSchoolName] = useState(getConfiguredSchoolName());
   const [studentName, setStudentName] = useState(data.studentName);
   const [divisionCode, setDivisionCode] = useState(data.divisionCode ?? "");
   const [academicId, setAcademicId] = useState(data.academicId ?? "");

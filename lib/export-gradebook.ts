@@ -1,6 +1,8 @@
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 
+const headers = ['م', 'اسم الطلاب/ة', 'الرقم الأكاديمي', 'الهوية الوطنية', 'الشعبة', 'مشاركة - الفترة 1 (10)', 'مهام أدائية - الفترة 1 (30)', 'اختبار قصير - الفترة 1 (10)', 'جانب عملي - الفترة 1 (10)', 'مشاركة - الفترة 2 (10)', 'مهام أدائية - الفترة 2 (30)', 'اختبار قصير - الفترة 2 (10)', 'جانب عملي - الفترة 2 (10)', 'المجموع النهائي (60)']
+
 export type GradebookStudent = {
   id: string
   studentId?: string
@@ -18,8 +20,48 @@ export type GradebookStudent = {
 export type GradebookCustomCategory = { key: string; label: string; max: number }
 export type GradebookPeriod = 'period1' | 'period2' | 'both'
 
-const headers = ['م', 'اسم الطلاب/ة', 'الرقم الأكاديمي', 'الهوية الوطنية', 'الشعبة', 'مشاركة - الفترة 1 (10)', 'مهام أدائية - الفترة 1 (30)', 'اختبار قصير - الفترة 1 (10)', 'جانب عملي - الفترة 1 (10)', 'مشاركة - الفترة 2 (10)', 'مهام أدائية - الفترة 2 (30)', 'اختبار قصير - الفترة 2 (10)', 'جانب عملي - الفترة 2 (10)', 'المجموع النهائي (60)']
-const templateFields = headers.slice(5, 13)
+const toExcelValue = (value: string | number | null | undefined): string | number => {
+  if (value === null || value === undefined) return ''
+  const normalized = String(value).trim()
+  if (!normalized) return ''
+  if (/^0\d+$/.test(normalized)) return normalized
+  const numeric = Number(normalized)
+  return Number.isSafeInteger(numeric) && String(numeric) === normalized ? numeric : normalized
+}
+
+const applyDubaiFont = (worksheet: ExcelJS.Worksheet) => {
+  worksheet.eachRow((row) => row.eachCell((cell) => {
+    cell.font = { ...cell.font, name: 'Dubai' }
+  }))
+}
+
+const setIdentifierCell = (cell: ExcelJS.Cell, value: string | number | null | undefined) => {
+  const normalized = toExcelValue(value)
+  cell.value = normalized
+  cell.numFmt = typeof normalized === 'number' ? '0' : '@'
+  cell.alignment = { ...cell.alignment, horizontal: 'center', vertical: 'middle' }
+}
+
+const setCenteredTextCell = (cell: ExcelJS.Cell, value: string | null | undefined) => {
+  cell.value = value ?? ''
+  cell.alignment = { ...cell.alignment, horizontal: 'center', vertical: 'middle', wrapText: true }
+}
+
+const getStudentRows = (worksheet: ExcelJS.Worksheet) => {
+  const firstRow = 11
+  let lastRow = worksheet.rowCount
+  while (lastRow >= firstRow && worksheet.getCell(`A${lastRow}`).value === null) lastRow -= 1
+  return { firstRow, lastRow, capacity: Math.max(0, lastRow - firstRow + 1) }
+}
+
+const removeUnusedStudentRows = (worksheet: ExcelJS.Worksheet, studentCount: number) => {
+  const { firstRow, lastRow } = getStudentRows(worksheet)
+  for (let rowNumber = firstRow + studentCount; rowNumber <= lastRow; rowNumber += 1) {
+    const row = worksheet.getRow(rowNumber)
+    row.hidden = true
+    row.eachCell((cell) => { cell.value = null })
+  }
+}
 
 export type GradebookExportMetadata = { schoolName?: string; teacherName?: string; subject?: string; principalName?: string }
 export async function exportGradebookToExcel(divisionName: string, studentsData: GradebookStudent[], customCategories: GradebookCustomCategory[] = [], customScores: Record<string, Record<string, number | null>> = {}, finalMaximum = 60, configuredFields: GradebookCustomCategory[] = [], period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
@@ -37,25 +79,51 @@ export async function exportGradebookToExcel(divisionName: string, studentsData:
     const score = (student: GradebookStudent, key: string) => Number(customScores[student.id]?.[key] ?? student[key as keyof GradebookStudent] ?? 0)
     const writeTerm = (row: ExcelJS.Row, student: GradebookStudent, keys: string[], scoreColumns: string[], totalColumn: string) => {
       const values = keys.map((key) => score(student, key))
-      values.forEach((value, index) => { row.getCell(scoreColumns[index]).value = hasScore(student, keys[index]) ? value : null })
+      values.forEach((value, index) => {
+        const cell = row.getCell(scoreColumns[index])
+        cell.value = hasScore(student, keys[index]) ? value : null
+        cell.alignment = { ...cell.alignment, horizontal: 'center', vertical: 'middle' }
+      })
+      row.getCell(totalColumn).alignment = { ...row.getCell(totalColumn).alignment, horizontal: 'center', vertical: 'middle' }
       row.getCell(totalColumn).value = keys.some((key) => hasScore(student, key)) ? values.reduce((sum, value) => sum + value, 0) : null
     }
     const period1Keys = ['participationPeriod1', 'performancePeriod1', 'quizPeriod1', 'practicalPeriod1']
     const period2Keys = ['participationPeriod2', 'performancePeriod2', 'quizPeriod2', 'practicalPeriod2']
-    studentsData.forEach((student, index) => {
-      const row = index < 26 ? worksheet.getRow(11 + index) : worksheet.addRow([])
-      if (index >= 26) {
-        const templateRow = worksheet.getRow(36)
-        for (let column = 1; column <= worksheet.columnCount; column += 1) row.getCell(column).style = { ...templateRow.getCell(column).style }
-      }
-      row.getCell('A').value = index + 1
-      row.getCell('B').value = student.fullName
-      row.getCell('C').value = student.academicId ?? student.studentId ?? ''
-      row.getCell('D').value = student.nationalId ?? ''
-      row.getCell('E').value = student.divisionCode ?? divisionName
+    studentsData.slice(0, getStudentRows(worksheet).capacity).forEach((student, index) => {
+      const row = worksheet.getRow(11 + index)
+      setIdentifierCell(row.getCell('A'), index + 1)
+      setCenteredTextCell(row.getCell('B'), student.fullName)
+      setIdentifierCell(row.getCell('C'), student.academicId ?? student.studentId)
+      setIdentifierCell(row.getCell('D'), student.nationalId)
+      setIdentifierCell(row.getCell('E'), student.divisionCode ?? divisionName)
       writeTerm(row, student, period === 'period2' ? period2Keys : period1Keys, ['F', 'G', 'H', 'I'], 'J')
       if (period === 'both') writeTerm(row, student, period2Keys, ['K', 'L', 'M', 'N'], 'O')
     })
+    removeUnusedStudentRows(worksheet, Math.min(studentsData.length, getStudentRows(worksheet).capacity))
+    if (customCategories.length) {
+      const customWorksheet = workbook.addWorksheet('أعمدة مخصصة', { views: [{ rightToLeft: true }] })
+      const customHeaders = ['م', 'اسم الطلاب/ة', 'الشعبة', ...customCategories.map((category) => `${category.label} (${category.max})`)]
+      customWorksheet.columns = customHeaders.map((_, index) => ({ width: index === 1 ? 30 : 20 }))
+      customWorksheet.addRow(customHeaders)
+      customWorksheet.getRow(1).eachCell((cell) => {
+        cell.font = { name: 'Dubai', bold: true, color: { argb: 'FFFFFFFF' } }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF047857' } }
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+      })
+      studentsData.forEach((student, index) => {
+        const row = customWorksheet.addRow([
+          index + 1,
+          student.fullName,
+          student.divisionCode ?? divisionName,
+          ...customCategories.map((category) => customScores[student.id]?.[category.key] ?? ''),
+        ])
+        row.eachCell((cell) => {
+          cell.font = { name: 'Dubai' }
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+        })
+      })
+    }
+    applyDubaiFont(worksheet)
     const buffer = await workbook.xlsx.writeBuffer()
     saveAs(new Blob([buffer]), `كشف_درجات_${divisionName}.xlsx`)
     return
@@ -132,35 +200,38 @@ export function exportGradebookToPdf(divisionName: string, studentsData: Gradebo
   printWindow.document.close()
 }
 
-export async function exportEmptyGradebookTemplates(divisionCodes: string[], period: GradebookPeriod = 'both') {
+export async function exportEmptyGradebookTemplates(divisionCodes: string[], period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
   const response = await fetch('/api/students')
   const json = await response.json() as { data?: GradebookStudent[] }
   const students = json.data ?? []
-  let schoolName = ''
-  try { schoolName = (JSON.parse(localStorage.getItem('thabat-settings') ?? '{}') as { schoolName?: string }).schoolName ?? '' } catch { schoolName = '' }
-  const workbook = new ExcelJS.Workbook()
-  const selectedTemplateFields = templateFields.filter((field) => period === 'both' || (period === 'period1' ? field.includes('الفترة 1') : field.includes('الفترة 2')))
-  const exportHeaders = [...headers.slice(0, 5), ...selectedTemplateFields, 'المجموع النهائي']
+  const templatePath = period === 'period1' ? '/gradebook-templates/term-1.xlsx' : period === 'period2' ? '/gradebook-templates/term-2.xlsx' : '/gradebook-templates/both-terms.xlsx'
+  const templateResponse = await fetch(templatePath)
+  if (!templateResponse.ok) throw new Error('Unable to load the gradebook template.')
+  const templateBuffer = await templateResponse.arrayBuffer()
   const uniqueCodes = Array.from(new Set(divisionCodes)).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
-  uniqueCodes.forEach((divisionCode) => {
-    const worksheet = workbook.addWorksheet(divisionCode)
-    worksheet.views = [{ rtl: true } as unknown as ExcelJS.WorksheetView]
-    worksheet.columns = exportHeaders.map((header, index) => ({ width: index === 1 ? 30 : index >= 5 ? 18 : 20 }))
-    worksheet.addRow([schoolName])
-    worksheet.mergeCells(1, 1, 1, exportHeaders.length)
-    worksheet.getRow(1).font = { bold: true, size: 14 }
-    worksheet.getRow(1).alignment = { horizontal: 'center' }
-    worksheet.addRow(['قالب كشف درجات الطلاب/ة'])
-    worksheet.mergeCells(2, 1, 2, exportHeaders.length)
-    worksheet.getRow(2).font = { bold: true, size: 13 }
-    worksheet.getRow(2).alignment = { horizontal: 'center' }
-    const headerRow = worksheet.addRow(exportHeaders)
-    headerRow.eachCell((cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF9BBB59' } }; cell.font = { bold: true }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true } })
-    headerRow.height = 34
-    students.filter((student) => student.divisionCode === divisionCode).forEach((student, index) => worksheet.addRow([index + 1, student.fullName, student.academicId ?? student.studentId ?? '', student.nationalId ?? '', student.divisionCode ?? divisionCode, ...selectedTemplateFields.map(() => ''), '']))
-  })
-  const buffer = await workbook.xlsx.writeBuffer()
-  saveAs(new Blob([buffer]), 'قوالب_الدرجات_جميع_الشعب.xlsx')
+  for (const divisionCode of uniqueCodes) {
+    const divisionWorkbook = new ExcelJS.Workbook()
+    await divisionWorkbook.xlsx.load(templateBuffer)
+    const worksheet = divisionWorkbook.worksheets[0]
+    worksheet.getCell('B2').value = `المادة : ${metadata.subject ?? ''}`
+    worksheet.getCell('C2').value = metadata.schoolName ?? ''
+    worksheet.getCell('B3').value = `المعلم : ${metadata.teacherName ?? ''}`
+    worksheet.getCell('C4').value = `مدير المدرسة : ${metadata.principalName ?? ''}`
+    const divisionStudents = students.filter((student) => student.divisionCode === divisionCode)
+    divisionStudents.slice(0, getStudentRows(worksheet).capacity).forEach((student, index) => {
+      const row = worksheet.getRow(11 + index)
+      setIdentifierCell(row.getCell('A'), index + 1)
+      setCenteredTextCell(row.getCell('B'), student.fullName)
+      setIdentifierCell(row.getCell('C'), student.academicId ?? student.studentId)
+      setIdentifierCell(row.getCell('D'), student.nationalId)
+      setIdentifierCell(row.getCell('E'), student.divisionCode ?? divisionCode)
+    })
+    removeUnusedStudentRows(worksheet, Math.min(divisionStudents.length, getStudentRows(worksheet).capacity))
+    applyDubaiFont(worksheet)
+    const buffer = await divisionWorkbook.xlsx.writeBuffer()
+    const safeCode = divisionCode.replace(/[\\/:*?"<>|]/g, '_')
+    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `كشف_درجات_${safeCode}.xlsx`)
+  }
 }
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character] ?? character)

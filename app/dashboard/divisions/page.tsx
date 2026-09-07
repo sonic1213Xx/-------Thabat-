@@ -39,17 +39,18 @@ export default function DivisionsPage() {
   const readOnlyTeachingView = session?.role === 'TEACHER' || teachingCodes.length > 0
   const canManageDivisions = !readOnlyTeachingView
 
-  const loadData = async () => {
+  const loadData = async (isActive: () => boolean = () => true) => {
     await withMinimumDelay(async () => {
       try {
         const [divisionsRes, studentsRes] = await Promise.all([
-          fetchCached<{ data?: DivisionRecord[] }>('dashboard:divisions', '/api/divisions'),
+          fetchCached<{ data?: DivisionRecord[] }>(`dashboard:divisions:${session?.id}:${session?.role}`, '/api/divisions'),
           fetchCached<{ data?: any[] }>('dashboard:students:all', '/api/students'),
         ])
 
+        if (!isActive()) return
         const loadedDivisions = divisionsRes.data ?? []
-        setDivisions(readOnlyTeachingView ? loadedDivisions.filter((division) => teachingCodes.includes(division.code)) : loadedDivisions)
-        setStudents(readOnlyTeachingView ? (studentsRes.data ?? []).filter((student) => teachingCodes.includes(student.divisionCode)) : (studentsRes.data ?? []))
+        if (isActive()) setDivisions(readOnlyTeachingView ? loadedDivisions.filter((division) => teachingCodes.includes(division.code)) : loadedDivisions)
+        if (isActive()) setStudents(readOnlyTeachingView ? (studentsRes.data ?? []).filter((student) => teachingCodes.includes(student.divisionCode)) : (studentsRes.data ?? []))
       } catch (error) {
         console.error('Failed to load divisions:', error)
       }
@@ -57,8 +58,12 @@ export default function DivisionsPage() {
   }
 
   useEffect(() => {
-    void loadData()
-  }, [readOnlyTeachingView, teachingCodes.join(',')])
+    let isActive = true
+    void loadData(() => isActive)
+    return () => {
+      isActive = false
+    }
+  }, [readOnlyTeachingView, teachingCodes.join(','), session?.id, session?.role])
 
   const divisionSummaries: DivisionSummary[] = (divisions.length ? divisions : []).map((division) => {
     const filtered = students.filter((student) => student.divisionCode === division.code)

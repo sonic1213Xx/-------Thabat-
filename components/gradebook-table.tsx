@@ -447,7 +447,7 @@ export function GradebookTable({
             type="button"
             onClick={() => {
               setIsExporting(true);
-              void runExport(() => exportGradebookToExcel(divisionName, rows, [], customScores, finalMaximum, categorySettings, selectedPeriod, getExportMetadata()), exportToast, updateToast).finally(() => setIsExporting(false))
+              void runExport(() => exportGradebookToExcel(divisionName, rows, categorySettings.filter((category) => !scoreFields.some((field) => field.key === category.key)), customScores, finalMaximum, categorySettings, selectedPeriod, getExportMetadata()), exportToast, updateToast).finally(() => setIsExporting(false))
             }}
             disabled={isExporting}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -468,7 +468,7 @@ export function GradebookTable({
               type="button"
               onClick={() => {
                 setIsExporting(true);
-                void runExport(() => exportEmptyGradebookTemplates(allDivisionCodes), exportToast, updateToast).finally(() => setIsExporting(false))
+                void runExport(() => exportEmptyGradebookTemplates(allDivisionCodes, selectedPeriod, getExportMetadata()), exportToast, updateToast).finally(() => setIsExporting(false))
               }}
               disabled={isExporting || !allDivisionCodes.length}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"

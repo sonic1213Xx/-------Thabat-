@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCached, invalidateCache, setCached } from '@/lib/redis'
+import { getCached, invalidateDivisionCaches, setCached } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
+import { authorizeDivisions } from '@/lib/division-auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const cacheKey = 'thabat:divisions:all'
+    const authorization = await authorizeDivisions(request)
+    if (authorization.status !== 200) return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+
+    const { user, isTeacher, divisionCodes } = authorization
+    const cacheKey = `thabat:divisions:${user.id}:${user.role}`
     const cached = await getCached<Array<{ id: string; code: string; name: string; createdAt: Date; updatedAt: Date }>>(cacheKey)
-    if (cached) return NextResponse.json({ data: cached }, { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' } })
-    const divisions = await prisma.division.findMany({ orderBy: { code: 'asc' }, select: { id: true, code: true, name: true, createdAt: true, updatedAt: true } })
+    if (cached) return NextResponse.json({ data: cached }, { headers: { 'Cache-Control': 'private, no-store' } })
+    const divisions = await prisma.division.findMany({
+      where: isTeacher ? { code: { in: divisionCodes } } : undefined,
+      orderBy: { code: 'asc' },
+      select: { id: true, code: true, name: true, createdAt: true, updatedAt: true },
+    })
     await setCached(cacheKey, divisions, 60)
-    return NextResponse.json({ data: divisions })
+    return NextResponse.json({ data: divisions }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch {
     return NextResponse.json({ error: 'Unable to fetch divisions.' }, { status: 500 })
   }
@@ -17,6 +26,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const authorization = await authorizeDivisions(request, true)
+    if (authorization.status !== 200) return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+
     const body = await request.json() as { code?: string; name?: string }
     const code = body.code?.trim()
 
@@ -35,7 +47,7 @@ export async function POST(request: NextRequest) {
         name: body.name?.trim() || `الفصل ${code}`,
       },
     })
-    await invalidateCache('thabat:divisions:all')
+    await invalidateDivisionCaches()
 
     return NextResponse.json({ data: division })
   } catch {

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDateOnly, getTimeOnly, formatRelativeTimeArabic, isValidDivisionCode } from '@/lib/utils'
 
 import { prisma } from '@/lib/prisma'
+import { authorizeDivisions } from '@/lib/division-auth'
 
 async function getActor(userId?: string) {
   if (userId) {
@@ -37,11 +38,17 @@ export async function GET(request: NextRequest) {
       isActive: isActive === 'false' ? false : true,
     }
 
+    const divisionAuthorization = await authorizeDivisions(request)
+    if (divisionAuthorization.status === 200 && divisionAuthorization.isTeacher) {
+      where.AND = [{ divisionCode: { in: divisionAuthorization.divisionCodes } }]
+    }
+
     if (division && isValidDivisionCode(division)) {
       const legacyDivision = division.match(/^(\d)(\d)\d$/)
         ? `${division[0] === '1' ? 'المستوى الأول' : division[0] === '2' ? 'المستوى الرابع' : 'المستوى السادس'} - الشعبة ${division[1]}`
         : null
-      where.AND = [{ OR: legacyDivision ? [{ divisionCode: division }, { divisionCode: legacyDivision }] : [{ divisionCode: division }] }]
+      const existingConditions = where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []
+      where.AND = [...existingConditions, { OR: legacyDivision ? [{ divisionCode: division }, { divisionCode: legacyDivision }] : [{ divisionCode: division }] }]
     }
 
     if (gradeLevel) {

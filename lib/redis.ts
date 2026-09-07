@@ -17,3 +17,12 @@ export async function invalidateCache(...keys: string[]): Promise<void> {
   if (!keys.length) return
   try { await redis.del(...keys) } catch (error) { console.warn('Redis invalidation failed:', error) }
 }
+
+export async function invalidateDivisionCaches(): Promise<void> {
+  try {
+    const keys = await redis.keys('thabat:divisions:*')
+    if (keys.length) await redis.del(...keys)
+  } catch (error) {
+    console.warn('Division cache invalidation failed:', error)
+  }
+}

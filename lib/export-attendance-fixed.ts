@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import { getConfiguredSchoolName } from '@/lib/school-settings'
 
 export type AttendanceExportStudent = {
   id: string;
@@ -43,13 +44,14 @@ function setup(
   images: { ministry: number; kingdom: number; crest: number },
   profile: AttendanceExportProfile,
   divisionCodes: string[],
+  schoolName: string,
 ) {
   const last = weekly ? "M" : "F";
   sheet.views = [{ rightToLeft: true, showGridLines: false, zoomScale: 90 }];
   sheet.getRow(1).height = 45;
   sheet.mergeCells(`B2:${last}2`);
   sheet.mergeCells(`B3:${last}3`);
-  sheet.getCell("B2").value = "ثانوية النجاح بالقطيف";
+  sheet.getCell("B2").value = schoolName;
   sheet.getCell("B2").font = {
     name: "Arial",
     size: 18,
@@ -57,9 +59,10 @@ function setup(
     color: { argb: "FF0F172A" },
   };
   sheet.getCell("B2").alignment = { horizontal: "center", vertical: "middle" };
-  sheet.getCell("B3").value = `سجل الحضور - ${sheet.name}`;
+  sheet.getCell("B3").value = weekly ? "سجل الحالة الأسبوعية للحضور والغياب" : "سجل الحالة اليومية للحضور والغياب";
   sheet.getCell("B3").alignment = { horizontal: "center", vertical: "middle" };
   sheet.getRow(5).values = [
+    "",
     "",
     "تعيين الدور:",
     profile.role,
@@ -93,6 +96,9 @@ function setup(
     tl: { col: weekly ? 10 : 4, row: 0 },
     ext: { width: 75, height: 55 },
   });
+  sheet.getRow(7).values = weekly
+    ? ["", "📄 تصدير التقرير PDF", "📄 تصدير التقرير PDF", "📄 تصدير التقرير PDF"]
+    : ["", "📄 تصدير التقرير PDF", "📄 تصدير التقرير PDF", "📋 عرض: كافة الطلاب"];
 }
 function styleTable(sheet: ExcelJS.Worksheet, statusColumns: number[]) {
   sheet.getRow(9).height = 30;
@@ -140,15 +146,6 @@ function styleTable(sheet: ExcelJS.Worksheet, statusColumns: number[]) {
   }
 }
 
-function addDivisionHeader(sheet: ExcelJS.Worksheet, code: string, lastColumn: string) {
-  const row = sheet.addRow([`الشعبة ${code}`]);
-  sheet.mergeCells(`A${row.number}:${lastColumn}${row.number}`);
-  row.height = 24;
-  row.getCell(1).font = { name: "Arial", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
-  row.getCell(1).alignment = { horizontal: "right", vertical: "middle" };
-  row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF047857" } };
-}
-
 export async function exportAttendanceWorkbook(
   divisionCodes: string[],
   date: string,
@@ -157,6 +154,7 @@ export async function exportAttendanceWorkbook(
   userId?: string,
   dailyOnly = false,
 ) {
+  const schoolName = getConfiguredSchoolName()
   const records = suppliedStudents.filter(
     (student) =>
       student.divisionCode && new Set(divisionCodes).has(student.divisionCode),
@@ -206,10 +204,10 @@ export async function exportAttendanceWorkbook(
   };
   ["الحالة اليومية (الجميع)", "الغائبون اليوم فقط"].forEach((name, index) => {
     const sheet = workbook.addWorksheet(name);
-    setup(sheet, false, images, profile, divisionCodes);
+    setup(sheet, false, images, profile, divisionCodes, schoolName);
     sheet.columns = [
       { width: 3 },
-      { width: 18 },
+      { width: 15 },
       { width: 30 },
       { width: 18 },
       { width: 22 },
@@ -223,14 +221,9 @@ export async function exportAttendanceWorkbook(
       "حالة الحضور اليوم",
       "ملاحظات المعلم / الإجراء",
     ];
-    let currentDivision = "";
     records
       .filter((student) => index === 0 || statusLabel(student.status) === "غائب")
       .forEach((student) => {
-        if (student.divisionCode !== currentDivision) {
-          currentDivision = student.divisionCode ?? "";
-          addDivisionHeader(sheet, currentDivision, "F");
-        }
         sheet.addRow([
           "",
           student.id,
@@ -249,15 +242,10 @@ export async function exportAttendanceWorkbook(
   });
   if (dailyOnly) {
     const sheet = workbook.addWorksheet("الحالة اليومية المحددة");
-    setup(sheet, false, images, profile, divisionCodes);
+    setup(sheet, false, images, profile, divisionCodes, schoolName);
     sheet.columns = [{ width: 3 }, { width: 18 }, { width: 30 }, { width: 18 }, { width: 18 }, { width: 42 }];
     sheet.getRow(9).values = ["", "رقم الطالب", "اسم الطالب", "الشعبة / الفصل", "حالة الحضور", "ملاحظات المعلم / الإجراء"];
-    let currentDivision = "";
     records.forEach((student) => {
-      if (student.divisionCode !== currentDivision) {
-        currentDivision = student.divisionCode ?? "";
-        addDivisionHeader(sheet, currentDivision, "F");
-      }
       sheet.addRow(["", student.id, student.fullName, `الشعبة ${student.divisionCode}`, statusLabel(student.status), student.notes || ""]);
     });
     styleTable(sheet, [5]);
@@ -265,7 +253,7 @@ export async function exportAttendanceWorkbook(
   if (!dailyOnly) ["الحالة الأسبوعية (الجميع)", "الغائبون أسبوعياً فقط"].forEach(
     (name, index) => {
       const sheet = workbook.addWorksheet(name);
-      setup(sheet, true, images, profile, divisionCodes);
+      setup(sheet, true, images, profile, divisionCodes, schoolName);
       sheet.columns = [
         { width: 3 },
         { width: 18 },
@@ -286,24 +274,15 @@ export async function exportAttendanceWorkbook(
         "رقم الطالب",
         "اسم الطالب",
         "الشعبة / الفصل",
-        "الأحد",
-        "الإثنين",
-        "الثلاثاء",
-        "الأربعاء",
-        "الخميس",
+        ...["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"].map((day, dayIndex) => `${day} (${divisionCodes[dayIndex % Math.max(divisionCodes.length, 1)] ?? ""})`),
         "مجموع الحضور",
         "مجموع الغياب",
         "نسبة الحضور",
         "ملاحظات المعلم / الإجراء",
       ];
-      let currentDivision = "";
       records
         .filter((student) => index === 0 || weekDates.some((weekDate) => statusLabel(weeklyStatuses.get(weekDate)?.get(student.studentId ?? student.id)) === "غائب"))
         .forEach((student) => {
-          if (student.divisionCode !== currentDivision) {
-            currentDivision = student.divisionCode ?? "";
-            addDivisionHeader(sheet, currentDivision, "M");
-          }
           const status = statusLabel(student.status);
           const dailyStatuses = weekDates.map((weekDate) => statusLabel(weeklyStatuses.get(weekDate)?.get(student.studentId ?? student.id)));
           const row = sheet.addRow([

@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { invalidateCache } from '@/lib/redis'
+import { invalidateDivisionCaches } from '@/lib/redis'
+import { authorizeDivisions } from '@/lib/division-auth'
 import { prisma } from '@/lib/prisma'
-
-async function teacherDenied(request: NextRequest) {
-  const userId = request.headers.get('x-thabat-user-id')
-  if (!userId) return false
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
-  return user?.role === 'TEACHER'
-}
 
 export async function PUT(request: NextRequest, context: { params: { id: string } }) {
   try {
-    if (await teacherDenied(request)) return NextResponse.json({ error: 'Teachers have read-only division access.' }, { status: 403 })
+    const authorization = await authorizeDivisions(request, true)
+    if (authorization.status !== 200) return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+
     const body = await request.json() as { code?: string; name?: string }
     const code = body.code?.trim()
 
@@ -42,7 +38,7 @@ export async function PUT(request: NextRequest, context: { params: { id: string 
       where: { divisionCode: current.code },
       data: { divisionCode: code },
     })
-    await invalidateCache('thabat:divisions:all')
+    await invalidateDivisionCaches()
 
     return NextResponse.json({ data: division })
   } catch {
@@ -56,7 +52,9 @@ export async function PATCH(request: NextRequest, context: { params: { id: strin
 
 export async function DELETE(request: NextRequest, context: { params: { id: string } }) {
   try {
-    if (await teacherDenied(request)) return NextResponse.json({ error: 'Teachers have read-only division access.' }, { status: 403 })
+    const authorization = await authorizeDivisions(request, true)
+    if (authorization.status !== 200) return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+
     const current = await prisma.division.findUnique({ where: { id: context.params.id }, select: { id: true, code: true } })
     if (!current) {
       return NextResponse.json({ error: 'Division not found.' }, { status: 404 })
@@ -68,7 +66,7 @@ export async function DELETE(request: NextRequest, context: { params: { id: stri
     })
 
     await prisma.division.delete({ where: { id: context.params.id } })
-    await invalidateCache('thabat:divisions:all')
+    await invalidateDivisionCaches()
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: 'Unable to delete division.' }, { status: 500 })

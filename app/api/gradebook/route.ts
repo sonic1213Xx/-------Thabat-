@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCached, invalidateCache, setCached } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
+import { authorizeDivisions } from '@/lib/division-auth'
 
 const scoreFields = ['taskPeriod1', 'taskPeriod2', 'examPeriod1', 'examPeriod2', 'finalExam'] as const
 
@@ -9,6 +10,11 @@ export async function GET(request: NextRequest) {
   const subject = request.nextUrl.searchParams.get('subject')
   const teacherId = request.nextUrl.searchParams.get('teacherId')
   if (!divisionId || !subject || !teacherId) return NextResponse.json({ error: 'divisionId, subject, and teacherId are required.' }, { status: 400 })
+  const authorization = await authorizeDivisions(request)
+  if (authorization.status !== 200) return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+  if (authorization.isTeacher && (teacherId !== authorization.user.id || !authorization.divisionCodes.includes(divisionId))) {
+    return NextResponse.json({ error: 'You are not authorized to access this gradebook.' }, { status: 403 })
+  }
   const cacheKey = `thabat:gradebook:${divisionId}:${subject}:${teacherId}`
   const cached = await getCached<unknown[]>(cacheKey)
   if (cached) return NextResponse.json({ data: cached })
@@ -21,6 +27,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as { studentId?: string; divisionId?: string; subject?: string; teacherId?: string; updatedBy?: string; field?: string; value?: number | null; customScores?: Record<string, number | null>; entries?: Array<{ studentId: string; fields?: Partial<Record<typeof scoreFields[number], number | null>>; customScores?: Record<string, number | null> }> }
+    const authorization = await authorizeDivisions(request)
+    if (authorization.status !== 200) return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+    if (authorization.isTeacher && (!body.teacherId || body.teacherId !== authorization.user.id || !body.divisionId || !authorization.divisionCodes.includes(body.divisionId))) {
+      return NextResponse.json({ error: 'You are not authorized to modify this gradebook.' }, { status: 403 })
+    }
     if (body.entries?.length && body.divisionId && body.subject && body.teacherId) {
       const operations = body.entries.map((entry) => prisma.gradebookScore.upsert({
         where: { studentId_divisionId_subject_teacherId: { studentId: entry.studentId, divisionId: body.divisionId!, subject: body.subject!, teacherId: body.teacherId! } },

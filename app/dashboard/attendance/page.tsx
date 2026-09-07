@@ -7,8 +7,9 @@ import { AttendanceStatusSelect } from "@/components/ui/attendance-status-select
 import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
 import { exportAttendanceWorkbook } from "@/lib/export-attendance-fixed";
+import { exportAttendancePdf } from "@/lib/export-attendance-pdf";
 import { useToast } from "@/components/toast-provider";
-import { notifyPdfComingSoon, runExport } from "@/lib/export-feedback";
+import { runExport } from "@/lib/export-feedback";
 import { fetchCached, invalidateCached } from "@/lib/client-cache";
 import { AttendanceLogsModal } from "@/components/attendance/attendance-logs-modal";
 
@@ -316,14 +317,21 @@ export default function AttendancePage() {
       },
       session?.id,
     );
+  const exportPdf = () =>
+    exportAttendancePdf(
+      students.map(exportRecord),
+      attendanceTemplateDivisions,
+      date,
+      {
+        name: profile?.name || session?.name || "غير محدد",
+        role: profile?.role || session?.role || "TEACHER",
+      },
+    );
   const exportEmptyAttendanceTemplates = exportExcel;
   const handleExport = () => {
     if (!attendanceTemplateDivisions.length) return;
-    if (exportType === "PDF") notifyPdfComingSoon(showToast);
-    else {
-      setIsExporting(true);
-      void runExport(exportExcel, showToast, updateToast).finally(() => setIsExporting(false));
-    }
+    setIsExporting(true);
+    void runExport(exportType === "PDF" ? exportPdf : exportExcel, showToast, updateToast).finally(() => setIsExporting(false));
     setExportPanelOpen(false);
   };
   const text = english

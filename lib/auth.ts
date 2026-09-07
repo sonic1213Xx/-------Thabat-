@@ -97,6 +97,8 @@ export function getSession(): SessionUser | null {
 export function setSession(user: SessionUser, remember = true): void {
   if (typeof window === 'undefined') return
   runtimeSession = user
+  // Prototype identity context for API routes; this is not a signed session token.
+  document.cookie = `THABAT_USER_ID=${encodeURIComponent(user.id)}; Max-Age=31536000; Path=/; SameSite=Lax`
   localStorage.removeItem(AUTH_STORAGE_KEY)
   localStorage.removeItem(AUTH_PERSISTENCE_KEY)
   sessionStorage.removeItem(AUTH_STORAGE_KEY)
