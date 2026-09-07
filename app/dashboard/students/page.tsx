@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
   BookOpen,
@@ -79,6 +79,8 @@ interface StudentRecord {
 
 export default function StudentsPage() {
   const { t, locale } = useLanguage();
+  const reducedMotion = useReducedMotion();
+  const [lowEndDevice, setLowEndDevice] = useState(false);
   const { showToast, updateToast } = useToast();
   const [gradebookExportPeriod, setGradebookExportPeriod] = useState<
     "period1" | "period2" | "both"
@@ -194,6 +196,14 @@ export default function StudentsPage() {
     nationalId: "",
     divisionCode: "",
   });
+
+  useEffect(() => {
+    const navigatorWithMemory = navigator as Navigator & { deviceMemory?: number };
+    setLowEndDevice(
+      navigator.hardwareConcurrency <= 4 ||
+        (navigatorWithMemory.deviceMemory ?? 8) <= 4,
+    );
+  }, []);
 
   useEffect(() => {
     const session = getSession();
@@ -1359,14 +1369,20 @@ export default function StudentsPage() {
                             <motion.tr
                               key={student.id}
                               initial={
-                                index < 10 ? { opacity: 0, y: -8 } : false
+                                !reducedMotion && !lowEndDevice && index < 10
+                                  ? { opacity: 0, y: -8 }
+                                  : false
                               }
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{
-                                duration: index < 10 ? 0.14 : 0,
-                                delay: index < 10 ? index * 0.02 : 0,
-                                ease: "easeOut",
-                              }}
+                              animate={
+                                !reducedMotion && !lowEndDevice
+                                  ? { opacity: 1, y: 0 }
+                                  : false
+                              }
+                              transition={
+                                !reducedMotion && !lowEndDevice && index < 10
+                                  ? { duration: 0.14, delay: index * 0.02, ease: "easeOut" }
+                                  : { duration: 0 }
+                              }
                               onClick={() =>
                                 canEditStudents && setEditingStudent(student)
                               }

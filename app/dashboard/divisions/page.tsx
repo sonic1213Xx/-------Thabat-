@@ -11,6 +11,7 @@ import { useTabLoading } from '@/components/dashboard/use-tab-loading'
 import { useLanguage } from '@/components/language-provider'
 import { fetchCached } from '@/lib/client-cache'
 import { getCurrentProfile, getSession } from '@/lib/auth'
+import { DivisionStudentsModal } from '@/components/division-students-modal'
 
 interface DivisionRecord {
   id: string
@@ -33,6 +34,7 @@ export default function DivisionsPage() {
   const [editingDivision, setEditingDivision] = useState<DivisionRecord | null>(null)
   const [newDivision, setNewDivision] = useState({ code: '', name: '' })
   const [deletingDivision, setDeletingDivision] = useState<DivisionRecord | null>(null)
+  const [selectedDivision, setSelectedDivision] = useState<DivisionSummary | null>(null)
   const session = getSession()
   const profile = getCurrentProfile()
   const teachingCodes = Array.from(new Set(profile?.teachingAssignments?.flatMap((assignment) => assignment.divisions) ?? profile?.assigned_divisions ?? []))
@@ -49,8 +51,11 @@ export default function DivisionsPage() {
 
         if (!isActive()) return
         const loadedDivisions = divisionsRes.data ?? []
-        if (isActive()) setDivisions(readOnlyTeachingView ? loadedDivisions.filter((division) => teachingCodes.includes(division.code)) : loadedDivisions)
-        if (isActive()) setStudents(readOnlyTeachingView ? (studentsRes.data ?? []).filter((student) => teachingCodes.includes(student.divisionCode)) : (studentsRes.data ?? []))
+        const allowedCodes = session?.role === 'TEACHER'
+          ? new Set(loadedDivisions.map((division) => division.code))
+          : new Set(teachingCodes)
+        if (isActive()) setDivisions(readOnlyTeachingView ? loadedDivisions.filter((division) => allowedCodes.has(division.code)) : loadedDivisions)
+        if (isActive()) setStudents(readOnlyTeachingView ? (studentsRes.data ?? []).filter((student) => allowedCodes.has(student.divisionCode)) : (studentsRes.data ?? []))
       } catch (error) {
         console.error('Failed to load divisions:', error)
       }
@@ -212,7 +217,11 @@ export default function DivisionsPage() {
             key={division.id}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"
+            role="button"
+            tabIndex={0}
+            onClick={() => setSelectedDivision(division)}
+            onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedDivision(division) }}
+            className="cursor-pointer rounded-xl border border-slate-200 bg-white p-5 transition hover:border-emerald-400 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -266,7 +275,7 @@ export default function DivisionsPage() {
               <tbody>
                 {divisionSummaries.map((division) => (
                   <tr key={division.id} className="border-t border-slate-200 dark:border-slate-800">
-                    <td className="px-4 py-3 font-medium">{division.name || `الفصل ${division.code}`}</td>
+                    <td className="px-4 py-3 font-medium"><button type="button" onClick={() => setSelectedDivision(division)} className="text-start hover:text-emerald-600 hover:underline">{division.name || `الفصل ${division.code}`}</button></td>
                     <td className="px-4 py-3">{division.students}</td>
                     <td className="px-4 py-3">{division.averageBehavior}/100</td>
                     <td className="px-4 py-3">
@@ -311,6 +320,8 @@ export default function DivisionsPage() {
         onCancel={() => setDeletingDivision(null)}
         onConfirm={confirmDeleteDivision}
       />
+
+      {selectedDivision && <DivisionStudentsModal divisionCode={selectedDivision.code} students={students.filter((student) => student.divisionCode === selectedDivision.code)} onClose={() => setSelectedDivision(null)} />}
     </div>
   )
 }

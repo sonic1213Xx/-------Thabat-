@@ -13,10 +13,13 @@ export function BetaNotice() {
   const { locale } = useLanguage()
   const [open, setOpen] = useState(false)
   const [noticeKey, setNoticeKey] = useState<string | null>(null)
+  const [eligible, setEligible] = useState(false)
 
   useEffect(() => {
     const session = getSession()
-    if (!session || isCreatorRole(session.role)) return
+    const role = session?.role?.trim().toUpperCase()
+    if (!session || isCreatorRole(role)) return
+    setEligible(true)
     const key = `${NOTICE_KEY_PREFIX}${session.id}`
     setNoticeKey(key)
     if (window.localStorage.getItem(key) !== 'true') setOpen(true)
@@ -28,6 +31,7 @@ export function BetaNotice() {
   }
 
   const english = locale === 'en'
+  if (!eligible) return null
   return (
     <Modal open={open} onOpenChange={(nextOpen) => { if (!nextOpen) acknowledge() }} className="max-w-lg">
       <div className="space-y-5" dir={english ? 'ltr' : 'rtl'}>
@@ -47,7 +51,7 @@ export function BetaNotice() {
         <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
           <p>{english ? 'This is a beta version for testing only.' : 'هذه نسخة تجريبية مخصصة للاختبار فقط.'}</p>
           <p>{english ? 'Any data currently stored in the system may be deleted when the official application launches.' : 'قد يتم حذف أي بيانات مخزنة حالياً في النظام عند إطلاق التطبيق الرسمي.'}</p>
-          <p>{english ? 'Please send any notes, issues, or reports to the curator.' : 'يرجى إرسال أي ملاحظات أو مشكلات أو تقارير إلى القيّم.'}</p>
+          <p>{english ? 'Please send any notes, issues, or reports to the creator.' : 'يرجى إرسال أي ملاحظات أو مشكلات أو تقارير إلى المُنشئ.'}</p>
         </div>
         <button type="button" onClick={acknowledge} className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700">
           {english ? 'I understand' : 'فهمت'}

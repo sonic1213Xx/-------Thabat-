@@ -81,9 +81,6 @@ export async function GET(request: NextRequest) {
         admissionDate: true, createdAt: true, createdDateOnly: true, createdTimeOnly: true,
         updatedAt: true, lastUpdatedBy: true, lastUpdatedByName: true, lastUpdatedByRole: true,
         isActive: true,
-        warnings: { select: { id: true, type: true, reason: true, deduction: true, severity: true, isResolved: true, issuedAt: true, issuedByName: true } },
-        attendance: { select: { id: true, date: true, status: true, notes: true, markedBy: true, markedByName: true, updatedAt: true } },
-        transferHistory: { select: { id: true, fromDivision: true, toDivision: true, reason: true, transferredAt: true, performedByName: true, performedByRole: true } },
       },
     })
 

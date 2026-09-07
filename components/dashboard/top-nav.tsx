@@ -3,8 +3,9 @@
 import * as Select from '@radix-ui/react-select'
 import { useTheme } from 'next-themes'
 import { useRouter } from 'next/navigation'
-import { Menu, Sun, Moon, LogOut, Users, Plus, Check, ChevronDown, X, Trash2, Languages, User, Bell, Eye } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Menu, Sun, Moon, LogOut, Users, Plus, Check, ChevronDown, X, Trash2, Languages, User, Bell, Eye, AlertTriangle, Printer } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
 import { cn, getStoredTeamId, setStoredTeamId, TEAM_OPTIONS, type TeamDefinition } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
@@ -14,9 +15,13 @@ import { getSession, type SessionUser } from '@/lib/auth'
 import { isCreatorRole } from '@/lib/permissions'
 
 type DBTeam = { id: string; label: string }
-type TransferNotification = { id: string; fromDivision: string; toDivision: string; createdAt: string; readAt: string | null; reviewedAt: string | null; students: Array<{ id: string; fullName: string; fromDivision: string; toDivision: string }>; grades: Array<{ id?: string; studentId: string; divisionId: string; subject: string; teacherId: string; taskPeriod1?: number | null; taskPeriod2?: number | null; examPeriod1?: number | null; examPeriod2?: number | null; finalExam?: number | null; customScores?: Record<string, number | null> }> }
+type TransferNotification = { type: 'TRANSFER'; id: string; fromDivision: string; toDivision: string; createdAt: string; readAt: string | null; reviewedAt: string | null; students: Array<{ id: string; fullName: string; fromDivision: string; toDivision: string }>; grades: Array<{ id?: string; studentId: string; divisionId: string; subject: string; teacherId: string; taskPeriod1?: number | null; taskPeriod2?: number | null; examPeriod1?: number | null; examPeriod2?: number | null; finalExam?: number | null; customScores?: Record<string, number | null> }> }
+type AttendanceNotification = { type: 'ATTENDANCE'; id: string; createdAt: string; readAt: string | null; studentId: string; studentName: string; divisionId: string; subject: string; date: string; status: 'ABSENT_UNEXCUSED' | 'ESCAPED' }
+type ReferralNotification = { type: 'REFERRAL'; id: string; createdAt: string; readAt: string | null; studentName: string; divisionCode: string; subject: string; reason: string; incidentDate: string; incidentTime: string; location: string; actionTaken: string; createdBy: { name: string } }
+type Notification = TransferNotification | AttendanceNotification | ReferralNotification
 
 const canUseTeamSwitcher = (role?: string) => Boolean(role && (isCreatorRole(role) || role === 'PRINCIPAL' || role === 'VICE_PRINCIPAL' || role.startsWith('VP_')))
+const canReceiveAttendanceAlerts = (role?: string) => Boolean(role && ['PRINCIPAL', 'VICE_PRINCIPAL', 'VP_STUDENT_AFFAIRS', 'VP_ACADEMIC_AFFAIRS', 'VP_OPERATIONS'].includes(role))
 
 export function TopNav() {
   const { dir, t, toggleLocale, locale } = useLanguage()
@@ -29,9 +34,11 @@ export function TopNav() {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null)
-  const [transferNotifications, setTransferNotifications] = useState<TransferNotification[]>([])
+  const [transferNotifications, setTransferNotifications] = useState<Notification[]>([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [selectedNotification, setSelectedNotification] = useState<TransferNotification | null>(null)
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null)
+  const [liveReferral, setLiveReferral] = useState<ReferralNotification | null>(null)
+  const notificationLoadRef = useRef(false)
 
   // Load teams from database
   const loadTeams = async () => {
@@ -66,7 +73,27 @@ export function TopNav() {
 
   useEffect(() => {
     if (!sessionUser) return
-    void fetch('/api/transfer-notifications', { headers: { 'x-thabat-user-id': sessionUser.id } }).then((response) => response.json()).then((json: { data?: TransferNotification[] }) => setTransferNotifications(json.data ?? [])).catch(() => setTransferNotifications([]))
+    const loadNotifications = async () => {
+      if (document.visibilityState === 'hidden') return
+      try {
+        const response = await fetch('/api/transfer-notifications', { headers: { 'x-thabat-user-id': sessionUser.id }, cache: 'no-store' })
+        const json = await response.json() as { data?: Notification[] }
+        const nextNotifications = json.data ?? []
+        if (notificationLoadRef.current) {
+          const previousIds = new Set(transferNotifications.map((notification) => `${notification.type}-${notification.id}`))
+          const newReferral = nextNotifications.find((notification): notification is ReferralNotification => notification.type === 'REFERRAL' && !previousIds.has(`${notification.type}-${notification.id}`))
+          if (newReferral) setLiveReferral(newReferral)
+        }
+        notificationLoadRef.current = true
+        setTransferNotifications(nextNotifications)
+      } catch {
+        // Keep the last notification state during a temporary polling failure.
+      }
+    }
+    void loadNotifications()
+    if (!canReceiveAttendanceAlerts(sessionUser.role)) return
+    const interval = window.setInterval(() => void loadNotifications(), 15000)
+    return () => window.clearInterval(interval)
   }, [sessionUser])
 
   useEffect(() => {
@@ -75,18 +102,26 @@ export function TopNav() {
     return () => window.removeEventListener('thabat-open-notifications', openNotifications)
   }, [])
 
+  const printReferral = (referral: ReferralNotification) => {
+    const popup = window.open('', '_blank', 'width=900,height=700')
+    if (!popup) return
+    popup.document.write(`<html dir="rtl"><head><title>نموذج إحالة طالب</title><style>body{font-family:Arial,sans-serif;color:#111;padding:36px;line-height:1.8}header{text-align:center;border-bottom:3px solid #047857;padding-bottom:18px}h1{font-size:24px;margin:0}h2{font-size:18px;color:#047857;margin-top:28px}.meta{display:grid;grid-template-columns:1fr 1fr;border:1px solid #9ca3af}.meta div{padding:10px;border:1px solid #d1d5db}.box{border:1px solid #9ca3af;min-height:90px;padding:12px}.sign{display:flex;justify-content:space-between;margin-top:70px}</style></head><body><header><h1>نموذج إحالة طالب إلى وكيل المدرسة</h1><p>ثَبَت - سجل المتابعة المدرسية</p></header><h2>بيانات الإحالة</h2><div class="meta"><div><b>اسم الطالب:</b> ${referral.studentName}</div><div><b>الشعبة:</b> ${referral.divisionCode}</div><div><b>المادة:</b> ${referral.subject}</div><div><b>تاريخ الواقعة:</b> ${referral.incidentDate}</div><div><b>وقت الواقعة:</b> ${referral.incidentTime}</div><div><b>المكان:</b> ${referral.location}</div><div><b>المعلم:</b> ${referral.createdBy.name}</div></div><h2>سبب الإحالة</h2><div class="box">${referral.reason}</div><h2>الإجراء الفوري المتخذ</h2><div class="box">${referral.actionTaken}</div><div class="sign"><span>توقيع المعلم: __________________</span><span>توقيع وكيل المدرسة: __________________</span></div><script>window.onload=()=>window.print()</script></body></html>`)
+    popup.document.close()
+  }
+
   const unreadNotifications = transferNotifications.filter((notification) => !notification.readAt).length
-  const openNotification = async (notification: TransferNotification) => {
+  const openNotification = async (notification: Notification) => {
     setSelectedNotification(notification)
     if (!notification.readAt && sessionUser) {
-      await fetch('/api/transfer-notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-thabat-user-id': sessionUser.id }, body: JSON.stringify({ id: notification.id, action: 'read' }) })
+      await fetch('/api/transfer-notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-thabat-user-id': sessionUser.id }, body: JSON.stringify({ id: notification.id, type: notification.type, action: 'read' }) })
       setTransferNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item))
     }
   }
 
   const markNotificationReviewed = async () => {
     if (!selectedNotification || !sessionUser) return
-    await fetch('/api/transfer-notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-thabat-user-id': sessionUser.id }, body: JSON.stringify({ id: selectedNotification.id, action: 'reviewed' }) })
+    if (selectedNotification.type === 'ATTENDANCE') return
+    await fetch('/api/transfer-notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-thabat-user-id': sessionUser.id }, body: JSON.stringify({ id: selectedNotification.id, type: selectedNotification.type, action: 'reviewed' }) })
     setTransferNotifications((current) => current.map((item) => item.id === selectedNotification.id ? { ...item, reviewedAt: new Date().toISOString(), readAt: item.readAt ?? new Date().toISOString() } : item))
     setSelectedNotification((current) => current ? { ...current, reviewedAt: new Date().toISOString() } : current)
   }
@@ -272,15 +307,25 @@ export function TopNav() {
         </div>
       </div>
 
+      <AnimatePresence>{liveReferral && <motion.button type="button" initial={{ opacity: 0, x: 80, y: -12 }} animate={{ opacity: 1, x: 0, y: 0 }} exit={{ opacity: 0, x: 80 }} transition={{ type: 'spring', stiffness: 360, damping: 28 }} onClick={() => { setSelectedNotification(liveReferral); setLiveReferral(null); setNotificationsOpen(true) }} className="fixed end-4 top-4 z-[2000] w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-amber-300 bg-white p-4 text-start shadow-2xl ring-4 ring-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:ring-amber-950/40"><span className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"><AlertTriangle className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">{locale === 'ar' ? 'إحالة طالب جديدة' : 'New student referral'}</span><span className="mt-1 block truncate font-bold text-slate-900 dark:text-white">{liveReferral.studentName}</span><span className="mt-1 block text-xs text-slate-600 dark:text-slate-300">{locale === 'ar' ? `من المعلم ${liveReferral.createdBy.name} · اضغط لفتح النموذج` : `From ${liveReferral.createdBy.name} · Click to open the form`}</span></span></span></motion.button>}</AnimatePresence>
       {notificationsOpen && <Modal open={true} onOpenChange={setNotificationsOpen} className="max-w-2xl">
         {!selectedNotification ? <div className="space-y-4" dir={dir}>
-          <div className="flex items-center gap-3 border-b border-border pb-4"><Bell className="h-5 w-5 text-emerald-600" /><div><h2 className="text-xl font-bold text-card-foreground">{locale === 'ar' ? 'إشعارات نقل الطلاب' : 'Student transfer notifications'}</h2><p className="text-sm text-card-foreground/60">{locale === 'ar' ? 'إشعار واحد لكل دفعة نقل.' : 'One notification for each transfer batch.'}</p></div></div>
-          {!transferNotifications.length && <p className="rounded-lg bg-muted p-6 text-center text-sm text-card-foreground/60">{locale === 'ar' ? 'لا توجد إشعارات نقل جديدة.' : 'No transfer notifications.'}</p>}
-          <div className="space-y-2">{transferNotifications.map((notification) => <button key={notification.id} type="button" onClick={() => void openNotification(notification)} className="flex w-full items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 text-start transition hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20"><div><p className="font-bold text-card-foreground">{locale === 'ar' ? `${notification.students.length} طالباً إلى الشعبة ${notification.toDivision}` : `${notification.students.length} students to Division ${notification.toDivision}`}</p><p className="mt-1 text-xs text-card-foreground/60">{locale === 'ar' ? `من الشعبة ${notification.fromDivision}` : `From Division ${notification.fromDivision}`} · {new Date(notification.createdAt).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')}</p></div><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${notification.readAt ? 'bg-slate-300' : 'bg-red-600'}`} /></button>)}</div>
+          <div className="flex items-center gap-3 border-b border-border pb-4"><Bell className="h-5 w-5 text-emerald-600" /><div><h2 className="text-xl font-bold text-card-foreground">{locale === 'ar' ? 'الإشعارات' : 'Notifications'}</h2><p className="text-sm text-card-foreground/60">{locale === 'ar' ? 'تنبيهات النقل والحضور.' : 'Transfer and attendance alerts.'}</p></div></div>
+          {!transferNotifications.length && <p className="rounded-lg bg-muted p-6 text-center text-sm text-card-foreground/60">{locale === 'ar' ? 'لا توجد إشعارات.' : 'No notifications.'}</p>}
+          <div className="space-y-2">{transferNotifications.map((notification) => <button key={`${notification.type}-${notification.id}`} type="button" onClick={() => void openNotification(notification)} className="flex w-full items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 text-start transition hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20"><div><p className="font-bold text-card-foreground">{notification.type === 'REFERRAL' ? (locale === 'ar' ? `إحالة طالب: ${notification.studentName}` : `Student referral: ${notification.studentName}`) : notification.type === 'ATTENDANCE' ? (locale === 'ar' ? `${notification.status === 'ESCAPED' ? 'هروب' : 'تخطي حصة'}: ${notification.studentName}` : `${notification.status === 'ESCAPED' ? 'Escaped' : 'Skipped class'}: ${notification.studentName}`) : locale === 'ar' ? `${notification.students.length} طالباً إلى الشعبة ${notification.toDivision}` : `${notification.students.length} students to Division ${notification.toDivision}`}</p><p className="mt-1 text-xs text-card-foreground/60">{notification.type === 'REFERRAL' ? (locale === 'ar' ? `من المعلم ${notification.createdBy.name} · الشعبة ${notification.divisionCode}` : `From ${notification.createdBy.name} · Division ${notification.divisionCode}`) : notification.type === 'ATTENDANCE' ? (locale === 'ar' ? `الشعبة ${notification.divisionId} · ${notification.subject}` : `Division ${notification.divisionId} · ${notification.subject}`) : locale === 'ar' ? `من الشعبة ${notification.fromDivision}` : `From Division ${notification.fromDivision}`} · {new Date(notification.createdAt).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')}</p></div><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${notification.readAt ? 'bg-slate-300' : 'bg-red-600'}`} /></button>)}</div>
         </div> : <div className="space-y-4" dir={dir}>
-          <div className="flex items-start justify-between gap-3 border-b border-border pb-4"><div><h2 className="text-xl font-bold text-card-foreground">{locale === 'ar' ? `نقل ${selectedNotification.students.length} طالباً إلى الشعبة ${selectedNotification.toDivision}` : `${selectedNotification.students.length} students transferred to Division ${selectedNotification.toDivision}`}</h2><p className="mt-1 text-sm text-card-foreground/60">{locale === 'ar' ? `من الشعبة ${selectedNotification.fromDivision}` : `From Division ${selectedNotification.fromDivision}`} · {new Date(selectedNotification.createdAt).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')}</p></div><button type="button" onClick={() => setSelectedNotification(null)} className="rounded-lg border border-border px-3 py-2 text-sm">{locale === 'ar' ? 'رجوع' : 'Back'}</button></div>
-          <div className="space-y-3">{selectedNotification.students.map((student) => <div key={student.id} className="rounded-xl border border-border p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-card-foreground">{student.fullName}</p><p className="text-xs text-card-foreground/60">{locale === 'ar' ? `من ${student.fromDivision} إلى ${student.toDivision}` : `${student.fromDivision} to ${student.toDivision}`}</p></div><Eye className="h-4 w-4 text-emerald-600" /></div><div className="mt-3 space-y-2">{selectedNotification.grades.filter((grade) => grade.studentId === student.id).map((grade) => <div key={grade.id ?? `${grade.studentId}-${grade.subject}-${grade.teacherId}`} className="rounded-lg bg-muted p-3 text-xs"><p className="font-bold">{grade.subject}</p><p className="mt-1 text-card-foreground/70">{[grade.taskPeriod1, grade.taskPeriod2, grade.examPeriod1, grade.examPeriod2, grade.finalExam].map((value, index) => value === null || value === undefined ? null : `${['مهمة 1', 'مهمة 2', 'اختبار 1', 'اختبار 2', 'نهائي'][index]}: ${value}`).filter(Boolean).join(' · ') || (locale === 'ar' ? 'لا توجد درجات محفوظة' : 'No saved grades')}</p></div>)}</div></div>)}</div>
-          <button type="button" onClick={() => void markNotificationReviewed()} disabled={Boolean(selectedNotification.reviewedAt)} className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{selectedNotification.reviewedAt ? (locale === 'ar' ? 'تمت المراجعة' : 'Reviewed') : (locale === 'ar' ? 'تحديد كمراجع' : 'Mark as reviewed')}</button>
+          {selectedNotification.type === 'REFERRAL' ? <>
+            <div className="flex items-start justify-between gap-3 border-b border-border pb-4"><div><h2 className="text-xl font-bold text-card-foreground">{locale === 'ar' ? `إحالة طالب: ${selectedNotification.studentName}` : `Student referral: ${selectedNotification.studentName}`}</h2><p className="mt-1 text-sm text-card-foreground/60">{locale === 'ar' ? `من المعلم ${selectedNotification.createdBy.name} · الشعبة ${selectedNotification.divisionCode} · ${selectedNotification.subject}` : `From ${selectedNotification.createdBy.name} · Division ${selectedNotification.divisionCode} · ${selectedNotification.subject}`}</p></div><button type="button" onClick={() => setSelectedNotification(null)} className="rounded-lg border border-border px-3 py-2 text-sm">{locale === 'ar' ? 'رجوع' : 'Back'}</button></div>
+            <div className="space-y-3 text-sm"><p className="rounded-lg bg-muted p-3"><b>{locale === 'ar' ? 'السبب' : 'Reason'}:</b> {selectedNotification.reason}</p><p className="rounded-lg bg-muted p-3"><b>{locale === 'ar' ? 'المكان والوقت' : 'Location and time'}:</b> {selectedNotification.location} · {selectedNotification.incidentDate} {selectedNotification.incidentTime}</p></div>
+            <div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => printReferral(selectedNotification)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-3 text-sm font-semibold hover:bg-muted"><Printer className="h-4 w-4" />{locale === 'ar' ? 'طباعة النموذج' : 'Print form'}</button><button type="button" onClick={() => void markNotificationReviewed()} className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">{locale === 'ar' ? 'تحديد كمراجع' : 'Mark as reviewed'}</button></div>
+          </> : selectedNotification.type === 'ATTENDANCE' ? <>
+            <div className="flex items-start justify-between gap-3 border-b border-border pb-4"><div><h2 className="text-xl font-bold text-card-foreground">{locale === 'ar' ? `${selectedNotification.status === 'ESCAPED' ? 'هروب' : 'تخطي حصة'}: ${selectedNotification.studentName}` : `${selectedNotification.status === 'ESCAPED' ? 'Escaped' : 'Skipped class'}: ${selectedNotification.studentName}`}</h2><p className="mt-1 text-sm text-card-foreground/60">{locale === 'ar' ? `الشعبة ${selectedNotification.divisionId} · ${selectedNotification.subject}` : `Division ${selectedNotification.divisionId} · ${selectedNotification.subject}`} · {selectedNotification.date}</p></div><button type="button" onClick={() => setSelectedNotification(null)} className="rounded-lg border border-border px-3 py-2 text-sm">{locale === 'ar' ? 'رجوع' : 'Back'}</button></div>
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">{locale === 'ar' ? 'تم تسجيل هذا التنبيه من قبل المعلم.' : 'This alert was recorded by the teacher.'}</p>
+          </> : <>
+            <div className="flex items-start justify-between gap-3 border-b border-border pb-4"><div><h2 className="text-xl font-bold text-card-foreground">{locale === 'ar' ? `نقل ${selectedNotification.students.length} طالباً إلى الشعبة ${selectedNotification.toDivision}` : `${selectedNotification.students.length} students transferred to Division ${selectedNotification.toDivision}`}</h2><p className="mt-1 text-sm text-card-foreground/60">{locale === 'ar' ? `من الشعبة ${selectedNotification.fromDivision}` : `From Division ${selectedNotification.fromDivision}`} · {new Date(selectedNotification.createdAt).toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US')}</p></div><button type="button" onClick={() => setSelectedNotification(null)} className="rounded-lg border border-border px-3 py-2 text-sm">{locale === 'ar' ? 'رجوع' : 'Back'}</button></div>
+            <div className="space-y-3">{selectedNotification.students.map((student) => <div key={student.id} className="rounded-xl border border-border p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-card-foreground">{student.fullName}</p><p className="text-xs text-card-foreground/60">{locale === 'ar' ? `من ${student.fromDivision} إلى ${student.toDivision}` : `${student.fromDivision} to ${student.toDivision}`}</p></div><Eye className="h-4 w-4 text-emerald-600" /></div><div className="mt-3 space-y-2">{selectedNotification.grades.filter((grade) => grade.studentId === student.id).map((grade) => <div key={grade.id ?? `${grade.studentId}-${grade.subject}-${grade.teacherId}`} className="rounded-lg bg-muted p-3 text-xs"><p className="font-bold">{grade.subject}</p><p className="mt-1 text-card-foreground/70">{[grade.taskPeriod1, grade.taskPeriod2, grade.examPeriod1, grade.examPeriod2, grade.finalExam].map((value, index) => value === null || value === undefined ? null : `${['مهمة 1', 'مهمة 2', 'اختبار 1', 'اختبار 2', 'نهائي'][index]}: ${value}`).filter(Boolean).join(' · ') || (locale === 'ar' ? 'لا توجد درجات محفوظة' : 'No saved grades')}</p></div>)}</div></div>)}</div>
+            <button type="button" onClick={() => void markNotificationReviewed()} disabled={Boolean(selectedNotification.reviewedAt)} className="w-full rounded-lg bg-emerald-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{selectedNotification.reviewedAt ? (locale === 'ar' ? 'تمت المراجعة' : 'Reviewed') : (locale === 'ar' ? 'تحديد كمراجع' : 'Mark as reviewed')}</button>
+          </>}
         </div>}
       </Modal>}
 

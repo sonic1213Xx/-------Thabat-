@@ -54,3 +54,18 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Unable to update profile.' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json() as { id?: string }
+    if (!body.id) return NextResponse.json({ error: 'Profile id is required.' }, { status: 400 })
+    const target = await prisma.user.findUnique({ where: { id: body.id }, select: { id: true, role: true, isActive: true } })
+    if (!target || !target.isActive) return NextResponse.json({ error: 'Profile not found.' }, { status: 404 })
+    if (target.role === 'PRINCIPAL' || target.role === 'CREATOR') return NextResponse.json({ error: 'This profile cannot be deleted.' }, { status: 403 })
+    await prisma.user.update({ where: { id: body.id }, data: { isActive: false } })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('User deletion failed:', error)
+    return NextResponse.json({ error: 'Unable to delete profile.' }, { status: 500 })
+  }
+}

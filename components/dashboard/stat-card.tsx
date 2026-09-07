@@ -11,6 +11,7 @@ interface StatCardProps {
   change: string
   icon: LucideIcon
   color: 'emerald' | 'blue' | 'orange' | 'purple'
+  loading?: boolean
 }
 
 const colorMap = {
@@ -40,7 +41,7 @@ const colorMap = {
   },
 }
 
-export function StatCard({ id, label, value, change, icon: Icon, color }: StatCardProps) {
+export function StatCard({ id, label, value, change, icon: Icon, color, loading = false }: StatCardProps) {
   const colors = colorMap[color]
   const normalizedChange = typeof change === 'string' ? change.trim() : ''
   const isBadgeVisible = Boolean(normalizedChange && normalizedChange !== '0' && normalizedChange !== '+0' && normalizedChange !== '-0')
@@ -62,10 +63,10 @@ export function StatCard({ id, label, value, change, icon: Icon, color }: StatCa
             {label}
           </p>
           <div className="mt-auto flex items-center gap-2 pt-3">
-            <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+            {loading ? <span aria-label="Loading" className="block h-9 w-20 animate-pulse rounded-md bg-slate-200 dark:bg-slate-700" /> : <h3 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
               {value}
-            </h3>
-            {isBadgeVisible && (
+            </h3>}
+            {!loading && isBadgeVisible && (
               <span className={cn('text-xs font-semibold', colors.text)}>
                 {normalizedChange}
               </span>

@@ -209,10 +209,37 @@ export async function exportEmptyGradebookTemplates(divisionCodes: string[], per
   if (!templateResponse.ok) throw new Error('Unable to load the gradebook template.')
   const templateBuffer = await templateResponse.arrayBuffer()
   const uniqueCodes = Array.from(new Set(divisionCodes)).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
-  for (const divisionCode of uniqueCodes) {
-    const divisionWorkbook = new ExcelJS.Workbook()
-    await divisionWorkbook.xlsx.load(templateBuffer)
-    const worksheet = divisionWorkbook.worksheets[0]
+  if (!uniqueCodes.length) return
+
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(templateBuffer)
+  const templateWorksheet = workbook.worksheets[0]
+
+  const copyTemplateWorksheet = (source: ExcelJS.Worksheet, name: string) => {
+    const worksheet = workbook.addWorksheet(name, { views: [{ rightToLeft: true }] })
+    worksheet.columns = source.columns.map((column) => ({
+      header: column.header,
+      key: column.key,
+      width: column.width,
+      hidden: column.hidden,
+    }))
+    source.eachRow({ includeEmpty: true }, (sourceRow, rowNumber) => {
+      const targetRow = worksheet.getRow(rowNumber)
+      targetRow.height = sourceRow.height
+      sourceRow.eachCell({ includeEmpty: true }, (sourceCell, columnNumber) => {
+        const targetCell = targetRow.getCell(columnNumber)
+        targetCell.value = sourceCell.value
+        targetCell.style = { ...sourceCell.style }
+      })
+    })
+    source.model.merges.forEach((merge) => worksheet.mergeCells(merge))
+    source.getImages().forEach((image) => worksheet.addImage(Number(image.imageId), image.range))
+    return worksheet
+  }
+
+  uniqueCodes.forEach((divisionCode, index) => {
+    const worksheet = index === 0 ? templateWorksheet : copyTemplateWorksheet(templateWorksheet, divisionCode)
+    worksheet.name = divisionCode
     worksheet.getCell('B2').value = `المادة : ${metadata.subject ?? ''}`
     worksheet.getCell('C2').value = metadata.schoolName ?? ''
     worksheet.getCell('B3').value = `المعلم : ${metadata.teacherName ?? ''}`
@@ -228,10 +255,10 @@ export async function exportEmptyGradebookTemplates(divisionCodes: string[], per
     })
     removeUnusedStudentRows(worksheet, Math.min(divisionStudents.length, getStudentRows(worksheet).capacity))
     applyDubaiFont(worksheet)
-    const buffer = await divisionWorkbook.xlsx.writeBuffer()
-    const safeCode = divisionCode.replace(/[\\/:*?"<>|]/g, '_')
-    saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `كشف_درجات_${safeCode}.xlsx`)
-  }
+  })
+
+  const buffer = await workbook.xlsx.writeBuffer()
+  saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'كشوف_درجات_جميع_الشعب.xlsx')
 }
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character] ?? character)

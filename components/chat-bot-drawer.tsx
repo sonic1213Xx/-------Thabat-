@@ -4,11 +4,55 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, Send, Sparkles, Trash2, X } from 'lucide-react'
+import { Bot, Check, Loader2, Send, Sparkles, Trash2, Undo2, X } from 'lucide-react'
 import { type ChatMessage } from '@/lib/utils'
 import { useLanguage } from '@/components/language-provider'
+import { getSession } from '@/lib/auth'
+import { usePathname, useRouter } from 'next/navigation'
 
 const CHAT_LOADING_DELAY = 300
+type AgentPlan = { type: string; [key: string]: unknown }
+type AgentPreview = { plan: AgentPlan; steps: string[]; target: string; actionId?: string; state: 'preview' | 'executed' | 'restored' }
+
+function getScreenContext(pathname: string) {
+  const root = document.querySelector('main') ?? document.body
+  const isVisible = (element: Element) => {
+    const style = window.getComputedStyle(element)
+    const rect = element.getBoundingClientRect()
+    return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
+  }
+  const text = (element: Element) => (element.textContent ?? '').replace(/\s+/g, ' ').trim()
+  const controls = Array.from(root.querySelectorAll('button, a, input, textarea, select, [role="button"]'))
+    .filter(isVisible)
+    .map((element) => ({
+      type: element.tagName.toLowerCase(),
+      label: element.getAttribute('aria-label') || element.getAttribute('title') || text(element) || element.getAttribute('placeholder') || '',
+      value: element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement ? element.value : undefined,
+    }))
+    .filter((control) => control.label || control.value)
+    .slice(0, 80)
+  const rows = Array.from(root.querySelectorAll('table tr, [role="row"], article, li'))
+    .filter(isVisible)
+    .map(text)
+    .filter(Boolean)
+    .slice(0, 100)
+  const headings = Array.from(root.querySelectorAll('h1, h2, h3, h4'))
+    .filter(isVisible)
+    .map(text)
+    .filter(Boolean)
+    .slice(0, 20)
+
+  return {
+    path: pathname,
+    title: document.title,
+    focusedElement: document.activeElement instanceof HTMLElement ? text(document.activeElement) || document.activeElement.getAttribute('aria-label') : '',
+    viewport: `${window.innerWidth}x${window.innerHeight}`,
+    headings,
+    rows,
+    controls,
+    mainText: (root.innerText || '').slice(0, 12000),
+  }
+}
 
 const TypingIndicator = () => (
   <div className="flex w-fit items-center gap-1.5 rounded-2xl bg-slate-100 px-3 py-1.5 dark:bg-slate-800">
@@ -19,7 +63,9 @@ const TypingIndicator = () => (
 )
 
 export function ChatBotDrawer() {
-  const { dir, t } = useLanguage()
+  const { dir, locale, t } = useLanguage()
+  const pathname = usePathname()
+  const router = useRouter()
   const welcomeMessage: ChatMessage = { role: 'model', content: t('botWelcome') }
   const [open, setOpen] = useState(false)
   const [drawerRendered, setDrawerRendered] = useState(false)
@@ -29,6 +75,8 @@ export function ChatBotDrawer() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [isInputFocused, setIsInputFocused] = useState(false)
+  const [actionPreview, setActionPreview] = useState<AgentPreview | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
   const requestControllerRef = useRef<AbortController | null>(null)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -92,7 +140,14 @@ export function ChatBotDrawer() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({ messages: nextMessages }),
+        body: JSON.stringify({
+          messages: nextMessages,
+          screenContext: {
+            ...getScreenContext(pathname),
+            locale,
+            profileName: getSession()?.name,
+          },
+        }),
       })
 
       if (!response.ok) {
@@ -106,6 +161,7 @@ export function ChatBotDrawer() {
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
+      let responseText = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -113,6 +169,7 @@ export function ChatBotDrawer() {
 
         const chunk = decoder.decode(value, { stream: true })
         if (!chunk) continue
+        responseText += chunk
 
         setMessages((current) => {
           const updated = [...current]
@@ -128,6 +185,23 @@ export function ChatBotDrawer() {
             content: `${last.content}${chunk}`,
           }
 
+          return updated
+        })
+      }
+      if (responseText.startsWith('__THABAT_ACTION_PLAN__')) {
+        const plan = JSON.parse(responseText.slice('__THABAT_ACTION_PLAN__'.length)) as AgentPlan
+        const previewResponse = await fetch('/api/chat/actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'preview', plan, locale }),
+        })
+        const preview = await previewResponse.json() as { error?: string; steps?: string[]; target?: string }
+        if (!previewResponse.ok) throw new Error(preview.error || 'This action is not allowed.')
+        setActionPreview({ plan, steps: preview.steps ?? [], target: preview.target ?? '', state: 'preview' })
+        setMessages((current) => {
+          const updated = [...current]
+          const last = updated[updated.length - 1]
+          if (last?.role === 'model') updated[updated.length - 1] = { ...last, content: 'I prepared an action preview for your confirmation.' }
           return updated
         })
       }
@@ -159,6 +233,47 @@ export function ChatBotDrawer() {
   const clearHistory = () => {
     const resetMessages = [welcomeMessage]
     setMessages(resetMessages)
+    setActionPreview(null)
+  }
+
+  const confirmAction = async () => {
+    if (!actionPreview || actionPreview.state !== 'preview') return
+    setActionLoading(true)
+    try {
+      const response = await fetch('/api/chat/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'execute', plan: actionPreview.plan, confirmed: true, currentPath: pathname }),
+      })
+      const result = await response.json() as { error?: string; actionId?: string; path?: string; navigation?: boolean }
+      if (!response.ok) throw new Error(result.error || 'The action could not be completed.')
+      setActionPreview({ ...actionPreview, actionId: result.actionId, state: 'executed' })
+      if (result.navigation && result.path) router.push(result.path)
+    } catch (error) {
+      setMessages((current) => [...current, { role: 'model', content: error instanceof Error ? error.message : 'The action could not be completed.' }])
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const restoreAction = async () => {
+    if (!actionPreview?.actionId || actionPreview.state !== 'executed') return
+    setActionLoading(true)
+    try {
+      const response = await fetch('/api/chat/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'restore', actionId: actionPreview.actionId }),
+      })
+      const result = await response.json() as { error?: string; path?: string }
+      if (!response.ok) throw new Error(result.error || 'The restore could not be completed.')
+      setActionPreview({ ...actionPreview, state: 'restored' })
+      if (result.path) router.push(result.path)
+    } catch (error) {
+      setMessages((current) => [...current, { role: 'model', content: error instanceof Error ? error.message : 'The restore could not be completed.' }])
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   const isThinking = loading
@@ -203,10 +318,11 @@ export function ChatBotDrawer() {
         type="button"
         onClick={() => open ? closeDrawer() : openConversation()}
         aria-label={t('askBot')}
-        className={`group fixed bottom-5 ${floatingSide} z-50 flex h-14 items-center gap-2 rounded-2xl border border-emerald-300/40 bg-emerald-600 px-4 text-white shadow-xl shadow-emerald-900/20 transition duration-300 hover:-translate-y-1 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950`}
+        aria-expanded={open}
+        title={t('askBot')}
+        className={`group fixed bottom-4 ${floatingSide} z-50 flex h-11 w-11 items-center justify-center rounded-full border border-emerald-300/40 bg-emerald-600 p-0 text-white shadow-lg shadow-emerald-900/20 transition duration-300 hover:-translate-y-1 hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-950`}
       >
-        <span className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-white/15"><Bot className="h-5 w-5" /><Sparkles className="absolute -right-1 -top-1 h-3.5 w-3.5 text-emerald-100 transition group-hover:rotate-12" /></span>
-        <span className="hidden text-sm font-bold sm:inline">{t('askBot')}</span>
+        <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/15"><Bot className="h-5 w-5" /><Sparkles className="absolute -right-1 -top-1 h-3.5 w-3.5 text-emerald-100 transition group-hover:rotate-12" /></span>
       </button>
 
       {drawerRendered && (
@@ -219,7 +335,10 @@ export function ChatBotDrawer() {
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Bot className="h-5 w-5" /></span>
               <div>
-              <h2 className="font-bold">Thabat Bot</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="!text-base !leading-tight shrink-0 whitespace-nowrap font-bold">Thabat Bot</h2>
+                <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">{locale === 'ar' ? 'تجريبي' : 'Beta'}</span>
+              </div>
               <p className="mt-1 flex items-center gap-1 text-xs text-primary">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" /> {t('botConnected')}
               </p>
@@ -267,9 +386,8 @@ export function ChatBotDrawer() {
               }
 
               return (
-                <div className={`flex w-full ${message.role === 'user' ? userBubbleAlignment : botBubbleAlignment}`}>
+                <div key={`${message.role}-${index}`} className={`flex w-full ${message.role === 'user' ? userBubbleAlignment : botBubbleAlignment}`}>
                 <div
-                  key={`${message.role}-${index}`}
                   dir="auto"
                   className={`w-fit max-w-[85%] break-words overflow-auto rounded-2xl px-3 py-2 text-sm leading-6 animate-in fade-in slide-in-from-bottom-2 duration-200 [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap ${
                     message.role === 'user'
@@ -288,6 +406,40 @@ export function ChatBotDrawer() {
                 </div>
               )
             })}
+            {actionPreview && (
+              <div className="animate-in slide-in-from-bottom-2 relative overflow-hidden rounded-2xl border border-emerald-500/40 bg-emerald-500/[0.07] p-3 shadow-sm duration-300">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                      {actionPreview.state === 'preview' ? <Sparkles className="h-4 w-4" /> : actionPreview.state === 'executed' ? <Check className="h-4 w-4" /> : <Undo2 className="h-4 w-4" />}
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">{locale === 'ar' ? (actionPreview.state === 'preview' ? 'معاينة الإجراء' : actionPreview.state === 'executed' ? 'اكتمل الإجراء' : 'تمت الاستعادة') : actionPreview.state === 'preview' ? 'Action preview' : actionPreview.state === 'executed' ? 'Action completed' : 'Action restored'}</p>
+                      <p className="mt-0.5 text-[11px] text-foreground/60">{locale === 'ar' ? (actionPreview.state === 'preview' ? 'راجع الإجراء قبل التنفيذ' : actionPreview.state === 'executed' ? 'نقطة الاستعادة متاحة' : 'تمت إعادة البيانات إلى حالتها السابقة') : actionPreview.state === 'preview' ? 'Review before changes' : actionPreview.state === 'executed' ? 'Restore point available' : 'Data returned to its previous state'}</p>
+                    </div>
+                  </div>
+                  {actionPreview.state === 'preview' && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-700 dark:text-amber-300">{locale === 'ar' ? 'بانتظار الموافقة' : 'Needs approval'}</span>}
+                </div>
+                <div className="mt-3 rounded-xl border border-border/70 bg-card/70 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-foreground/50">{locale === 'ar' ? 'الهدف' : 'Target'}</p>
+                  <p dir="auto" className="mt-0.5 truncate text-sm font-semibold">{actionPreview.target}</p>
+                </div>
+                <ol className="mt-3 space-y-2">
+                  {actionPreview.steps.map((step, index) => (
+                    <li key={step} className="flex items-start gap-2 text-xs text-foreground/75">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-500/40 bg-card text-[10px] font-bold text-emerald-700 dark:text-emerald-300">{index + 1}</span>
+                      <span dir="auto" className="pt-0.5">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+                {actionPreview.state === 'preview' && <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-800 dark:text-amber-200">{locale === 'ar' ? 'هل أنت متأكد من المتابعة؟' : 'Are you sure you want to continue?'}</p>}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {actionPreview.state === 'preview' && <button type="button" disabled={actionLoading} onClick={() => void confirmAction()} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">{actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} {locale === 'ar' ? 'تأكيد' : 'Confirm'}</button>}
+                  {actionPreview.state === 'executed' && <button type="button" disabled={actionLoading} onClick={() => void restoreAction()} className="col-span-2 inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-600 px-3 py-2.5 text-xs font-bold text-amber-700 transition hover:bg-amber-500/10 dark:text-amber-300 disabled:cursor-not-allowed disabled:opacity-50">{actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />} {locale === 'ar' ? 'استعادة الحالة السابقة' : 'Restore previous state'}</button>}
+                  {actionPreview.state === 'preview' && <button type="button" disabled={actionLoading} onClick={() => setActionPreview(null)} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2.5 text-xs font-bold transition hover:bg-accent"><X className="h-3.5 w-3.5" /> {locale === 'ar' ? 'إلغاء' : 'Cancel'}</button>}
+                </div>
+              </div>
+            )}
             <div ref={endRef} />
           </div>
 

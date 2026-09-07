@@ -10,6 +10,7 @@ const palettes: Record<string, { label: string; icon: typeof Circle; classes: st
   ABSENT_UNEXCUSED: { label: 'غائب', icon: XCircle, classes: 'text-red-600' },
   ABSENT_EXCUSED: { label: 'غياب بعذر', icon: AlertCircle, classes: 'text-amber-600' },
   LATE: { label: 'متأخر', icon: AlertCircle, classes: 'text-yellow-600' },
+  ESCAPED: { label: 'هروب', icon: XCircle, classes: 'text-fuchsia-600' },
 }
 
 type Props = { value: string; onValueChange: (value: string) => void; options: Array<{ value: string; label?: string }>; english?: boolean; className?: string; variant?: 'dropdown' | 'buttons' }
@@ -18,7 +19,7 @@ export function AttendanceStatusSelect({ value, onValueChange, options, english 
   const [open, setOpen] = useState(false)
   const selected = palettes[value] ?? palettes.UNMARKED
   const SelectedIcon = selected.icon
-  const labels: Record<string, string> = { UNMARKED: english ? 'Leave unmarked' : 'اتركه دون تحديد', PRESENT: english ? 'Present' : 'حاضر', ABSENT_UNEXCUSED: english ? 'Absent' : 'غائب', ABSENT_EXCUSED: english ? 'Excused' : 'غياب بعذر', LATE: english ? 'Late' : 'متأخر' }
+  const labels: Record<string, string> = { UNMARKED: english ? 'Leave unmarked' : 'اتركه دون تحديد', PRESENT: english ? 'Present' : 'حاضر', ABSENT_UNEXCUSED: english ? 'Absent' : 'غائب', ABSENT_EXCUSED: english ? 'Excused' : 'غياب بعذر', LATE: english ? 'Late' : 'متأخر', ESCAPED: english ? 'Escaped' : 'هروب' }
   const label = labels[value] ?? selected.label
 
   if (variant === 'buttons') return <div className={`flex flex-row flex-nowrap items-center gap-2 overflow-x-auto ${className}`} role="group" aria-label={english ? 'Attendance status' : 'الحالة'}>
@@ -31,7 +32,9 @@ export function AttendanceStatusSelect({ value, onValueChange, options, english 
           ? 'border-red-600 bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.35)]'
           : option.value === 'ABSENT_EXCUSED'
             ? 'border-amber-500 bg-amber-400 text-amber-950 shadow-[0_0_10px_rgba(245,158,11,0.35)]'
-            : 'border-yellow-500 bg-yellow-400 text-yellow-950 shadow-[0_0_10px_rgba(234,179,8,0.35)]'
+            : option.value === 'ESCAPED'
+              ? 'border-fuchsia-600 bg-fuchsia-500 text-white shadow-[0_0_10px_rgba(217,70,239,0.35)]'
+              : 'border-yellow-500 bg-yellow-400 text-yellow-950 shadow-[0_0_10px_rgba(234,179,8,0.35)]'
       const optionLabel = english ? (labels[option.value] ?? option.label ?? option.value) : (option.label ?? palette.label)
       return <button key={option.value} type="button" aria-pressed={value === option.value} onClick={() => onValueChange(option.value)} className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-bold transition-all duration-200 ${value === option.value ? activeClasses : 'border-transparent bg-gray-100 text-gray-500 hover:border-slate-300 hover:bg-gray-200 dark:bg-zinc-800 dark:text-gray-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-700'}`}><Icon className="h-4 w-4 shrink-0" />{optionLabel}</button>
     })}

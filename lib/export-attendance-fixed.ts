@@ -11,17 +11,28 @@ export type AttendanceExportStudent = {
   notes?: string;
 };
 type AttendanceExportProfile = { name: string; role: string };
+export type AttendanceCalendar = "gregorian" | "hijri" | "both";
+type AttendanceImages = { ministry: string; kingdom: string; crest: string };
 const border = {
   top: { style: "thin" as const, color: { argb: "FFE2E8F0" } },
   left: { style: "thin" as const, color: { argb: "FFE2E8F0" } },
   bottom: { style: "thin" as const, color: { argb: "FFE2E8F0" } },
   right: { style: "thin" as const, color: { argb: "FFE2E8F0" } },
 };
+function addSheetImages(workbook: ExcelJS.Workbook, imageData: AttendanceImages) {
+  return {
+    ministry: workbook.addImage({ base64: imageData.ministry, extension: "jpeg" as const }),
+    kingdom: workbook.addImage({ base64: imageData.kingdom, extension: "png" as const }),
+    crest: workbook.addImage({ base64: imageData.crest, extension: "jpeg" as const }),
+  };
+}
 const statusLabel = (status?: string) =>
   status === "PRESENT"
     ? "حاضر"
     : status === "LEFT_WITH_PERMISSION"
       ? "مستأذن"
+    : status === "ESCAPED"
+      ? "هروب"
     : status === "ABSENT_EXCUSED" || status === "ABSENT_UNEXCUSED"
       ? "غائب"
       : status === "LATE"
@@ -45,6 +56,8 @@ function setup(
   profile: AttendanceExportProfile,
   divisionCodes: string[],
   schoolName: string,
+  date: string,
+  calendar: AttendanceCalendar,
 ) {
   const last = weekly ? "M" : "F";
   sheet.views = [{ rightToLeft: true, showGridLines: false, zoomScale: 90 }];
@@ -71,6 +84,9 @@ function setup(
     "الشعب / القاعات:",
     divisionCodes.join(" , "),
   ];
+  const gregorian = new Date(`${date}T12:00:00`).toLocaleDateString("en-GB");
+  const hijri = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura", { dateStyle: "full" }).format(new Date(`${date}T12:00:00`));
+  sheet.getRow(6).values = ["", "التاريخ:", calendar === "hijri" ? hijri : calendar === "gregorian" ? gregorian : `${gregorian} | ${hijri}`];
   sheet.getRow(5).eachCell((cell) => {
     cell.alignment = {
       horizontal: "center",
@@ -119,9 +135,7 @@ function styleTable(sheet: ExcelJS.Worksheet, statusColumns: number[]) {
   for (let rowNumber = 10; rowNumber <= sheet.rowCount; rowNumber += 1) {
     const row = sheet.getRow(rowNumber);
     if (String(row.getCell(1).value ?? "").startsWith("الشعبة ")) continue;
-    const absent = statusColumns.some(
-      (column) => row.getCell(column).value === "غائب",
-    );
+    const absent = statusColumns.some((column) => ["غائب", "هروب"].includes(String(row.getCell(column).value ?? "")));
     row.height = 24;
     row.eachCell((cell) => {
       cell.font = {
@@ -153,6 +167,7 @@ export async function exportAttendanceWorkbook(
   profile: AttendanceExportProfile,
   userId?: string,
   dailyOnly = false,
+  calendar: AttendanceCalendar = "both",
 ) {
   const schoolName = getConfiguredSchoolName()
   const records = suppliedStudents.filter(
@@ -188,23 +203,14 @@ export async function exportAttendanceWorkbook(
     })));
   }
   const workbook = new ExcelJS.Workbook();
-  const images = {
-    ministry: workbook.addImage({
-      base64: await getImage("/attendance/ministry.jpg"),
-      extension: "jpeg" as const,
-    }),
-    kingdom: workbook.addImage({
-      base64: await getImage("/attendance/kingdom.png"),
-      extension: "png" as const,
-    }),
-    crest: workbook.addImage({
-      base64: await getImage("/attendance/crest.jpeg"),
-      extension: "jpeg" as const,
-    }),
+  const imageData = {
+    ministry: await getImage("/attendance/ministry.jpg"),
+    kingdom: await getImage("/attendance/kingdom.png"),
+    crest: await getImage("/attendance/crest.jpeg"),
   };
   ["الحالة اليومية (الجميع)", "الغائبون اليوم فقط"].forEach((name, index) => {
     const sheet = workbook.addWorksheet(name);
-    setup(sheet, false, images, profile, divisionCodes, schoolName);
+    setup(sheet, false, addSheetImages(workbook, imageData), profile, divisionCodes, schoolName, date, calendar);
     sheet.columns = [
       { width: 3 },
       { width: 15 },
@@ -222,7 +228,7 @@ export async function exportAttendanceWorkbook(
       "ملاحظات المعلم / الإجراء",
     ];
     records
-      .filter((student) => index === 0 || statusLabel(student.status) === "غائب")
+      .filter((student) => index === 0 || ["غائب", "هروب"].includes(statusLabel(student.status)))
       .forEach((student) => {
         sheet.addRow([
           "",
@@ -242,7 +248,7 @@ export async function exportAttendanceWorkbook(
   });
   if (dailyOnly) {
     const sheet = workbook.addWorksheet("الحالة اليومية المحددة");
-    setup(sheet, false, images, profile, divisionCodes, schoolName);
+    setup(sheet, false, addSheetImages(workbook, imageData), profile, divisionCodes, schoolName, date, calendar);
     sheet.columns = [{ width: 3 }, { width: 18 }, { width: 30 }, { width: 18 }, { width: 18 }, { width: 42 }];
     sheet.getRow(9).values = ["", "رقم الطالب", "اسم الطالب", "الشعبة / الفصل", "حالة الحضور", "ملاحظات المعلم / الإجراء"];
     records.forEach((student) => {
@@ -253,7 +259,7 @@ export async function exportAttendanceWorkbook(
   if (!dailyOnly) ["الحالة الأسبوعية (الجميع)", "الغائبون أسبوعياً فقط"].forEach(
     (name, index) => {
       const sheet = workbook.addWorksheet(name);
-      setup(sheet, true, images, profile, divisionCodes, schoolName);
+      setup(sheet, true, addSheetImages(workbook, imageData), profile, divisionCodes, schoolName, date, calendar);
       sheet.columns = [
         { width: 3 },
         { width: 18 },
@@ -281,7 +287,7 @@ export async function exportAttendanceWorkbook(
         "ملاحظات المعلم / الإجراء",
       ];
       records
-        .filter((student) => index === 0 || weekDates.some((weekDate) => statusLabel(weeklyStatuses.get(weekDate)?.get(student.studentId ?? student.id)) === "غائب"))
+        .filter((student) => index === 0 || weekDates.some((weekDate) => ["غائب", "هروب"].includes(statusLabel(weeklyStatuses.get(weekDate)?.get(student.studentId ?? student.id)))))
         .forEach((student) => {
           const status = statusLabel(student.status);
           const dailyStatuses = weekDates.map((weekDate) => statusLabel(weeklyStatuses.get(weekDate)?.get(student.studentId ?? student.id)));
@@ -295,7 +301,7 @@ export async function exportAttendanceWorkbook(
             null,
             null,
             student.notes ||
-              (status === "غائب"
+              (status === "غائب" || status === "هروب"
                 ? "لم يحضر - يتم التواصل مع ولي الأمر"
                 : status === "مستأذن"
                   ? "خرج بإذن بعد التحقق من تصريح الخروج"
@@ -306,7 +312,7 @@ export async function exportAttendanceWorkbook(
             formula: `COUNTIF(E${number}:I${number}, "حاضر")`,
           };
           sheet.getCell(`K${number}`).value = {
-            formula: `COUNTIF(E${number}:I${number}, "غائب")`,
+            formula: `COUNTIF(E${number}:I${number}, "غائب")+COUNTIF(E${number}:I${number}, "هروب")`,
           };
           sheet.getCell(`L${number}`).value = {
             formula: `IFERROR(J${number}/COUNTA(E${number}:I${number}),0)`,

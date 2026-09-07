@@ -16,7 +16,7 @@ async function main() {
       username: '10',
       name: 'حسين',
       password: await bcrypt.hash('admin123', 10),
-      role: 'CURATOR',
+      role: 'CREATOR',
       isActive: true,
     },
   })

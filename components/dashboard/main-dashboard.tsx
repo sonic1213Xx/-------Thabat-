@@ -140,12 +140,25 @@ function OverviewTabView({
   dashboardStats,
   recentActivities,
   averageBehavior,
+  loading,
+  isTeacher,
 }: {
   dashboardStats: DashboardStat[]
   recentActivities: Array<{ id: string; action: string; targetType?: string; targetName: string; operator: string; role?: string; details?: string; time: string }>
   averageBehavior: number
+  loading: boolean
+  isTeacher: boolean
 }) {
-  const { t, dir } = useLanguage()
+  const { t, dir, locale } = useLanguage()
+  const actions = isTeacher
+    ? [
+        { id: 'teacher-attendance', label: locale === 'ar' ? 'حضور الفصول' : 'Class attendance', icon: CalendarCheck, href: '/dashboard/class-attendance', description: locale === 'ar' ? 'تسجيل حضور طلاب حصصك' : 'Record attendance for your classes' },
+        { id: 'teacher-referrals', label: locale === 'ar' ? 'إحالة طالب' : 'Refer a student', icon: AlertCircle, href: '/dashboard/teacher-referrals', description: locale === 'ar' ? 'إرسال إحالة لوكيل المدرسة' : 'Send a referral to the vice principal' },
+        { id: 'teacher-gradebook', label: locale === 'ar' ? 'كشوف الدرجات' : 'Gradebooks', icon: BookOpen, href: '/dashboard/students', description: locale === 'ar' ? 'فتح كشوف درجات شعبك' : 'Open gradebooks for your divisions' },
+        { id: 'teacher-lounge', label: locale === 'ar' ? 'استراحة المعلمين' : "Teachers' lounge", icon: Users, href: '/dashboard/teachers-lounge', description: locale === 'ar' ? 'التعرف على فريق التعليم' : 'View the teaching team' },
+        { id: 'teacher-profile', label: locale === 'ar' ? 'ملفي الشخصي' : 'My profile', icon: Users, href: '/dashboard/profile', description: locale === 'ar' ? 'إدارة موادك وشعبك' : 'Manage your subjects and divisions' },
+      ]
+    : quickActions.map((action) => ({ ...action, label: t(action.label as never), description: t(action.description as never) }))
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -174,19 +187,16 @@ function OverviewTabView({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
-              <StatCard {...stat} />
+              <StatCard {...stat} loading={loading} />
             </motion.div>
           ))}
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <motion.div variants={itemVariants} className="lg:col-span-2">
-            <RecentActivityCard activities={recentActivities} />
-          </motion.div>
-
+        <div className={`grid grid-cols-1 gap-6 ${isTeacher ? '' : 'lg:grid-cols-3'}`}>
+          {!isTeacher && <motion.div variants={itemVariants} className="lg:col-span-2"><RecentActivityCard activities={recentActivities} /></motion.div>}
           <motion.div
             variants={itemVariants}
-            className="rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm"
+            className={`rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm ${isTeacher ? '' : 'lg:col-span-1'}`}
           >
             <h3 className="mb-4 text-lg font-semibold text-card-foreground">{t('quickSummary')}</h3>
             <div className="space-y-4">
@@ -217,8 +227,8 @@ function OverviewTabView({
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t('quickActions')}</h2>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {quickActions.map((action) => (
-              <QuickActionCard key={action.id} label={t(action.label as never)} description={t(action.description as never)} icon={action.icon} href={action.href} id={action.id} />
+            {actions.map((action) => (
+              <QuickActionCard key={action.id} label={action.label} description={action.description} icon={action.icon} href={action.href} id={action.id} />
             ))}
           </div>
         </motion.div>
@@ -350,6 +360,8 @@ function ActiveTabContent({
   dashboardStats,
   recentActivities,
   averageBehavior,
+  loading,
+  isTeacher,
   students,
   teams,
   divisions,
@@ -358,6 +370,8 @@ function ActiveTabContent({
   dashboardStats: DashboardStat[]
   recentActivities: Array<{ id: string; action: string; targetType?: string; targetName: string; operator: string; role?: string; details?: string; time: string }>
   averageBehavior: number
+  loading: boolean
+  isTeacher: boolean
   students: ApiStudent[]
   teams: Array<{ id: string; label: string }>
   divisions: Array<{ id: string; code: string; name: string }>
@@ -371,7 +385,7 @@ function ActiveTabContent({
       return <DivisionsTabView divisions={divisions} students={students} />
     case 'overview':
     default:
-      return <OverviewTabView dashboardStats={dashboardStats} recentActivities={recentActivities} averageBehavior={averageBehavior} />
+      return <OverviewTabView dashboardStats={dashboardStats} recentActivities={recentActivities} averageBehavior={averageBehavior} loading={loading} isTeacher={isTeacher} />
   }
 }
 
@@ -442,6 +456,13 @@ export function MainDashboard() {
   const dashboardStats = useMemo<DashboardStat[]>(() => {
     const totalStudents = accessibleStudents.length
     const divisionsCount = accessibleDivisions.length || new Set(accessibleStudents.map((student) => student.divisionCode)).size
+    const teacherSubjects = Array.from(new Set([
+      ...(getCurrentProfile()?.subjectsTaught ?? []),
+      ...(getCurrentProfile()?.teachingAssignments?.map((assignment) => assignment.subject) ?? []),
+    ].filter(Boolean)))
+    const teacherAssignments = getCurrentProfile()?.teachingAssignments ?? []
+    const teachingAssignmentCount = teacherAssignments.reduce((total, assignment) => total + assignment.divisions.length, 0)
+    const teacherView = session?.role === 'TEACHER'
     const warningsToday = warnings.filter((warning) => {
       const issuedAt = warning.issuedAt ? new Date(warning.issuedAt) : null
       if (!issuedAt) return false
@@ -468,35 +489,33 @@ export function MainDashboard() {
       },
       {
         id: '3',
-        label: t('warningsToday'),
-        value: String(warningsToday),
+        label: teacherView ? (locale === 'ar' ? 'المواد التي أدرسها' : 'My subjects') : t('warningsToday'),
+        value: teacherView ? String(teacherSubjects.length) : String(warningsToday),
         change: '',
-        icon: AlertCircle,
+        icon: teacherView ? BookOpen : AlertCircle,
         color: 'orange',
       },
       {
         id: '4',
-        label: t('loggedOperations'),
-        value: operations.toLocaleString('en-US'),
+        label: teacherView ? (locale === 'ar' ? 'التكليفات التدريسية' : 'Teaching assignments') : t('loggedOperations'),
+        value: teacherView ? String(teachingAssignmentCount) : operations.toLocaleString('en-US'),
         change: '',
-        icon: TrendingUp,
+        icon: teacherView ? Users : TrendingUp,
         color: 'purple',
       },
     ]
-  }, [accessibleStudents, accessibleDivisions, warnings, auditLogs, t])
+  }, [accessibleStudents, accessibleDivisions, warnings, auditLogs, locale, session?.role, t])
 
-  const recentActivities = useMemo(() => {
-    return (auditLogs.slice(0, 3) || []).map((log, index) => ({
-      id: log.id || String(index),
-      action: log.action || t('action'),
-      targetType: log.targetType,
-      targetName: log.targetName || t('student'),
-      operator: locale === 'en' && log.userName === 'نظام ثَبَت' ? t('brandName') : (log.userName || t('brandName')),
-      role: log.userRole,
-      details: log.details,
-      time: locale === 'ar' ? (log.relativeTime || log.timestamp || 'الآن') : (log.timestamp || 'Now'),
-    }))
-  }, [auditLogs, locale, t])
+  const recentActivities = useMemo(() => auditLogs.slice(0, 3).map((log, index) => ({
+    id: log.id || String(index),
+    action: log.action || t('action'),
+    targetType: log.targetType,
+    targetName: log.targetName || t('student'),
+    operator: locale === 'en' && log.userName === 'نظام ثَبَت' ? t('brandName') : (log.userName || t('brandName')),
+    role: log.userRole,
+    details: log.details,
+    time: locale === 'ar' ? (log.relativeTime || log.timestamp || 'الآن') : (log.timestamp || 'Now'),
+  })), [auditLogs, locale, t])
 
   const averageBehavior = useMemo(() => {
     if (!accessibleStudents.length) return 0
@@ -564,6 +583,8 @@ export function MainDashboard() {
           dashboardStats={dashboardStats}
           recentActivities={recentActivities}
           averageBehavior={averageBehavior}
+          loading={loading}
+          isTeacher={session?.role === 'TEACHER'}
           students={accessibleStudents}
           teams={teams}
           divisions={accessibleDivisions}

@@ -1,6 +1,6 @@
 import type { Locale } from '@/lib/translations'
 
-export type AppRole = 'CREATOR' | 'CURATOR' | 'PRINCIPAL' | 'VP_STUDENT_AFFAIRS' | 'VP_ACADEMIC_AFFAIRS' | 'VP_OPERATIONS' | 'VICE_PRINCIPAL' | 'TEACHER' | 'COUNSELOR' | 'ACTIVITIES_COORDINATOR' | 'GATE_SECURITY' | 'TRANSPORTATION_SUPERVISOR'
+export type AppRole = 'CREATOR' | 'PRINCIPAL' | 'VP_STUDENT_AFFAIRS' | 'VP_ACADEMIC_AFFAIRS' | 'VP_OPERATIONS' | 'VICE_PRINCIPAL' | 'TEACHER' | 'COUNSELOR' | 'ACTIVITIES_COORDINATOR' | 'GATE_SECURITY' | 'TRANSPORTATION_SUPERVISOR'
 
 export type SessionUser = { id: string; name: string; role: AppRole }
 export type TeachingAssignment = { id: string; subject: string; gradeLevel: number | null; divisions: string[]; attendance: boolean; gradebook: boolean }
@@ -19,7 +19,7 @@ export type Profile = SessionUser & {
   subjectsTaught?: string[]
 }
 
-export const DEFAULT_CREDENTIALS = { id: '10', password: 'admin123', role: 'CURATOR' as AppRole, name: 'حسين' }
+export const DEFAULT_CREDENTIALS = { id: '10', password: 'admin123', role: 'CREATOR' as AppRole, name: 'حسين' }
 const TEST_CREDENTIALS: Array<{ id: string; password: string; role: AppRole; name: string }> = [
   DEFAULT_CREDENTIALS,
   { id: '11', password: 'principal123', role: 'PRINCIPAL', name: 'مدير المدرسة' },

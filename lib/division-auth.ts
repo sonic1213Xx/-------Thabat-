@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 
 export const MANAGEMENT_ROLES = new Set([
   'CREATOR',
-  'CURATOR',
   'PRINCIPAL',
   'VICE_PRINCIPAL',
   'VP_STUDENT_AFFAIRS',

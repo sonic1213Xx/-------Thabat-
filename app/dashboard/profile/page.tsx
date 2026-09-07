@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Pencil, Trash2, User } from 'lucide-react'
-import { getCurrentProfile, getProfileSignature, saveProfileSignature } from '@/lib/auth'
+import { getCurrentProfile, getProfileSignature, getSession, saveProfile, saveProfileSignature, type Profile } from '@/lib/auth'
 import { SignatureCanvas } from '@/components/ui/signature-canvas'
 import { useLanguage } from '@/components/language-provider'
 import { TeachingAssignmentEditor } from '@/components/dashboard/teaching-assignment-editor'
@@ -19,7 +19,23 @@ export default function ProfilePage() {
   const [assignmentsMessage, setAssignmentsMessage] = useState('')
     const { t: translate, locale } = useLanguage()
     const t = (key: Parameters<typeof translate>[0]) => key === 'addStudent' ? (locale === 'ar' ? 'إضافة توقيعك' : 'Add your signature') : translate(key)
-  useEffect(() => { const sync = () => { const nextProfile = getCurrentProfile(); setProfile(nextProfile); setAssignments(nextProfile?.teachingAssignments ?? []); setSignature(getProfileSignature()) }; window.addEventListener('thabat-profile-signature-changed', sync); void fetch('/api/divisions').then((response) => response.json()).then((json) => setDivisions((json.data ?? []).map((item: { code: string }) => item.code))).catch(() => setDivisions([])); return () => window.removeEventListener('thabat-profile-signature-changed', sync) }, [])
+  useEffect(() => {
+    const sync = () => { const nextProfile = getCurrentProfile(); setProfile(nextProfile); setAssignments(nextProfile?.teachingAssignments ?? []); setSignature(getProfileSignature()) }
+    window.addEventListener('thabat-profile-signature-changed', sync)
+    const session = getSession()
+    void fetch('/api/users', { cache: 'no-store' }).then((response) => response.json()).then((json: { data?: Profile[] }) => {
+      const databaseProfile = json.data?.find((item) => item.id === session?.id)
+      if (!databaseProfile) return
+      const localProfile = getCurrentProfile()
+      const normalizedAssignments = databaseProfile.teachingAssignments?.length ? databaseProfile.teachingAssignments : databaseProfile.assigned_divisions?.length ? [{ id: `legacy-${databaseProfile.id}`, subject: databaseProfile.subjectsTaught?.[0] ?? '', gradeLevel: null, divisions: databaseProfile.assigned_divisions, attendance: true, gradebook: true }] : []
+      const nextProfile = { ...databaseProfile, teachingAssignments: normalizedAssignments, password: localProfile?.password ?? '', createdAt: localProfile?.createdAt ?? '', lastActivity: localProfile?.lastActivity ?? '' }
+      saveProfile(nextProfile)
+      setProfile(nextProfile)
+      setAssignments(nextProfile.teachingAssignments ?? [])
+    }).catch(() => undefined)
+    void fetch('/api/divisions').then((response) => response.json()).then((json) => setDivisions((json.data ?? []).map((item: { code: string }) => item.code))).catch(() => setDivisions([]))
+    return () => window.removeEventListener('thabat-profile-signature-changed', sync)
+  }, [])
   const saveAssignments = async () => {
     if (!profile) return
     const nextAssignments = assignments.filter((assignment) => assignment.subject.trim()).map((assignment) => ({ ...assignment, subject: assignment.subject.trim(), divisions: Array.from(new Set(assignment.divisions)) }))

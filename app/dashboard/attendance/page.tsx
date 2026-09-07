@@ -2,16 +2,20 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarCheck, Check, FileText, Loader2, Save, X } from "lucide-react";
+import { CalendarCheck, Check, FileText, Loader2, Save, Upload, X } from "lucide-react";
 import { AttendanceStatusSelect } from "@/components/ui/attendance-status-select";
 import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
-import { exportAttendanceWorkbook } from "@/lib/export-attendance-fixed";
+import { exportAttendanceWorkbook, type AttendanceCalendar } from "@/lib/export-attendance-fixed";
 import { exportAttendancePdf } from "@/lib/export-attendance-pdf";
 import { useToast } from "@/components/toast-provider";
 import { runExport } from "@/lib/export-feedback";
 import { fetchCached, invalidateCached } from "@/lib/client-cache";
 import { AttendanceLogsModal } from "@/components/attendance/attendance-logs-modal";
+import { AttendanceImportModal } from "@/components/attendance/attendance-import-modal";
+import { StyledSelect } from "@/components/ui/styled-select";
+import { usePathname, useRouter } from "next/navigation";
+import { getConfiguredClassroomDefaultAttendance, getConfiguredLateTime } from "@/lib/school-settings";
 
 type Status =
   | "UNMARKED"
@@ -20,6 +24,7 @@ type Status =
   | "ABSENT_UNEXCUSED"
   | "LATE"
   | "OTHER"
+  | "ESCAPED"
   | "LEFT_WITH_PERMISSION";
 type Student = {
   id: string;
@@ -30,6 +35,7 @@ type Student = {
   divisionCode?: string | null;
   gradeLevel?: number | null;
   status?: Status;
+  entryTime?: string | null;
   notes?: string;
 };
 type DivisionGroup = {
@@ -38,30 +44,43 @@ type DivisionGroup = {
   students: Student[];
 };
 
-const options = (english: boolean) => [
+const options = (english: boolean, classroom: boolean) => [
   { value: "PRESENT", label: english ? "Present" : "حاضر" },
   { value: "ABSENT_UNEXCUSED", label: english ? "Absent" : "غائب" },
   { value: "ABSENT_EXCUSED", label: english ? "Excused" : "غياب بعذر" },
   { value: "LATE", label: english ? "Late" : "متأخر" },
+  ...(classroom ? [{ value: "ESCAPED", label: english ? "Escaped" : "هروب" }] : []),
 ];
+  const [startHour, startMinute] = getConfiguredLateTime().split(":").map(Number);
+  const schoolStartMinutes = startHour * 60 + startMinute;
+const lateDuration = (entryTime: string, english: boolean) => {
+  const [hour, minute] = entryTime.split(":").map(Number);
+  const total = hour * 60 + minute - schoolStartMinutes;
+  if (total <= 0) return english ? "after start time" : "بعد بداية الدوام";
+  return total >= 60 ? `${Math.floor(total / 60)} ${english ? "hour" : "ساعة"} ${total % 60} ${english ? "minutes" : "دقيقة"}` : `${total} ${english ? "minutes" : "دقيقة"}`;
+};
 
 export default function AttendancePage() {
-  const { dir, locale, t } = useLanguage();
+  const { dir, locale } = useLanguage();
   const { showToast, updateToast } = useToast();
   const english = locale === "en";
   const session = getSession();
   const profile = getCurrentProfile();
+  const classroom = usePathname() === "/dashboard/class-attendance";
+  const router = useRouter();
   const isTeacher = session?.role === "TEACHER";
-  const teachingDivisions = Array.from(new Set(profile?.teachingAssignments?.filter((assignment) => assignment.attendance !== false).flatMap((assignment) => assignment.divisions) ?? []));
-  const isClassOnly = isTeacher;
-  const canClassAttendance = isTeacher || teachingDivisions.length > 0;
+  const teachingAssignments = profile?.teachingAssignments?.filter((assignment) => assignment.attendance !== false) ?? [];
+  const subjects = Array.from(new Set(teachingAssignments.map((assignment) => assignment.subject).filter(Boolean)));
+  const [selectedSubject, setSelectedSubject] = useState(subjects[0] ?? "");
+  const teachingDivisions = Array.from(new Set(teachingAssignments.filter((assignment) => !selectedSubject || assignment.subject === selectedSubject).flatMap((assignment) => assignment.divisions)));
+  const isClassroomPage = classroom;
+  const canClassAttendance = isTeacher && isClassroomPage;
   const canExportAttendanceTemplates = Boolean(session);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [mode, setMode] = useState<"SCHOOL" | "CLASS">(
-    canClassAttendance ? "CLASS" : "SCHOOL",
-  );
+  const mode: "SCHOOL" | "CLASS" = isClassroomPage ? "CLASS" : "SCHOOL";
   const [students, setStudents] = useState<Student[]>([]);
   const [statuses, setStatuses] = useState<Record<string, Status | null>>({});
+  const [entryTimes, setEntryTimes] = useState<Record<string, string | null>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [selectedDivision, setSelectedDivision] = useState("ALL");
   const [saving, setSaving] = useState(false);
@@ -74,13 +93,19 @@ export default function AttendancePage() {
   const [templateSelectionReady, setTemplateSelectionReady] = useState(false);
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
   const [exportType, setExportType] = useState<"EXCEL" | "PDF">("EXCEL");
+  const [exportCalendar, setExportCalendar] = useState<AttendanceCalendar>("both");
   const [isExporting, setIsExporting] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [attendanceImportOpen, setAttendanceImportOpen] = useState(false);
+  const [attendanceRevision, setAttendanceRevision] = useState(0);
   const studentsRequestRef = useRef<string | null>(null);
   const attendanceRequestRef = useRef<string | null>(null);
   const hasFetchedRef = useRef<string | null>(null);
   const [attendanceLoadedKey, setAttendanceLoadedKey] = useState<string | null>(null);
   const initialAttendanceMapRef = useRef<Map<string, { status: Status; note: string }>>(new Map());
+  useEffect(() => {
+    if (isTeacher && !classroom) router.replace("/dashboard/class-attendance");
+  }, [classroom, isTeacher, router]);
   useEffect(() => {
     if (!message) return;
     const timer = window.setTimeout(() => setMessage(""), 3000);
@@ -181,7 +206,7 @@ export default function AttendancePage() {
   ]);
 
   useEffect(() => {
-    const requestKey = `${session?.id ?? "anonymous"}:${date}:${mode}:${divisionKey}`;
+    const requestKey = `${session?.id ?? "anonymous"}:${date}:${mode}:${divisionKey}:${attendanceRevision}`;
     if (!students.length || !session?.id || !divisions.length) {
       setLoadingAttendance(false);
       setAttendanceLoadedKey(requestKey);
@@ -195,17 +220,22 @@ export default function AttendancePage() {
       setLoadingAttendance(true);
       try {
         const params = new URLSearchParams({ date, mode });
-        if (mode === "CLASS") params.set("teacherId", session.id);
+        if (mode === "CLASS") {
+          params.set("teacherId", session.id);
+          params.set("subject", selectedSubject);
+        }
         const response = await fetchCached<{ data?: Student[] }>(`attendance:${date}:${mode}:${divisionKey}:${session.id}`, `/api/attendance?${params}`, {
           headers: { "x-thabat-user-id": session.id },
         });
         const records = response.data ?? [];
-        setStatuses(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.status ?? "UNMARKED"])));
+        const classroomDefault = mode === "CLASS" ? getConfiguredClassroomDefaultAttendance() : "UNMARKED";
+        setStatuses(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.status === "UNMARKED" ? classroomDefault : record.status ?? classroomDefault])));
+        setEntryTimes(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.entryTime ?? null])));
         setNotes(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.notes ?? ""])));
         const fetchedRecords = new Map(records.map((record) => [record.studentId ?? record.id, { status: record.status ?? "UNMARKED", note: record.notes ?? "" }]));
         initialAttendanceMapRef.current = new Map(students.flatMap((student) => {
           const record = fetchedRecords.get(student.id);
-          return [[student.id, { status: record?.status ?? "UNMARKED", note: record?.note ?? "" }]];
+          return [[student.id, { status: record?.status === "UNMARKED" ? classroomDefault : record?.status ?? classroomDefault, note: record?.note ?? "" }]];
         }));
       } finally {
         setLoadingAttendance(false);
@@ -213,10 +243,15 @@ export default function AttendancePage() {
       }
     };
     void load().catch(() => setMessage("تعذر تحميل الحضور."));
-  }, [date, mode, divisionKey, session?.id]);
+  }, [date, mode, divisionKey, session?.id, attendanceRevision, selectedSubject]);
 
-  const setStudentStatus = (studentId: string, status: Status) =>
-    setStatuses((current) => current[studentId] === "LEFT_WITH_PERMISSION" ? current : ({ ...current, [studentId]: status }));
+  const setStudentStatus = (studentId: string, status: Status) => {
+    if (statuses[studentId] === "LEFT_WITH_PERMISSION") return;
+    const entryTime = status === "LATE" ? new Date().toTimeString().slice(0, 5) : null;
+    setStatuses((current) => ({ ...current, [studentId]: status }));
+    setEntryTimes((current) => ({ ...current, [studentId]: entryTime }));
+    if (status === "LATE") setNotes((current) => ({ ...current, [studentId]: `${english ? "Entry time" : "وقت الدخول"}: ${entryTime} | ${english ? "Late by" : "التأخر"}: ${lateDuration(entryTime!, english)}` }));
+  };
   const setDivisionStatus = (code: string, status: Status) =>
     setStatuses((current) => ({
       ...current,
@@ -231,6 +266,11 @@ export default function AttendancePage() {
     setStatuses((current) => ({
       ...current,
       ...Object.fromEntries(students.filter((student) => statuses[student.id] !== "LEFT_WITH_PERMISSION").map((student) => [student.id, status])),
+    }));
+  const clearMasterStatus = () =>
+    setStatuses((current) => ({
+      ...current,
+      ...Object.fromEntries(students.filter((student) => current[student.id] !== "LEFT_WITH_PERMISSION").map((student) => [student.id, null])),
     }));
   const save = async () => {
     if (!session?.id) return;
@@ -275,8 +315,9 @@ export default function AttendancePage() {
             date,
             mode,
             teacherId: session.id,
+            subject: selectedSubject,
             markedBy: session.id,
-            records: chunks[index].map((record) => ({ ...record, notes: record.note })),
+            records: chunks[index].map((record) => ({ ...record, notes: record.note, entryTime: entryTimes[record.studentId] ?? undefined })),
           }),
         });
         if (!response.ok) throw new Error("Attendance save failed");
@@ -301,6 +342,17 @@ export default function AttendancePage() {
     selectedDivision === "ALL"
       ? divisions
       : divisions.filter((group) => group.code === selectedDivision);
+  const selectDivision = (code: string) => {
+    setSelectedDivision(code);
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(max-width: 767px)").matches || code === "ALL") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      document.getElementById(`division-${code}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
   const exportRecord = (student: Student) => ({
     ...student,
     id: student.academicId || student.nationalId || student.id,
@@ -316,6 +368,8 @@ export default function AttendancePage() {
         role: profile?.role || session?.role || "TEACHER",
       },
       session?.id,
+      false,
+      exportCalendar,
     );
   const exportPdf = () =>
     exportAttendancePdf(
@@ -327,7 +381,6 @@ export default function AttendancePage() {
         role: profile?.role || session?.role || "TEACHER",
       },
     );
-  const exportEmptyAttendanceTemplates = exportExcel;
   const handleExport = () => {
     if (!attendanceTemplateDivisions.length) return;
     setIsExporting(true);
@@ -400,7 +453,7 @@ export default function AttendancePage() {
             ? "border-blue-300 bg-blue-50/80 shadow-[inset_0_0_24px_rgba(59,130,246,0.22)] dark:bg-blue-950/25"
             : "border-slate-200 dark:border-slate-700";
 
-        const attendanceKey = `${session?.id ?? "anonymous"}:${date}:${mode}:${divisionKey}`;
+        const attendanceKey = `${session?.id ?? "anonymous"}:${date}:${mode}:${divisionKey}:${attendanceRevision}`;
         const isLoading = loadingStudents || loadingAttendance || (Boolean(students.length && divisions.length && session?.id) && attendanceLoadedKey !== attendanceKey);
 
   return (
@@ -411,32 +464,33 @@ export default function AttendancePage() {
             <CalendarCheck className="h-6 w-6 text-emerald-600 md:h-7 md:w-7" />
             <h1 className="text-xl font-bold md:text-2xl">{text.title}</h1>
           </div>
-          <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:flex-wrap">
+          <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
             <input
               aria-label={text.date}
               type="date"
               value={date}
               onChange={(event) => setDate(event.target.value)}
-              className="col-span-2 min-w-0 rounded-lg border px-3 py-2 text-sm dark:bg-slate-900 md:col-span-1"
+              className="h-10 w-full min-w-0 rounded-lg border px-3 py-2 text-sm dark:bg-slate-900 md:w-auto"
             />
-            {!isClassOnly && <button
+            {isClassroomPage && <div className="min-w-48"><StyledSelect key={`subject-${selectedSubject}-${subjects.join("|")}`} value={selectedSubject} onValueChange={setSelectedSubject} options={subjects.map((subject) => ({ value: subject, label: subject }))} placeholder={english ? "Choose subject" : "اختر المادة"} /></div>}
+            <button
               type="button"
-              onClick={() => setMode(mode === "SCHOOL" ? "CLASS" : "SCHOOL")}
-              className="min-w-0 rounded-lg border border-slate-300 px-2 py-2 text-xs dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 md:px-3 md:text-sm"
+              onClick={clearMasterStatus}
+              className="h-10 min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-xs whitespace-nowrap text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 md:text-sm"
             >
-              {mode === "SCHOOL" ? text.school : text.class}
-            </button>}
+              {english ? "Deselect all" : "إلغاء تحديد الكل"}
+            </button>
             <button
               type="button"
               onClick={() => setMasterStatus("PRESENT")}
-              className="min-w-0 rounded-lg bg-emerald-600 px-2 py-2 text-xs text-white hover:bg-emerald-500 md:px-3 md:text-sm"
+              className="h-10 min-w-0 rounded-lg bg-emerald-600 px-3 py-2 text-xs whitespace-nowrap text-white hover:bg-emerald-500 md:text-sm"
             >
               {text.masterPresent}
             </button>
             <button
               type="button"
               onClick={() => setMasterStatus("ABSENT_UNEXCUSED")}
-              className="min-w-0 rounded-lg border border-red-300 px-2 py-2 text-xs text-red-700 hover:bg-red-950/40 dark:border-red-400 dark:text-red-300 md:px-3 md:text-sm"
+              className="h-10 min-w-0 rounded-lg border border-red-300 px-3 py-2 text-xs whitespace-nowrap text-red-700 hover:bg-red-950/40 dark:border-red-400 dark:text-red-300 md:text-sm"
             >
               {text.masterAbsent}
             </button>
@@ -444,21 +498,25 @@ export default function AttendancePage() {
               type="button"
               onClick={() => void save()}
               disabled={saving || !divisions.length}
-              className="inline-flex min-w-0 items-center justify-center gap-1 rounded-lg bg-slate-900 px-2 py-2 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white md:gap-2 md:px-4 md:text-sm"
+              className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold whitespace-nowrap text-white hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white md:px-4 md:text-sm"
             >
               <Save className="h-4 w-4" />
               {saving ? text.saving : text.save}
             </button>
-            <button type="button" onClick={() => setLogsOpen(true)} className="-translate-y-1 inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border border-emerald-600 px-2 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 md:gap-2 md:px-4 md:text-sm">
+            <button type="button" onClick={() => setLogsOpen(true)} className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-transparent px-3 py-2 text-xs font-semibold whitespace-nowrap text-emerald-700 transition-colors hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40 md:px-4 md:text-sm">
               {english ? "Attendance logs" : "سجل الحضور"}
             </button>
+            {!isTeacher && <button type="button" onClick={() => setAttendanceImportOpen(true)} className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-sky-600 bg-transparent px-3 py-2 text-xs font-semibold whitespace-nowrap text-sky-700 transition-colors hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-950/40 md:px-4 md:text-sm">
+              <Upload className="h-4 w-4" />
+              {english ? "Import Excel" : "استيراد Excel"}
+            </button>}
           </div>
         </div>
         <div className="mt-2 flex max-w-full items-center gap-1.5 overflow-x-auto pb-0.5 md:mt-3 md:flex-wrap md:gap-2 md:overflow-visible">
           <span className="shrink-0 text-xs font-semibold md:text-sm">{text.skip}</span>
           <button
             type="button"
-            onClick={() => setSelectedDivision("ALL")}
+            onClick={() => selectDivision("ALL")}
             className={`shrink-0 rounded-full border px-2.5 py-1 text-xs dark:border-slate-500 dark:text-slate-100 md:px-3 md:py-1.5 md:text-sm ${selectedDivision === "ALL" ? "border-emerald-600 bg-emerald-600 text-white" : "hover:border-emerald-400 dark:hover:border-emerald-300"}`}
           >
             {text.all}
@@ -467,12 +525,7 @@ export default function AttendancePage() {
             <button
               key={group.code}
               type="button"
-              onClick={() => {
-                setSelectedDivision(group.code);
-                document
-                  .getElementById(`division-${group.code}`)
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
+              onClick={() => selectDivision(group.code)}
               className={`shrink-0 rounded-full border px-2.5 py-1 text-xs dark:border-slate-500 dark:text-slate-100 md:px-3 md:py-1.5 md:text-sm ${selectedDivision === group.code ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "hover:border-emerald-400 dark:hover:border-emerald-300"}`}
             >
               {group.code}
@@ -528,6 +581,12 @@ export default function AttendancePage() {
                   ))}
                 </div>
               </fieldset>
+              <fieldset className="mt-5">
+                <legend className="text-sm font-bold">{english ? "Calendar" : "التقويم"}</legend>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {([['gregorian', english ? 'Gregorian' : 'ميلادي'], ['hijri', english ? 'Hijri' : 'هجري'], ['both', english ? 'Both' : 'كلاهما']] as const).map(([value, label]) => <label key={value} className="cursor-pointer"><input type="radio" name="attendance-calendar" value={value} checked={exportCalendar === value} onChange={() => setExportCalendar(value)} className="peer sr-only" /><span className="flex items-center justify-center rounded-lg border border-border px-3 py-2 text-sm font-semibold peer-checked:border-emerald-600 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 dark:peer-checked:bg-emerald-950/40 dark:peer-checked:text-emerald-300">{label}</span></label>)}
+                </div>
+              </fieldset>
               <div className="mt-5 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold">{english ? "Divisions" : "الشعب"}</h3>
@@ -572,6 +631,19 @@ export default function AttendancePage() {
         </div>
       )}
       <AttendanceLogsModal open={logsOpen} onClose={() => setLogsOpen(false)} english={english} />
+      {attendanceImportOpen && session && <AttendanceImportModal
+        students={students.map((student) => ({ id: student.id, fullName: student.fullName, divisionCode: student.divisionCode }))}
+        divisions={divisions.map((group) => group.code)}
+        defaultDate={date}
+        userId={session.id}
+        onClose={() => setAttendanceImportOpen(false)}
+        onImported={(count) => {
+          setMessage(english ? `${count} attendance records imported.` : `تم استيراد ${count} سجل حضور.`);
+          invalidateCached("dashboard:attendance", `attendance:${date}:${mode}:${divisionKey}:${session.id}`);
+          setAttendanceRevision((current) => current + 1);
+          window.dispatchEvent(new CustomEvent("thabat-attendance-changed"));
+        }}
+      />}
       <main className={`space-y-8 ${isLoading ? "hidden" : ""}`}>
         {visibleDivisions.map((group) => (
           <section
@@ -614,7 +686,7 @@ export default function AttendancePage() {
                   <div className="flex items-start justify-between gap-3">
                     <p className={`min-w-0 truncate rounded-md px-2 py-1 font-semibold ${statusOverlay(statuses[student.id] ?? undefined)}`}>{student.fullName}</p>
                   </div>
-                  <div className="mt-3">{statuses[student.id] === "LEFT_WITH_PERMISSION" ? <button type="button" disabled className="w-full cursor-not-allowed rounded-lg border border-blue-400 bg-blue-100 px-3 py-2 text-sm font-bold text-blue-800 shadow-[0_0_18px_rgba(59,130,246,0.45)] dark:bg-blue-950/50 dark:text-blue-200">{english ? "Left with permission" : "خرج بإذن"}</button> : <AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))} options={options(english)} english={english} variant="buttons" />}</div>
+                  <div className="mt-3">{statuses[student.id] === "LEFT_WITH_PERMISSION" ? <button type="button" disabled className="w-full cursor-not-allowed rounded-lg border border-blue-400 bg-blue-100 px-3 py-2 text-sm font-bold text-blue-800 shadow-[0_0_18px_rgba(59,130,246,0.45)] dark:bg-blue-950/50 dark:text-blue-200">{english ? "Left with permission" : "خرج بإذن"}</button> : <AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStudentStatus(student.id, statuses[student.id] === value ? "UNMARKED" : value as Status)} options={options(english, isClassroomPage)} english={english} variant="buttons" />}</div>
                   <textarea value={notes[student.id] ?? ""} onChange={(event) => setNotes((current) => ({ ...current, [student.id]: event.target.value }))} disabled={statuses[student.id] === "LEFT_WITH_PERMISSION"} placeholder={text.notes} aria-label={`${text.notes} ${student.fullName}`} rows={2} className="mt-3 block min-h-16 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-6 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-900" />
                 </article>
               ))}
@@ -638,7 +710,7 @@ export default function AttendancePage() {
                         <span className={`inline-block rounded-md px-2 py-1 ${statusOverlay(statuses[student.id] ?? undefined)}`}>{student.fullName}</span>
                       </td>
                       <td className="w-[45%] min-w-[28rem] px-4 py-3">
-                        {statuses[student.id] === "LEFT_WITH_PERMISSION" ? <button type="button" disabled className="cursor-not-allowed rounded-lg border border-blue-400 bg-blue-100 px-4 py-2 text-sm font-bold text-blue-800 shadow-[0_0_18px_rgba(59,130,246,0.45)] dark:bg-blue-950/50 dark:text-blue-200">{english ? "Left with permission" : "خرج بإذن"}</button> : <AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStatuses((current) => ({ ...current, [student.id]: current[student.id] === value ? null : value as Status }))} options={options(english)} english={english} variant="buttons" />}
+                        {statuses[student.id] === "LEFT_WITH_PERMISSION" ? <button type="button" disabled className="cursor-not-allowed rounded-lg border border-blue-400 bg-blue-100 px-4 py-2 text-sm font-bold text-blue-800 shadow-[0_0_18px_rgba(59,130,246,0.45)] dark:bg-blue-950/50 dark:text-blue-200">{english ? "Left with permission" : "خرج بإذن"}</button> : <AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStudentStatus(student.id, statuses[student.id] === value ? "UNMARKED" : value as Status)} options={options(english, isClassroomPage)} english={english} variant="buttons" />}
                       </td>
                       <td className="w-[30%] min-w-[18rem] max-w-[30rem] overflow-hidden px-4 py-3">
                         <textarea

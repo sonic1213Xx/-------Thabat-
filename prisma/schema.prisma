@@ -39,6 +39,10 @@ model User {
   loginHistory  LoginHistory[]
   issuedGatePasses GatePass[]     @relation("IssuedGatePasses")
   transferNotifications TransferNotification[] @relation("TransferNotificationRecipient")
+  attendanceNotifications AttendanceNotification[] @relation("AttendanceNotificationRecipient")
+  referralsCreated TeacherReferral[] @relation("TeacherReferralCreator")
+  referralsReceived TeacherReferral[] @relation("TeacherReferralRecipient")
+  agentActions   AgentAction[]
 
   @@index([username])
   @@index([role])
@@ -82,6 +86,7 @@ model Student {
   auditLogs        AuditLog[]        @relation("TargetStudent")
   attendance       Attendance[]
   gatePasses       GatePass[]
+  teacherReferrals TeacherReferral[]
 
   @@index([divisionCode])
   @@index([divisionCode, isActive])
@@ -97,6 +102,7 @@ model Attendance {
   date      String   // YYYY-MM-DD format for unique constraint
   status    String   @default("UNMARKED") // UNMARKED | PRESENT | ABSENT_EXCUSED | ABSENT_UNEXCUSED | LATE
   notes     String?  // Optional notes for absence or late marking
+  entryTime String?  // HH:mm arrival time for late attendance
   markedBy  String?  // User ID of who marked attendance
   markedByName String? // Cached name of who marked
   createdAt DateTime @default(now())
@@ -141,6 +147,7 @@ model AttendanceLog {
   date       String
   divisionId String
   teacherId  String?
+  subject    String   @default("")
   statusMap  String
   mode       String   @default("SCHOOL")
   presentCount Int     @default(0)
@@ -159,11 +166,13 @@ model ClassAttendance {
   date       String
   divisionId String
   teacherId  String
+  subject    String   @default("")
   status     String
+  entryTime  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([studentId, date, divisionId, teacherId])
+  @@unique([studentId, date, divisionId, teacherId, subject])
   @@index([date])
   @@index([divisionId])
   @@index([teacherId])
@@ -305,6 +314,52 @@ model TransferNotification {
   @@index([createdAt])
 }
 
+model AttendanceNotification {
+  id          String   @id @default(cuid())
+  recipientId String
+  recipient   User     @relation("AttendanceNotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  createdBy   String
+  studentId   String
+  studentName String
+  divisionId  String
+  subject     String
+  date        String
+  status      String
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([recipientId, readAt])
+  @@index([createdAt])
+  @@unique([recipientId, studentId, date, subject, status])
+}
+
+model TeacherReferral {
+  id              String   @id @default(cuid())
+  createdById     String
+  createdBy       User     @relation("TeacherReferralCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  recipientId     String
+  recipient       User     @relation("TeacherReferralRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentName     String
+  divisionCode    String
+  subject         String
+  reason          String
+  incidentDate   String
+  incidentTime   String
+  location        String
+  actionTaken    String
+  vicePrincipalAction String?
+  teacherNotes   String?
+  status          String   @default("NEW")
+  readAt          DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([createdById, createdAt])
+  @@index([recipientId, readAt])
+  @@index([studentId, createdAt])
+}
+
 // ============ AuditLog Model ============
 // Complete operation audit trail for compliance with precise timestamps
 model AuditLog {
@@ -344,6 +399,22 @@ model AuditLog {
   @@index([timestamp])
   @@index([dateOnly])
   @@index([studentId])
+}
+
+model AgentAction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actionType  String
+  requestJson String
+  beforeJson  String
+  afterJson   String?
+  status      String   @default("EXECUTED")
+  createdAt   DateTime @default(now())
+  restoredAt  DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
 }
 
 

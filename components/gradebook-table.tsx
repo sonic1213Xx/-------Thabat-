@@ -86,6 +86,7 @@ export function GradebookTable({
         };
   const [rows, setRows] = useState(students);
   const [saving, setSaving] = useState(false);
+  const [applyingFullMarks, setApplyingFullMarks] = useState(false);
   const [message, setMessage] = useState("");
   const [toast, setToast] = useState<"success" | "error" | null>(null);
   const [finalMaximum, setFinalMaximum] = useState(60);
@@ -307,7 +308,7 @@ export function GradebookTable({
     });
     setRows(nextRows);
     setCustomScores(nextCustomScores);
-    void saveScores(nextRows, nextCustomScores);
+    void saveScores(nextRows, nextCustomScores, "apply");
   };
   const setColumnScore = (
     studentId: string,
@@ -331,13 +332,15 @@ export function GradebookTable({
   const saveScores = async (
     rowsToSave = rows,
     customScoresToSave = customScores,
+    action: "save" | "apply" = "save",
   ): Promise<boolean> => {
     const actorId = teacherId ?? getSession()?.id;
     if (!actorId) {
       showToast("error");
       return false;
     }
-    setSaving(true);
+    if (action === "save") setSaving(true);
+    else setApplyingFullMarks(true);
     setMessage("");
     localStorage.setItem(
       settingsKey,
@@ -367,7 +370,8 @@ export function GradebookTable({
     } catch {
       showToast("error");
       setMessage(locale === "ar" ? "فشل في حفظ الدرجات، يرجى المحاولة مرة أخرى" : "Failed to save grades, please try again");
-      setSaving(false);
+      if (action === "save") setSaving(false);
+      else setApplyingFullMarks(false);
       return false;
     }
     const saved =
@@ -379,7 +383,8 @@ export function GradebookTable({
       if (!response.ok) {
         showToast("error");
         setMessage(locale === "ar" ? "فشل في حفظ الدرجات، يرجى المحاولة مرة أخرى" : "Failed to save grades, please try again");
-        setSaving(false);
+        if (action === "save") setSaving(false);
+        else setApplyingFullMarks(false);
         return false;
       }
       const json = (await response.json()) as { data?: GradebookStudent[] };
@@ -397,7 +402,8 @@ export function GradebookTable({
       showToast("error");
       setMessage(locale === "ar" ? "فشل في حفظ الدرجات، يرجى المحاولة مرة أخرى" : "Failed to save grades, please try again");
     }
-    setSaving(false);
+    if (action === "save") setSaving(false);
+    else setApplyingFullMarks(false);
     return saved;
   };
 
@@ -421,17 +427,19 @@ export function GradebookTable({
               type="button"
               onClick={giveFullMarks}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
+              title={locale === "ar" ? "تعبئة جميع خانات الدرجات بالحد الأعلى" : "Fill every grade field with its maximum value"}
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-100 disabled:saturate-50"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Maximize2 className="h-4 w-4" />} {saving ? (locale === "ar" ? "جارٍ الحفظ..." : "Saving...") : labels.fullMarks}
+              {applyingFullMarks ? <Loader2 className="h-4 w-4 animate-spin" /> : <Maximize2 className="h-4 w-4" />} {applyingFullMarks ? (locale === "ar" ? "جارٍ التطبيق..." : "Applying...") : labels.fullMarks}
             </button>
           )}
           {!readOnly && (
             <button
               type="button"
               onClick={() => void saveScores()}
-              disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700 disabled:opacity-50"
+              disabled={saving || applyingFullMarks}
+              title={locale === "ar" ? "حفظ الدرجات الحالية" : "Save the current grades"}
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-400 disabled:text-slate-500 dark:text-emerald-400 dark:hover:bg-emerald-950/30 dark:disabled:border-slate-600 dark:disabled:text-slate-400"
             >
               <Save className="h-4 w-4" />
               {saving
@@ -450,7 +458,8 @@ export function GradebookTable({
               void runExport(() => exportGradebookToExcel(divisionName, rows, categorySettings.filter((category) => !scoreFields.some((field) => field.key === category.key)), customScores, finalMaximum, categorySettings, selectedPeriod, getExportMetadata()), exportToast, updateToast).finally(() => setIsExporting(false))
             }}
             disabled={isExporting}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            title={locale === "ar" ? "تصدير كشف هذه الشعبة إلى Excel" : "Export this division to Excel"}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {labels.export}
           </button>
@@ -459,7 +468,8 @@ export function GradebookTable({
             onClick={() =>
               notifyPdfComingSoon(exportToast)
             }
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+            title={locale === "ar" ? "طباعة كشف هذه الشعبة بصيغة PDF" : "Print this division as a PDF"}
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
           >
             <Printer className="h-4 w-4" /> {labels.pdf}
           </button>
@@ -471,7 +481,8 @@ export function GradebookTable({
                 void runExport(() => exportEmptyGradebookTemplates(allDivisionCodes, selectedPeriod, getExportMetadata()), exportToast, updateToast).finally(() => setIsExporting(false))
               }}
               disabled={isExporting || !allDivisionCodes.length}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"
+              title={!allDivisionCodes.length ? (locale === "ar" ? "لا توجد شعب متاحة للتصدير" : "No divisions are available to export") : (locale === "ar" ? "تصدير قوالب جميع الشعب" : "Export templates for every division")}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-400 disabled:text-slate-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:border-slate-600 dark:disabled:text-slate-400"
             >
               {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {labels.exportAll}
@@ -488,7 +499,8 @@ export function GradebookTable({
             key={period}
             type="button"
             onClick={() => setSelectedPeriod(period)}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${selectedPeriod === period ? "bg-emerald-600 text-white shadow-sm" : "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+            title={period === "period1" ? labels.period1 : period === "period2" ? labels.period2 : labels.both}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 ${selectedPeriod === period ? "bg-emerald-600 text-white shadow-sm" : "border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"}`}
           >
             {period === "period1"
               ? labels.period1

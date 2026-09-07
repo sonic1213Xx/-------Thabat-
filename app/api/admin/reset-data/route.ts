@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       select: { id: true, role: true, password: true, isActive: true },
     })
     const validPassword = user?.isActive ? await bcrypt.compare(body.password, user.password) : false
-    if (!user || user.id !== '10' || !['CREATOR', 'CURATOR'].includes(user.role) || !validPassword) {
+    if (!user || user.id !== '10' || user.role !== 'CREATOR' || !validPassword) {
       return NextResponse.json({ error: 'كلمة المرور غير صحيحة' }, { status: 401 })
     }
 
@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       prisma.loginHistory.deleteMany(),
       prisma.excelImportLog.deleteMany(),
       prisma.transferNotification.deleteMany(),
+      prisma.attendanceNotification.deleteMany(),
       prisma.gatePass.deleteMany(),
       prisma.classAttendance.deleteMany(),
       prisma.gradebookModificationLog.deleteMany(),

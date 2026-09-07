@@ -16,7 +16,7 @@ export default function DashboardLayout({
       <BetaNotice />
       <div className="flex min-w-0 flex-1 flex-col md:overflow-hidden">
         <TopNav />
-        <main className="dashboard-main mx-auto w-full max-w-7xl flex-1 overflow-x-hidden p-6 md:overscroll-contain md:overflow-y-auto">
+        <main className="dashboard-main mx-auto w-full max-w-7xl flex-1 overflow-x-hidden p-3 sm:p-4 md:overscroll-contain md:overflow-y-auto md:p-6">
           {children}
         </main>
       </div>

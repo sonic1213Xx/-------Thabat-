@@ -271,10 +271,16 @@ export default function RolesPage() {
     const target = profiles.find((item) => item.id === id);
     if (authorized && target && target.role !== "PRINCIPAL") setDeletingProfile(target);
   };
-  const confirmRemoveProfile = () => {
+  const confirmRemoveProfile = async () => {
     if (!deletingProfile) return;
+    const response = await fetch('/api/users', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deletingProfile.id }) });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({})) as { error?: string };
+      alert(result.error ?? (locale === 'ar' ? 'تعذر حذف الملف.' : 'Unable to delete profile.'));
+      return;
+    }
     deleteProfile(deletingProfile.id);
-    setProfiles(getProfiles());
+    setProfiles((current) => current.filter((item) => item.id !== deletingProfile.id));
     setDeletingProfile(null);
   };
   return (

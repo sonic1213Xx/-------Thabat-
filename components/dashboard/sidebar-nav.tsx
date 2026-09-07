@@ -25,6 +25,7 @@ import {
   Loader2,
   Bell,
   User,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
@@ -47,7 +48,9 @@ export function SidebarNav() {
     { label: t('divisions'), href: '/dashboard/divisions', icon: BookOpen },
     { label: t('warnings'), href: '/dashboard/warnings', icon: AlertCircle, visible: session?.role !== 'TEACHER' },
     { label: t('vicePrincipalCenter'), href: '/dashboard/vice-principal', icon: ShieldAlert, visible: Boolean(session && (can(session.role, 'can_approve_gate_passes') || session.role === 'GATE_SECURITY')) },
-    { label: t('attendance'), href: '/dashboard/attendance', icon: CalendarCheck },
+    { label: locale === 'ar' ? 'حضور المدرسة' : 'School attendance', href: '/dashboard/attendance', icon: CalendarCheck, visible: session?.role !== 'TEACHER' },
+    { label: locale === 'ar' ? 'حضور الفصول' : 'Classroom attendance', href: '/dashboard/class-attendance', icon: CalendarCheck, visible: Boolean(session && (session.role === 'TEACHER' || hasPermission(session.role, 'attendance', 'read'))) },
+    { label: locale === 'ar' ? 'إحالات الطلاب' : 'Student referrals', href: '/dashboard/teacher-referrals', icon: FileText, visible: Boolean(session && (session.role === 'TEACHER' || session.role === 'CREATOR' || session.role === 'PRINCIPAL' || session.role === 'VICE_PRINCIPAL' || session.role.startsWith('VP_'))) },
     { label: t('teachersLounge'), href: '/dashboard/teachers-lounge', icon: Coffee, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'TEACHER' || session.role === 'PRINCIPAL' || session.role === 'VICE_PRINCIPAL')) },
     { label: t('auditLog'), href: '/dashboard/audit-log', icon: Clock, visible: Boolean(session && hasPermission(session.role, 'audit_log', 'read')) },
     { label: t('reports'), href: '/dashboard/reports', icon: BarChart3, visible: Boolean(session && hasPermission(session.role, 'reports', 'read')) },
@@ -122,7 +125,7 @@ export function SidebarNav() {
   return (
     <>
     {mobileOpen && <button type="button" aria-label={locale === 'ar' ? 'إغلاق القائمة' : 'Close navigation'} onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 animate-[fadeIn_0.22s_ease-out] bg-slate-950/40 backdrop-blur-sm md:hidden" />}
-    {navigating && <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-slate-950/55 p-6 text-white backdrop-blur-sm md:hidden" role="status" aria-live="polite"><Loader2 className="h-9 w-9 animate-spin text-emerald-300" /><span className="text-sm font-semibold">{locale === 'ar' ? 'يرجى الانتظار...' : 'Please wait...'}</span></div>}
+    {navigating && <div className="fixed inset-0 z-[100] flex cursor-wait flex-col items-center justify-center gap-3 bg-slate-950/55 p-6 text-white backdrop-blur-sm" role="status" aria-live="polite"><Loader2 className="h-9 w-9 animate-spin text-emerald-300" /><span className="text-sm font-semibold">{locale === 'ar' ? 'يرجى الانتظار...' : 'Please wait...'}</span></div>}
     <aside id="dashboard-sidebar" className={cn(
       'w-[280px] shrink-0 flex-col md:static md:flex md:w-[260px]',
       mobileOpen ? `fixed inset-y-0 start-0 z-50 flex ${dir === 'rtl' ? 'animate-[mobileSidebarEnterRtl_0.28s_cubic-bezier(0.22,1,0.36,1)]' : 'animate-[mobileSidebarEnterLtr_0.28s_cubic-bezier(0.22,1,0.36,1)]'}` : 'hidden',

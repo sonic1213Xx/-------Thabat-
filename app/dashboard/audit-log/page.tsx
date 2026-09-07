@@ -21,7 +21,7 @@ type AuditLogRecord = {
 const actionLabels: Record<string, { ar: string; en: string }> = {
   STUDENT_CREATED: { ar: 'إضافة طالب', en: 'Student created' }, STUDENT_UPDATED: { ar: 'تعديل بيانات طالب', en: 'Student updated' }, STUDENT_TRANSFERRED: { ar: 'نقل طالب', en: 'Student transferred' },
   WARNING_ISSUED: { ar: 'إصدار إنذار', en: 'Warning issued' }, INCIDENT_RECORDED: { ar: 'تسجيل واقعة', en: 'Incident recorded' }, GATE_PASS_ISSUED: { ar: 'إصدار تصريح خروج', en: 'Gate pass issued' },
-  GRADEBOOK_SCORE_UPDATED: { ar: 'تحديث درجة', en: 'Grade updated' }, USER_LOGIN: { ar: 'تسجيل دخول', en: 'User signed in' }, BULK_IMPORT: { ar: 'استعادة من Excel', en: 'Bulk import' },
+  GRADEBOOK_SCORE_UPDATED: { ar: 'تحديث درجة', en: 'Grade updated' }, STUDENT_REFERRED_TO_VICE_PRINCIPAL: { ar: 'إحالة طالب لوكيل المدرسة', en: 'Student referred to vice principal' }, USER_LOGIN: { ar: 'تسجيل دخول', en: 'User signed in' }, BULK_IMPORT: { ar: 'استعادة من Excel', en: 'Bulk import' },
 }
 const typeLabels: Record<string, { ar: string; en: string }> = { Student: { ar: 'طلاب', en: 'Students' }, Warning: { ar: 'إنذارات', en: 'Warnings' }, Attendance: { ar: 'حضور', en: 'Attendance' }, Gradebook: { ar: 'درجات', en: 'Gradebook' }, Incident: { ar: 'وقائع', en: 'Incidents' }, GatePass: { ar: 'تصاريح', en: 'Gate passes' }, User: { ar: 'مستخدمون', en: 'Users' } }
 const roleLabels: Record<string, { ar: string; en: string }> = { PRINCIPAL: { ar: 'مدير المدرسة', en: 'Principal' }, VICE_PRINCIPAL: { ar: 'وكيل المدرسة', en: 'Vice principal' }, TEACHER: { ar: 'معلم', en: 'Teacher' } }
