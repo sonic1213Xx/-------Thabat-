@@ -387,6 +387,7 @@ export default function TeacherReferralsPage() {
   const isTransferred = (status: string) =>
     ["TRANSFERRED", "REFERRED", "NEW"].includes(status);
   const handleCancelTransfer = async (referralId: string) => {
+    if (!window.confirm(english ? "Are you sure you want to cancel this transfer?" : "هل أنت متأكد من إلغاء هذا التحويل؟")) return;
     setCancellingId(referralId);
     setMessage("");
     try {
@@ -414,6 +415,7 @@ export default function TeacherReferralsPage() {
     }
   };
   const handleCancelOwn = async (referralId: string) => {
+    if (!window.confirm(english ? "Are you sure you want to cancel this referral? It will be removed and will not remain in your history." : "هل أنت متأكد من إلغاء هذه الإحالة؟ ستتم إزالتها ولن تبقى في سجلك.")) return;
     setCancellingId(referralId);
     setMessage("");
     try {
@@ -423,7 +425,7 @@ export default function TeacherReferralsPage() {
         body: JSON.stringify({ id: referralId, action: "cancelOwn" }),
       });
       if (!response.ok) throw new Error();
-      setReferrals((current) => current.map((referral) => referral.id === referralId ? { ...referral, status: "CANCELLED" } : referral));
+      setReferrals((current) => current.filter((referral) => referral.id !== referralId));
       setMessage(english ? "Referral cancelled." : "تم إلغاء الإحالة.");
     } catch { setMessage(labels.updateFailed); } finally { setCancellingId(null); }
   };

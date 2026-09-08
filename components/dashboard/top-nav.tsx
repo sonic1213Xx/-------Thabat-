@@ -37,8 +37,9 @@ export function TopNav() {
   const [transferNotifications, setTransferNotifications] = useState<Notification[]>([])
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null)
-  const [liveReferral, setLiveReferral] = useState<ReferralNotification | null>(null)
+  const [liveReferrals, setLiveReferrals] = useState<ReferralNotification[]>([])
   const notificationLoadRef = useRef(false)
+  const knownNotificationIdsRef = useRef<Set<string>>(new Set())
 
   // Load teams from database
   const loadTeams = async () => {
@@ -80,10 +81,10 @@ export function TopNav() {
         const json = await response.json() as { data?: Notification[] }
         const nextNotifications = json.data ?? []
         if (notificationLoadRef.current) {
-          const previousIds = new Set(transferNotifications.map((notification) => `${notification.type}-${notification.id}`))
-          const newReferral = nextNotifications.find((notification): notification is ReferralNotification => notification.type === 'REFERRAL' && !previousIds.has(`${notification.type}-${notification.id}`))
-          if (newReferral) setLiveReferral(newReferral)
+          const newReferrals = nextNotifications.filter((notification): notification is ReferralNotification => notification.type === 'REFERRAL' && !notification.readAt && !knownNotificationIdsRef.current.has(`${notification.type}-${notification.id}`))
+          if (newReferrals.length) setLiveReferrals((current) => [...current, ...newReferrals].slice(-3))
         }
+        knownNotificationIdsRef.current = new Set(nextNotifications.map((notification) => `${notification.type}-${notification.id}`))
         notificationLoadRef.current = true
         setTransferNotifications(nextNotifications)
       } catch {
@@ -124,6 +125,13 @@ export function TopNav() {
     await fetch('/api/transfer-notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-thabat-user-id': sessionUser.id }, body: JSON.stringify({ id: selectedNotification.id, type: selectedNotification.type, action: 'reviewed' }) })
     setTransferNotifications((current) => current.map((item) => item.id === selectedNotification.id ? { ...item, reviewedAt: new Date().toISOString(), readAt: item.readAt ?? new Date().toISOString() } : item))
     setSelectedNotification((current) => current ? { ...current, reviewedAt: new Date().toISOString() } : current)
+  }
+
+  const dismissLiveReferral = async (referral: ReferralNotification) => {
+    setLiveReferrals((current) => current.filter((item) => item.id !== referral.id))
+    if (!sessionUser || referral.readAt) return
+    await fetch('/api/transfer-notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-thabat-user-id': sessionUser.id }, body: JSON.stringify({ id: referral.id, type: referral.type, action: 'read' }) })
+    setTransferNotifications((current) => current.map((item) => item.id === referral.id ? { ...item, readAt: new Date().toISOString() } : item))
   }
 
   const teamOptions = useMemo(() => [...TEAM_OPTIONS, ...dbTeams].map((team) => team.id === 'all' ? { ...team, label: t('allTeams') } : team), [dbTeams, t])
@@ -307,7 +315,9 @@ export function TopNav() {
         </div>
       </div>
 
-      <AnimatePresence>{liveReferral && <motion.button type="button" initial={{ opacity: 0, x: 80, y: -12 }} animate={{ opacity: 1, x: 0, y: 0 }} exit={{ opacity: 0, x: 80 }} transition={{ type: 'spring', stiffness: 360, damping: 28 }} onClick={() => { setSelectedNotification(liveReferral); setLiveReferral(null); setNotificationsOpen(true) }} className="fixed end-4 top-4 z-[2000] w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-amber-300 bg-white p-4 text-start shadow-2xl ring-4 ring-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:ring-amber-950/40"><span className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"><AlertTriangle className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">{locale === 'ar' ? 'إحالة طالب جديدة' : 'New student referral'}</span><span className="mt-1 block truncate font-bold text-slate-900 dark:text-white">{liveReferral.studentName}</span><span className="mt-1 block text-xs text-slate-600 dark:text-slate-300">{locale === 'ar' ? `من المعلم ${liveReferral.createdBy.name} · اضغط لفتح النموذج` : `From ${liveReferral.createdBy.name} · Click to open the form`}</span></span></span></motion.button>}</AnimatePresence>
+      <div className="fixed end-4 top-4 z-[2000] flex max-h-[calc(100vh-2rem)] w-[min(24rem,calc(100vw-2rem))] flex-col gap-2 overflow-y-auto">
+        <AnimatePresence initial={false}>{liveReferrals.map((liveReferral) => <motion.div key={liveReferral.id} initial={{ opacity: 0, x: 80, y: -12 }} animate={{ opacity: 1, x: 0, y: 0 }} exit={{ opacity: 0, x: 80 }} transition={{ type: 'spring', stiffness: 360, damping: 28 }} className="shrink-0 rounded-2xl border border-amber-300 bg-white p-4 text-start shadow-2xl ring-4 ring-amber-100 dark:border-amber-700 dark:bg-slate-900 dark:ring-amber-950/40"><div className="flex items-start gap-3"><button type="button" onClick={() => { setSelectedNotification(liveReferral); void dismissLiveReferral(liveReferral); setNotificationsOpen(true) }} className="flex min-w-0 flex-1 items-start gap-3 text-start"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"><AlertTriangle className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">{locale === 'ar' ? 'إحالة طالب جديدة' : 'New student referral'}</span><span className="mt-1 block truncate font-bold text-slate-900 dark:text-white">{liveReferral.studentName}</span><span className="mt-1 block text-xs text-slate-600 dark:text-slate-300">{locale === 'ar' ? `من المعلم ${liveReferral.createdBy.name} · اضغط لفتح النموذج` : `From ${liveReferral.createdBy.name} · Click to open the form`}</span></span></button><button type="button" onClick={() => void dismissLiveReferral(liveReferral)} className="shrink-0 rounded-lg p-1 text-slate-500 hover:bg-amber-50 hover:text-slate-900 dark:hover:bg-amber-950/40 dark:hover:text-white" aria-label={locale === 'ar' ? 'إغلاق الإشعار' : 'Dismiss notification'}><X className="h-4 w-4" /></button></div></motion.div>)}</AnimatePresence>
+      </div>
       {notificationsOpen && <Modal open={true} onOpenChange={setNotificationsOpen} className="max-w-2xl">
         {!selectedNotification ? <div className="space-y-4" dir={dir}>
           <div className="flex items-center gap-3 border-b border-border pb-4"><Bell className="h-5 w-5 text-emerald-600" /><div><h2 className="text-xl font-bold text-card-foreground">{locale === 'ar' ? 'الإشعارات' : 'Notifications'}</h2><p className="text-sm text-card-foreground/60">{locale === 'ar' ? 'تنبيهات النقل والحضور.' : 'Transfer and attendance alerts.'}</p></div></div>

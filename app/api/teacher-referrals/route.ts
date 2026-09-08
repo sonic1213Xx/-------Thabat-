@@ -62,6 +62,11 @@ export async function PATCH(request: NextRequest) {
   if (body.action === 'cancelTransfer' && !transferStatuses.includes(referral.status)) return NextResponse.json({ error: 'Only transferred referrals can be cancelled.' }, { status: 409 })
   if (body.action === 'updateAdministrativeAction' && !body.administrativeAction?.trim()) return NextResponse.json({ error: 'Administrative action is required.' }, { status: 400 })
   if (body.action === 'cancelOwn' && !transferStatuses.includes(referral.status)) return NextResponse.json({ error: 'Only active referrals can be cancelled.' }, { status: 409 })
+  if (body.action === 'cancelOwn') {
+    await prisma.teacherReferral.delete({ where: { id: referral.id } })
+    await invalidateCache('thabat:teacher-referrals', `thabat:teacher-referrals:${referral.createdById}`, `thabat:teacher-referrals:${referral.recipientId}`)
+    return NextResponse.json({ success: true, data: referral })
+  }
   if (body.action === 'delete') {
     await prisma.teacherReferral.delete({ where: { id: referral.id } })
     await invalidateCache('thabat:teacher-referrals', `thabat:teacher-referrals:${referral.createdById}`, `thabat:teacher-referrals:${referral.recipientId}`)
@@ -74,8 +79,6 @@ export async function PATCH(request: NextRequest) {
       ? { vicePrincipalAction: body.administrativeAction!.trim(), readAt: new Date(), status: 'REVIEWED' }
       : body.action === 'cancelTransfer'
       ? { status: 'CANCELLED', readAt: new Date() }
-      : body.action === 'cancelOwn'
-        ? { status: 'CANCELLED', readAt: new Date() }
       : { readAt: new Date(), status: body.action === 'reviewed' ? 'REVIEWED' : 'SEEN' },
     include: { createdBy: { select: { id: true, name: true } }, recipient: { select: { id: true, name: true } } },
   })
