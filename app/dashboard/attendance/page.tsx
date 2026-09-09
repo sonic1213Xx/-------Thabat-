@@ -260,7 +260,8 @@ export default function AttendancePage() {
     const entryTime = status === "LATE" ? new Date().toTimeString().slice(0, 5) : null;
     setStatuses((current) => ({ ...current, [studentId]: status }));
     setEntryTimes((current) => ({ ...current, [studentId]: entryTime }));
-    if (status === "LATE") setNotes((current) => ({ ...current, [studentId]: `${english ? "Entry time" : "وقت الدخول"}: ${entryTime} | ${english ? "Late by" : "التأخر"}: ${lateDuration(entryTime!, english)}` }));
+    // Only add automatic late note for school attendance, not classroom attendance
+    if (status === "LATE" && !isClassroomPage) setNotes((current) => ({ ...current, [studentId]: `${english ? "Entry time" : "وقت الدخول"}: ${entryTime} | ${english ? "Late by" : "التأخر"}: ${lateDuration(entryTime!, english)}` }));
   };
   const setDivisionStatus = (code: string, status: Status) =>
     setStatuses((current) => ({
