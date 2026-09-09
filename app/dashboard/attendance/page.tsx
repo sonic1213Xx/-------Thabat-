@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarCheck, Check, FileText, Loader2, Save, Upload, X } from "lucide-react";
+import { AlertTriangle, CalendarCheck, Check, FileText, Loader2, Save, Upload, X } from "lucide-react";
 import { AttendanceStatusSelect } from "@/components/ui/attendance-status-select";
 import { useLanguage } from "@/components/language-provider";
 import { getCurrentProfile, getSession } from "@/lib/auth";
@@ -15,6 +15,7 @@ import { AttendanceLogsModal } from "@/components/attendance/attendance-logs-mod
 import { AttendanceImportModal } from "@/components/attendance/attendance-import-modal";
 import { EditAttendanceModal } from "@/components/attendance/edit-attendance-modal";
 import { StyledSelect } from "@/components/ui/styled-select";
+import { Modal } from "@/components/ui/modal";
 import { usePathname, useRouter } from "next/navigation";
 import { getConfiguredClassroomDefaultAttendance, getConfiguredLateTime } from "@/lib/school-settings";
 
@@ -99,6 +100,7 @@ export default function AttendancePage() {
   const [isExporting, setIsExporting] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [attendanceImportOpen, setAttendanceImportOpen] = useState(false);
+  const [clearNotesConfirmOpen, setClearNotesConfirmOpen] = useState(false);
   const [attendanceRevision, setAttendanceRevision] = useState(0);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<{
@@ -268,7 +270,13 @@ export default function AttendancePage() {
   const setMasterStatus = (status: Status) => applyStatus(students.map((student) => student.id), status);
   const clearMasterStatus = () => {
     const hasNotes = Object.values(notes).some((note) => note.trim());
-    if (hasNotes && !window.confirm("تنبيه: سيتم حذف جميع الملاحظات وتفريغ حالات الحضور. هل تريد المتابعة؟")) return;
+    if (hasNotes) {
+      setClearNotesConfirmOpen(true);
+      return;
+    }
+    clearAttendanceValues();
+  };
+  const clearAttendanceValues = () => {
     const eligibleStudents = students.filter((student) => statuses[student.id] !== "LEFT_WITH_PERMISSION");
     setStatuses((current) => ({
       ...current,
@@ -282,6 +290,7 @@ export default function AttendancePage() {
       ...current,
       ...Object.fromEntries(students.map((student) => [student.id, null])),
     }));
+    setClearNotesConfirmOpen(false);
   };
   const save = async () => {
     if (!session?.id) return;
@@ -453,13 +462,13 @@ export default function AttendancePage() {
       };
 
   const statusOverlay = (status?: Status) => status === "PRESENT"
-    ? "border-emerald-300 bg-emerald-50/80 shadow-[inset_0_0_22px_rgba(16,185,129,0.16)] dark:bg-emerald-950/20"
+    ? "border-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/20"
     : status === "ABSENT_UNEXCUSED"
-      ? "border-red-300 bg-red-50/80 shadow-[inset_0_0_22px_rgba(239,68,68,0.16)] dark:bg-red-950/20"
+      ? "border-red-300 bg-red-50/80 dark:bg-red-950/20"
       : status === "ABSENT_EXCUSED"
-        ? "border-amber-300 bg-amber-50/80 shadow-[inset_0_0_22px_rgba(245,158,11,0.16)] dark:bg-amber-950/20"
+        ? "border-amber-300 bg-amber-50/80 dark:bg-amber-950/20"
         : status === "LATE"
-          ? "border-yellow-300 bg-yellow-50/80 shadow-[inset_0_0_22px_rgba(234,179,8,0.18)] dark:bg-yellow-950/20"
+          ? "border-yellow-300 bg-yellow-50/80 dark:bg-yellow-950/20"
           : status === "LEFT_WITH_PERMISSION"
             ? "border-blue-300 bg-blue-50/80 shadow-[inset_0_0_24px_rgba(59,130,246,0.22)] dark:bg-blue-950/25"
             : "border-slate-200 dark:border-slate-700";
@@ -469,13 +478,13 @@ export default function AttendancePage() {
 
   return (
     <div className="attendance-page space-y-6" dir={dir}>
-      <header className="sticky top-0 z-[100] -mx-4 -mt-3 mb-0 shrink-0 border-b border-slate-200 bg-slate-50 px-3 py-2 shadow-lg dark:border-slate-800 dark:bg-slate-950 md:-mx-6 md:-mt-6 md:top-[-2.25rem] md:mb-2 md:px-6 md:py-4">
+      <header className="sticky top-0 z-40 -mx-4 -mt-3 mb-0 shrink-0 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950 md:-mx-6 md:-mt-6 md:top-[-2.25rem] md:mb-2 md:px-6 md:py-4">
         <div className="flex flex-wrap items-center justify-between gap-2 md:gap-4">
           <div className="flex items-center gap-2 md:gap-3">
             <CalendarCheck className="h-6 w-6 text-emerald-600 md:h-7 md:w-7" />
             <h1 className="text-xl font-bold md:text-2xl">{text.title}</h1>
           </div>
-          <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
+          <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap md:gap-1">
             <input
               aria-label={text.date}
               type="date"
@@ -483,6 +492,7 @@ export default function AttendancePage() {
               onChange={(event) => setDate(event.target.value)}
               className="h-10 w-full min-w-0 rounded-lg border px-3 py-2 text-sm dark:bg-slate-900 md:w-auto"
             />
+            {!isClassroomPage && <div className="hidden md:block"><StyledSelect aria-label={text.skip} value={selectedDivision} onValueChange={selectDivision} options={[{ value: "ALL", label: text.all }, ...divisions.map((group) => ({ value: group.code, label: group.code }))]} className="!h-10 !w-32 max-w-32 shrink-0 rounded-lg px-2 text-xs" /></div>}
             {isClassroomPage && <div className="min-w-48"><StyledSelect key={`subject-${selectedSubject}-${subjects.join("|")}`} value={selectedSubject} onValueChange={setSelectedSubject} options={subjects.map((subject) => ({ value: subject, label: subject }))} placeholder={english ? "Choose subject" : "اختر المادة"} /></div>}
             <button
               type="button"
@@ -522,10 +532,6 @@ export default function AttendancePage() {
               {english ? "Import Excel" : "استيراد Excel"}
             </button>}
           </div>
-        </div>
-        <div className="hidden md:mt-3 md:flex md:items-center md:justify-end md:gap-2">
-          <span className="text-sm font-semibold">{text.skip}</span>
-          <StyledSelect value={selectedDivision} onValueChange={selectDivision} options={[{ value: "ALL", label: text.all }, ...divisions.map((group) => ({ value: group.code, label: group.code }))]} className="h-9 w-44 rounded-lg px-2 text-xs" />
         </div>
         <div className="mt-2 flex max-w-full items-center gap-1.5 overflow-x-auto pb-0.5 md:hidden">
           <span className="shrink-0 text-xs font-semibold md:text-sm">{text.skip}</span>
@@ -645,6 +651,15 @@ export default function AttendancePage() {
           <div className="w-full max-w-md space-y-3"><p className="font-semibold text-slate-700 dark:text-slate-200">{text.loading}</p><div className="h-3 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-3 w-4/5 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /><div className="h-3 w-3/5 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" /></div>
         </div>
       )}
+      <Modal open={clearNotesConfirmOpen} onOpenChange={setClearNotesConfirmOpen} className="max-w-md">
+        <div dir="rtl" className="animate-[slideInUp_0.25s_ease-out] space-y-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-300"><AlertTriangle className="h-5 w-5" /></div>
+            <div><h2 className="text-lg font-bold text-slate-900 dark:text-white">حذف جميع الملاحظات</h2><p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">سيتم حذف جميع الملاحظات وتفريغ حالات الحضور. لا يمكن التراجع عن هذا الإجراء.</p></div>
+          </div>
+          <div className="flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700"><button type="button" onClick={() => setClearNotesConfirmOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200">إلغاء</button><button type="button" onClick={clearAttendanceValues} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-red-600/25 transition hover:bg-red-700 active:scale-95"><AlertTriangle className="h-4 w-4" />تأكيد الحذف</button></div>
+        </div>
+      </Modal>
       <AttendanceLogsModal open={logsOpen} onClose={() => setLogsOpen(false)} english={english} />
       {attendanceImportOpen && session && <AttendanceImportModal
         students={students.map((student) => ({ id: student.id, fullName: student.fullName, divisionCode: student.divisionCode, isActive: student.isActive }))}
@@ -706,8 +721,8 @@ export default function AttendancePage() {
                 </article>
               ))}
             </div>
-            <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:block">
-              <table className="min-w-[64rem] w-full table-fixed text-sm">
+            <div className="hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:block">
+              <table className="w-full table-fixed text-sm">
                 <thead className="bg-slate-50 dark:bg-slate-800">
                   <tr>
                     <th className="w-[25%] px-4 py-3 text-start">{text.student}</th>
@@ -724,10 +739,10 @@ export default function AttendancePage() {
                       <td className="w-[25%] px-4 py-3 font-medium">
                         <span className={`inline-block rounded-md px-2 py-1 ${statusOverlay(statuses[student.id] ?? undefined)}`}>{student.fullName}</span>
                       </td>
-                      <td className="w-[45%] min-w-[28rem] px-4 py-3">
+                      <td className="w-[45%] px-4 py-3">
                         {statuses[student.id] === "LEFT_WITH_PERMISSION" ? <button type="button" disabled className="cursor-not-allowed rounded-lg border border-blue-400 bg-blue-100 px-4 py-2 text-sm font-bold text-blue-800 shadow-[0_0_18px_rgba(59,130,246,0.45)] dark:bg-blue-950/50 dark:text-blue-200">{english ? "Left with permission" : "خرج بإذن"}</button> : <AttendanceStatusSelect value={statuses[student.id] ?? ""} onValueChange={(value) => setStudentStatus(student.id, statuses[student.id] === value ? "UNMARKED" : value as Status)} options={options(english, isClassroomPage)} english={english} variant="buttons" />}
                       </td>
-                      <td className="w-[30%] min-w-[18rem] max-w-[30rem] overflow-hidden px-4 py-3">
+                      <td className="w-[30%] overflow-hidden px-4 py-3">
                         <textarea
                           value={notes[student.id] ?? ""}
                           disabled={statuses[student.id] === "LEFT_WITH_PERMISSION"}

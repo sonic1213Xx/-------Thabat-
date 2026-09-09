@@ -147,7 +147,7 @@ export function SidebarNav() {
         </div>
       </div>
 
-      {session && <div className="border-b border-slate-200/80 px-3 py-4 dark:border-slate-800/80 md:hidden">
+      {session && <div className="border-b border-slate-200/80 px-3 py-4 dark:border-slate-800/80">
         <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-800/70">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"><User className="h-5 w-5" /></div>
           <Link href="/dashboard/profile" prefetch={false} onClick={() => setMobileOpen(false)} className="min-w-0 flex-1 text-start"><span className="block truncate text-sm font-bold text-slate-900 dark:text-white">{session.name}</span><span className="block truncate text-xs text-slate-500 dark:text-slate-400">{session.role}</span></Link>

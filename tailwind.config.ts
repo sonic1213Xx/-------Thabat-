@@ -8,6 +8,10 @@ const config: Config = {
   ],
   darkMode: ['class'],
   theme: {
+    screens: {
+      ...defaultTheme.screens,
+      md: '1024px',
+    },
     extend: {
       colors: {
         card: 'hsl(var(--card) / <alpha-value>)',
