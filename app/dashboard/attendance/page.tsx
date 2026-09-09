@@ -34,6 +34,7 @@ type Student = {
   nationalId?: string | null;
   fullName: string;
   divisionCode?: string | null;
+  isActive?: boolean;
   gradeLevel?: number | null;
   status?: Status;
   entryTime?: string | null;
@@ -643,7 +644,7 @@ export default function AttendancePage() {
       )}
       <AttendanceLogsModal open={logsOpen} onClose={() => setLogsOpen(false)} english={english} />
       {attendanceImportOpen && session && <AttendanceImportModal
-        students={students.map((student) => ({ id: student.id, fullName: student.fullName, divisionCode: student.divisionCode }))}
+        students={students.map((student) => ({ id: student.id, fullName: student.fullName, divisionCode: student.divisionCode, isActive: student.isActive }))}
         divisions={divisions.map((group) => group.code)}
         defaultDate={date}
         userId={session.id}

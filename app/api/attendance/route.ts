@@ -4,6 +4,13 @@ import { getDateOnly, getTimeOnly } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
 
 const validStatuses = ['UNMARKED', 'PRESENT', 'ABSENT_UNEXCUSED', 'ABSENT_EXCUSED', 'LATE', 'OTHER']
+const vicePrincipalRoles = ['VICE_PRINCIPAL', 'VP_STUDENT_AFFAIRS', 'VP_ACADEMIC_AFFAIRS', 'VP_OPERATIONS']
+
+function attendanceNotes(notes: string | undefined, user: { role: string }) {
+  const existing = notes?.trim() ?? ''
+  if (!vicePrincipalRoles.includes(user.role) || existing.includes('تم التعديل بواسطة الوكيل')) return existing
+  return [existing, 'تم التعديل بواسطة الوكيل'].filter(Boolean).join(' | ')
+}
 
 async function getRequestUser(request: NextRequest) {
   const userId = request.headers.get('x-thabat-user-id')
@@ -269,12 +276,12 @@ export async function POST(request: NextRequest) {
     const existingAttendanceIds = new Set(existingAttendance.map((record) => record.studentId))
     const newAttendance = writableRecords.filter((record) => !existingAttendanceIds.has(record.studentId))
     if (newAttendance.length) {
-      await prisma.attendance.createMany({ data: newAttendance.map((record) => ({ studentId: record.studentId, date: requestDate, status: record.status, notes: record.notes || null, entryTime: record.entryTime || null, markedBy: body.markedBy || null, markedByName: body.markedByName || null })), skipDuplicates: true })
+      await prisma.attendance.createMany({ data: newAttendance.map((record) => ({ studentId: record.studentId, date: requestDate, status: record.status, notes: attendanceNotes(record.notes, user) || null, entryTime: record.entryTime || null, markedBy: body.markedBy || user.id, markedByName: body.markedByName || user.name })), skipDuplicates: true })
     }
     for (let index = 0; index < recordsToSave.length; index += 50) {
       const batch = writableRecords.slice(index, index + 50).filter((record) => existingAttendanceIds.has(record.studentId))
       if (batch.length) {
-        await prisma.$transaction(batch.map((record) => prisma.attendance.update({ where: { studentId_date: { studentId: record.studentId, date: requestDate } }, data: { status: record.status, notes: record.notes || null, entryTime: record.entryTime || null, markedBy: body.markedBy || null, markedByName: body.markedByName || null, updatedAt: new Date() } })))
+        await prisma.$transaction(batch.map((record) => prisma.attendance.update({ where: { studentId_date: { studentId: record.studentId, date: requestDate } }, data: { status: record.status, notes: attendanceNotes(record.notes, user) || null, entryTime: record.entryTime || null, markedBy: body.markedBy || user.id, markedByName: body.markedByName || user.name, updatedAt: new Date() } })))
       }
     }
     const saved = await prisma.attendance.findMany({ where: { date: requestDate, studentId: { in: writableRecords.map((record) => record.studentId) } }, select: { id: true, studentId: true, date: true, status: true, notes: true, markedBy: true, markedByName: true, updatedAt: true } })

@@ -32,6 +32,7 @@ export function AttendanceLogsModal({ open, onClose, english }: { open: boolean;
   const [selectedDivision, setSelectedDivision] = useState<string | null>(null)
   const [students, setStudents] = useState<StudentRow[]>([])
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -72,7 +73,7 @@ export function AttendanceLogsModal({ open, onClose, english }: { open: boolean;
   }, [open, session?.id, selectedDate, selectedDivision])
 
   const dates = useMemo(() => Array.from(new Set(savedSessions.map((item) => item.date))), [savedSessions])
-  const filteredStudents = useMemo(() => students.filter((student) => student.studentName.toLocaleLowerCase().includes(query.toLocaleLowerCase())), [students, query])
+  const filteredStudents = useMemo(() => students.filter((student) => student.studentName.toLocaleLowerCase().includes(query.toLocaleLowerCase()) && (statusFilter === 'ALL' || student.status === statusFilter)), [students, query, statusFilter])
   const pageSize = 100
   const pageCount = Math.max(1, Math.ceil(filteredStudents.length / pageSize))
   const visibleStudents = filteredStudents.slice(page * pageSize, (page + 1) * pageSize)
@@ -83,6 +84,7 @@ export function AttendanceLogsModal({ open, onClose, english }: { open: boolean;
     setSelectedDivision(null)
     setStudents([])
     setQuery('')
+    setStatusFilter('ALL')
     setPage(0)
   }
 
@@ -91,6 +93,7 @@ export function AttendanceLogsModal({ open, onClose, english }: { open: boolean;
     setSelectedDivision(null)
     setStudents([])
     setQuery('')
+    setStatusFilter('ALL')
     setPage(0)
     setDivisionMenuOpen(false)
     initialStudentsRef.current.clear()
@@ -137,6 +140,7 @@ export function AttendanceLogsModal({ open, onClose, english }: { open: boolean;
 
   return <Modal open={open} onOpenChange={(nextOpen) => !nextOpen && handleClose()} className="max-w-6xl">
     <div className="space-y-5">
+      {selectedDate && selectedDivision && <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0) }} aria-label={english ? 'Filter by status' : 'تصفية حسب الحالة'} className="rounded-lg border border-border bg-transparent px-3 py-2 text-sm"><option value="ALL">{english ? 'All statuses' : 'كل الحالات'}</option>{statusOptions(english).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>}
       <div className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-emerald-600" /><div><h2 className="text-xl font-bold">{english ? 'Attendance logs' : 'سجل الحضور والغياب'}</h2><p className="text-xs text-muted-foreground">{selectedDate ? (english ? 'Choose a division to edit this day' : 'اختر شعبة لتعديل هذا اليوم') : (english ? 'Choose a saved day' : 'اختر يوماً محفوظاً')}</p></div></div>
 
       {!selectedDate ? <>

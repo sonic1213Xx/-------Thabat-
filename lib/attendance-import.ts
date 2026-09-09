@@ -41,9 +41,10 @@ const fieldTerms = {
   name: ['اسم الطالب', 'اسم الطالبة', 'الاسم', 'اسم', 'طالب', 'student name', 'studentname', 'name', 'الاسم الكامل', 'الاسم كامل'],
   division: ['الشعبة', 'الفصل', 'الصف والفصل', 'division', 'class', 'section', 'قسم', 'شعبة', 'صف'],
   date: ['التاريخ', 'اليوم', 'date', 'day', 'اليوم', 'التاريخ الميلادي'],
-  status: ['الحالة', 'الحضور', 'الغياب', 'status', 'attendance', 'حالة الحضور', 'الحالة الحضور'],
+  status: ['الحالة', 'الحضور', 'الغياب', 'الوصف', 'status', 'attendance', 'حالة الحضور', 'الحالة الحضور'],
   notes: ['ملاحظات', 'ملاحظة', 'notes', 'note', 'remark', 'ملاحظ'],
   lateCount: ['عدد مرات التأخر', 'عدد التأخر', 'مرات التأخر', 'late count', 'latecount', 'tardies', 'التأخر'],
+  entryTime: ['وقت الدخول', 'وقت الحضور', 'entry time', 'entrytime', 'check-in time'],
 } as const
 
 function columnIndex(headers: string[], field: keyof typeof fieldTerms) {
@@ -70,10 +71,10 @@ function excelDate(value: unknown): string {
 function parseStatus(value: unknown): AttendanceImportStatus {
   const normalized = compact(clean(value))
   if (!normalized) return 'UNMARKED'
-  if (['حاضر', 'حضور', 'present', 'p', '1'].includes(normalized)) return 'PRESENT'
+  if (['حاضر', 'حضور', 'دخول صحيح', 'دخول', 'present', 'p', '1'].includes(normalized) || normalized.includes('دخولصحيح')) return 'PRESENT'
   if (['غائب', 'غياب', 'absent', 'a', '0'].includes(normalized)) return 'ABSENT_UNEXCUSED'
   if (normalized.includes('بعذر') || normalized.includes('excused')) return 'ABSENT_EXCUSED'
-  if (normalized.includes('متاخر') || normalized.includes('تاخر') || normalized.includes('late')) return 'LATE'
+  if (normalized.includes('متاخر') || normalized.includes('تاخر') || normalized.includes('تاخير') || normalized.includes('late')) return 'LATE'
   if (/\d{1,2}[:：]\d{2}/.test(clean(value))) return 'PRESENT'
   return 'OTHER'
 }
@@ -103,7 +104,7 @@ function parseCount(value: unknown): number | null {
 
 function divisionCode(value: unknown) {
   const text = clean(value)
-  return text.match(/\b[1-3]\d{2}\b/)?.[0] ?? text
+  return text.match(/[1-3]\d{2}/)?.[0] ?? text
 }
 
 export function parseAttendanceWorkbook(input: string | ArrayBuffer, type: 'string' | 'array'): AttendanceImportRow[] {
@@ -133,6 +134,7 @@ export function parseAttendanceWorkbook(input: string | ArrayBuffer, type: 'stri
     const statusColumn = columnIndex(headers, 'status')
     const notesColumn = columnIndex(headers, 'notes')
     const lateCountColumn = columnIndex(headers, 'lateCount')
+    const entryTimeColumn = columnIndex(headers, 'entryTime')
     const dateColumns = dateColumn === null && statusColumn === null
       ? headers.map((header, index) => ({ index, date: excelDate(header) })).filter((item) => item.date)
       : []
@@ -150,9 +152,12 @@ export function parseAttendanceWorkbook(input: string | ArrayBuffer, type: 'stri
         sourceRow: headerIndex + index + 2,
         name,
         divisionCode: divisionColumn === null ? '' : divisionCode(row[divisionColumn]),
-        notes: notesColumn === null ? '' : clean(row[notesColumn]),
+        notes: [
+          notesColumn === null ? '' : clean(row[notesColumn]),
+          statusColumn !== null && compact(clean(row[statusColumn])).includes('تاخيرمكرر') ? 'الطالب متأخر عدة مرات' : '',
+        ].filter(Boolean).join(' | '),
         lateCount: lateCountColumn === null ? null : parseCount(row[lateCountColumn]),
-        entryTime: statusColumn === null ? null : parseEntryTime(row[statusColumn]),
+        entryTime: entryTimeColumn === null ? (statusColumn === null ? null : parseEntryTime(row[statusColumn])) : parseEntryTime(row[entryTimeColumn]),
       }
       if (dateColumns.length) dateColumns.forEach(({ index: dateIndex, date }) => {
         if (clean(row[dateIndex])) rows.push({ ...common, date, status: parseStatus(row[dateIndex]), entryTime: parseEntryTime(row[dateIndex]) })
@@ -198,58 +203,39 @@ function similarity(left: string, right: string) {
 export function reviewAttendanceRows(rows: AttendanceImportRow[], students: AttendanceImportStudent[]): AttendanceImportReview[] {
   return rows.map((row) => {
     if (!row.date || !row.name || !row.status) return { row, exactMatch: null, candidates: [], reason: 'INVALID' }
-    
-    // Only match against active students (skip graduated ones)
+
     const activeStudents = students.filter((s) => s.isActive !== false)
-    
-    // Filter by division if specified
-    const divisionStudents = row.divisionCode ? activeStudents.filter((student) => student.divisionCode === row.divisionCode) : activeStudents
-    
     const sourceParts = nameParts(row.name)
     const sourceFirst = sourceParts[0]
-    const sourceMiddle = sourceParts.length > 2 ? sourceParts.slice(1, -1).join('') : sourceParts.length > 1 ? '' : sourceParts[0]
+    const sourceMiddle = sourceParts.length > 2 ? sourceParts.slice(1, -1).join('') : ''
     const sourceLast = sourceParts[sourceParts.length - 1]
-    
-    // Check if first, middle, and last names match
-    const sharesNameParts = (student: AttendanceImportStudent) => {
+
+    const nameMatchScore = (student: AttendanceImportStudent) => {
       const studentParts = nameParts(student.fullName)
-      if (!sourceFirst || !sourceLast) return false
-      
+      if (!sourceFirst || !sourceLast || studentParts.length < sourceParts.length) return 0
       const studentFirst = studentParts[0]
       const studentLast = studentParts[studentParts.length - 1]
-      const studentMiddle = studentParts.length > 2 ? studentParts.slice(1, -1).join('') : studentParts.length > 1 ? '' : studentParts[0]
-      
-      // First and last name must match
-      const firstLastMatch = studentFirst === sourceFirst && studentLast === sourceLast
-      
-      // If we have middle names, they should also match (or one is empty)
-      if (sourceMiddle && studentMiddle) {
-        return firstLastMatch && studentMiddle === sourceMiddle
-      }
-      
-      return firstLastMatch
+      const studentMiddle = studentParts.length > 2 ? studentParts.slice(1, -1).join('') : ''
+      if (studentFirst !== sourceFirst || (sourceMiddle && studentMiddle !== sourceMiddle)) return 0
+      const lastScore = similarity(sourceLast, studentLast)
+      return lastScore >= 0.65 ? similarity(row.name, student.fullName) : 0
     }
-    
-    // Look for exact perfect match (all parts match with high similarity)
-    const exactMatch = divisionStudents
-      .filter(sharesNameParts)
-      .map((student) => ({ student, score: similarity(row.name, student.fullName) }))
-      .find(({ score }) => score >= 0.95) // 95% similarity for exact match
-      ?.student ?? null
+
+    const matches = activeStudents
+      .map((student) => ({ student, score: nameMatchScore(student), sameDivision: Boolean(row.divisionCode && student.divisionCode === row.divisionCode) }))
+      .filter((match) => match.score >= MINIMUM_NAME_CONFIDENCE)
+      .sort((left, right) => Number(right.sameDivision) - Number(left.sameDivision) || right.score - left.score)
+
+    const exactMatch = matches.find(({ score }) => score >= 0.95)?.student ?? null
     
     if (exactMatch) return { row, exactMatch, candidates: [], reason: 'EXACT', approvalConfirmed: true }
-    
-    // Look for approximate matches that need user confirmation (checkpoint)
-    const approximateCandidates = divisionStudents
-      .filter(sharesNameParts)
-      .map((student) => ({ ...student, score: similarity(row.name, student.fullName) }))
-      .filter((student) => student.score >= MINIMUM_NAME_CONFIDENCE)
-      .sort((left, right) => right.score - left.score)
+
+    const approximateCandidates = matches
+      .map(({ student, score }) => ({ ...student, score }))
       .slice(0, 5)
     
     if (approximateCandidates.length) return { row, exactMatch: null, candidates: approximateCandidates, reason: 'NEEDS_APPROVAL', approvalConfirmed: false }
     
-    // Skip if not found (don't show anything)
     return { row, exactMatch: null, candidates: [], reason: 'SKIP' }
   })
 }

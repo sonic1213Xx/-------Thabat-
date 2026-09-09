@@ -38,7 +38,7 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const filteredReviews = useMemo(() => reviews.filter((review) => review.reason !== 'SKIP' && (divisionFilter === "ALL" || review.row.divisionCode === divisionFilter)), [reviews, divisionFilter]);
+  const filteredReviews = useMemo(() => reviews.filter((review) => divisionFilter === "ALL" || review.row.divisionCode === divisionFilter), [reviews, divisionFilter]);
   const approvalRows = filteredReviews.filter((review) => review.reason === "NEEDS_APPROVAL");
   const selectedCount = filteredReviews.filter((review) => {
     if (review.reason === "EXACT") return true;
@@ -58,6 +58,9 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
       // Pre-select EXACT matches
       setSelectedMatches(Object.fromEntries(nextReviews.filter((review) => review.reason === "EXACT" && review.exactMatch).map((review) => [review.row.sourceRow, review.exactMatch!.id])));
       setApprovalChecked({});
+      if (!nextReviews.some((review) => review.reason !== "SKIP")) {
+        setError("تمت قراءة الملف، لكن لم تتم مطابقة أي اسم مع الطلاب المسجلين. تحقق من الأسماء والشعب.");
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "تعذر قراءة الملف.");
     }
@@ -75,13 +78,14 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
     const records = filteredReviews.flatMap((review) => {
       // EXACT matches are auto-approved
       if (review.reason === "EXACT" && review.exactMatch) {
-        return [{ studentId: review.exactMatch.id, status: review.row.status, date: review.row.date, notes: review.row.notes, entryTime: review.row.entryTime ?? undefined, divisionId: review.row.divisionCode }];
+        return [{ studentId: review.exactMatch.id, status: review.row.status, date: review.row.date, notes: review.row.notes, entryTime: review.row.entryTime ?? undefined, divisionId: review.exactMatch.divisionCode ?? review.row.divisionCode }];
       }
       // NEEDS_APPROVAL requires checkbox to be checked
       if (review.reason === "NEEDS_APPROVAL" && approvalChecked[review.row.sourceRow]) {
         const selectedId = selectedMatches[review.row.sourceRow];
         if (selectedId) {
-          return [{ studentId: selectedId, status: review.row.status, date: review.row.date, notes: review.row.notes, entryTime: review.row.entryTime ?? undefined, divisionId: review.row.divisionCode }];
+          const selectedStudent = review.candidates.find((candidate) => candidate.id === selectedId);
+          return [{ studentId: selectedId, status: review.row.status, date: review.row.date, notes: review.row.notes, entryTime: review.row.entryTime ?? undefined, divisionId: selectedStudent?.divisionCode ?? review.row.divisionCode }];
         }
       }
       return [];
@@ -151,6 +155,6 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
 
 function ReviewRow({ review, selectedId, onSelect, isApprovalChecked, onApprovalToggle }: { review: AttendanceImportReview; selectedId?: string; onSelect: (studentId: string) => void; isApprovalChecked?: boolean; onApprovalToggle?: (checked: boolean) => void }) {
   const isAccepted = review.reason === "EXACT";
-  const status = review.reason === "EXACT" ? "مطابقة مباشرة" : review.reason === "NEEDS_APPROVAL" ? "يحتاج تأكيد" : "بيانات ناقصة";
-  return <tr className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2">{review.row.sourceRow}</td><td className="px-3 py-2 font-medium">{review.row.name}</td><td className="px-3 py-2">{review.row.divisionCode || "-"}</td><td className="px-3 py-2">{review.row.date || "-"}</td><td className="px-3 py-2">{statusLabel[review.row.status]}</td><td className="max-w-64 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">{review.row.notes || "-"}</td><td className="min-w-64 px-3 py-2">{review.reason === "EXACT" ? <label className="inline-flex items-center gap-2 text-emerald-700"><input type="checkbox" checked={true} disabled /><Check className="h-4 w-4" />{review.exactMatch?.fullName}</label> : review.reason === "NEEDS_APPROVAL" ? <div className="space-y-2"><div className="flex items-center gap-2"><input type="checkbox" checked={isApprovalChecked ?? false} onChange={(event) => onApprovalToggle?.(event.target.checked)} className="rounded border-slate-300" /><span className="text-xs font-medium text-slate-600 dark:text-slate-300">أؤكد أن هذا هو الطالب</span></div><select value={selectedId ?? ""} onChange={(event) => onSelect(event.target.value)} disabled={!isApprovalChecked} className="w-full rounded-md border border-amber-300 bg-amber-50 px-2 py-1 disabled:opacity-50 dark:bg-amber-950/30"><option value="">{status}</option>{review.candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.fullName} ({Math.round(candidate.score * 100)}%)</option>)}</select></div> : <span className={isAccepted ? "text-emerald-700" : "text-slate-500"}>{status}</span>}</td></tr>;
+  const status = review.reason === "EXACT" ? "مطابقة مباشرة" : review.reason === "NEEDS_APPROVAL" ? "يحتاج تأكيد" : review.reason === "SKIP" ? "لا توجد مطابقة" : "بيانات ناقصة";
+  return <tr className="border-t border-slate-200 dark:border-slate-800"><td className="px-3 py-2">{review.row.sourceRow}</td><td className="px-3 py-2 font-medium">{review.row.name}</td><td className="px-3 py-2">{review.row.divisionCode || "-"}</td><td className="px-3 py-2">{review.row.date || "-"}</td><td className="px-3 py-2">{statusLabel[review.row.status]}</td><td className="max-w-64 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">{review.row.notes || "-"}</td><td className="min-w-64 px-3 py-2">{review.reason === "EXACT" ? <label className="inline-flex items-center gap-2 text-emerald-700"><input type="checkbox" checked={true} disabled /><Check className="h-4 w-4" />{review.exactMatch?.fullName} ({review.exactMatch?.divisionCode || "-"})</label> : review.reason === "NEEDS_APPROVAL" ? <div className="space-y-2"><div className="flex items-center gap-2"><input type="checkbox" checked={isApprovalChecked ?? false} onChange={(event) => onApprovalToggle?.(event.target.checked)} className="rounded border-slate-300" /><span className="text-xs font-medium text-slate-600 dark:text-slate-300">أؤكد أن هذا هو الطالب</span></div><select value={selectedId ?? ""} onChange={(event) => onSelect(event.target.value)} disabled={!isApprovalChecked} className="w-full rounded-md border border-amber-300 bg-amber-50 px-2 py-1 disabled:opacity-50 dark:bg-amber-950/30"><option value="">{status}</option>{review.candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.fullName} ({candidate.divisionCode || "-"}, {Math.round(candidate.score * 100)}%)</option>)}</select></div> : <span className={isAccepted ? "text-emerald-700" : "text-slate-500"}>{status}</span>}</td></tr>;
 }
