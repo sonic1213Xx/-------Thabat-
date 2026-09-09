@@ -523,7 +523,11 @@ export default function AttendancePage() {
             </button>}
           </div>
         </div>
-        <div className="mt-2 flex max-w-full items-center gap-1.5 overflow-x-auto pb-0.5 md:mt-3 md:flex-wrap md:gap-2 md:overflow-visible">
+        <div className="hidden md:mt-3 md:flex md:items-center md:justify-end md:gap-2">
+          <span className="text-sm font-semibold">{text.skip}</span>
+          <StyledSelect value={selectedDivision} onValueChange={selectDivision} options={[{ value: "ALL", label: text.all }, ...divisions.map((group) => ({ value: group.code, label: group.code }))]} className="h-9 w-44 rounded-lg px-2 text-xs" />
+        </div>
+        <div className="mt-2 flex max-w-full items-center gap-1.5 overflow-x-auto pb-0.5 md:hidden">
           <span className="shrink-0 text-xs font-semibold md:text-sm">{text.skip}</span>
           <button
             type="button"
