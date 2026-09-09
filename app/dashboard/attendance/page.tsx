@@ -95,6 +95,7 @@ export default function AttendancePage() {
   const [templateSelectionReady, setTemplateSelectionReady] = useState(false);
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
   const [desktopHeaderCompact, setDesktopHeaderCompact] = useState(false);
+  const desktopHeaderCompactRef = useRef(false);
   const [exportType, setExportType] = useState<"EXCEL" | "PDF">("EXCEL");
   const [exportCalendar, setExportCalendar] = useState<AttendanceCalendar>("both");
   const [isExporting, setIsExporting] = useState(false);
@@ -134,6 +135,8 @@ export default function AttendancePage() {
     const scrollContainer = document.querySelector<HTMLElement>(".dashboard-main");
     if (!scrollContainer) return;
     let previousScrollY = scrollContainer.scrollTop;
+    let downwardDistance = 0;
+    let upwardDistance = 0;
     let frame = 0;
     const handleScroll = () => {
       cancelAnimationFrame(frame);
@@ -141,9 +144,30 @@ export default function AttendancePage() {
         if (!window.matchMedia("(min-width: 768px)").matches) return;
         const currentScrollY = scrollContainer.scrollTop;
         const scrollDelta = currentScrollY - previousScrollY;
-        if (currentScrollY <= 96) setDesktopHeaderCompact(false);
-        else if (scrollDelta > 2) setDesktopHeaderCompact(true);
-        else if (scrollDelta < -2) setDesktopHeaderCompact(false);
+        if (currentScrollY <= 96) {
+          downwardDistance = 0;
+          upwardDistance = 0;
+          if (desktopHeaderCompactRef.current) {
+            desktopHeaderCompactRef.current = false;
+            setDesktopHeaderCompact(false);
+          }
+        } else if (scrollDelta > 0) {
+          downwardDistance += scrollDelta;
+          upwardDistance = 0;
+          if (downwardDistance >= 48 && !desktopHeaderCompactRef.current) {
+            desktopHeaderCompactRef.current = true;
+            setDesktopHeaderCompact(true);
+            downwardDistance = 0;
+          }
+        } else if (scrollDelta < 0) {
+          upwardDistance -= scrollDelta;
+          downwardDistance = 0;
+          if (upwardDistance >= 64 && desktopHeaderCompactRef.current) {
+            desktopHeaderCompactRef.current = false;
+            setDesktopHeaderCompact(false);
+            upwardDistance = 0;
+          }
+        }
         previousScrollY = currentScrollY;
       });
     };
