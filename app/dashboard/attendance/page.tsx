@@ -469,7 +469,7 @@ export default function AttendancePage() {
 
   return (
     <div className="attendance-page space-y-6" dir={dir}>
-      <header className="relative isolate sticky top-0 z-50 -mx-4 mb-0 shrink-0 overflow-hidden border-b border-slate-200 bg-slate-50 px-3 py-2 shadow-lg dark:border-slate-800 dark:bg-slate-950 md:-mx-6 md:mb-2 md:px-6 md:py-4">
+      <header className="relative isolate sticky top-0 z-50 -mx-4 -mt-3 mb-0 shrink-0 overflow-hidden border-b border-slate-200 bg-slate-50 px-3 py-2 shadow-lg dark:border-slate-800 dark:bg-slate-950 md:-mx-6 md:-mt-6 md:mb-2 md:px-6 md:py-4">
         <div className="flex flex-wrap items-center justify-between gap-2 md:gap-4">
           <div className="flex items-center gap-2 md:gap-3">
             <CalendarCheck className="h-6 w-6 text-emerald-600 md:h-7 md:w-7" />
