@@ -131,13 +131,15 @@ export default function AttendancePage() {
     };
   }, [saving]);
   useEffect(() => {
-    let previousScrollY = window.scrollY;
+    const scrollContainer = document.querySelector<HTMLElement>(".dashboard-main");
+    if (!scrollContainer) return;
+    let previousScrollY = scrollContainer.scrollTop;
     let frame = 0;
     const handleScroll = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (!window.matchMedia("(min-width: 768px)").matches) return;
-        const currentScrollY = window.scrollY;
+        const currentScrollY = scrollContainer.scrollTop;
         const scrollDelta = currentScrollY - previousScrollY;
         if (currentScrollY <= 96) setDesktopHeaderCompact(false);
         else if (scrollDelta > 2) setDesktopHeaderCompact(true);
@@ -145,10 +147,10 @@ export default function AttendancePage() {
         previousScrollY = currentScrollY;
       });
     };
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", handleScroll);
+      scrollContainer.removeEventListener("scroll", handleScroll);
     };
   }, []);
   const assigned = profile?.assigned_divisions ?? [];
@@ -491,7 +493,7 @@ export default function AttendancePage() {
 
   return (
     <div className="attendance-page space-y-6" dir={dir}>
-      <header className={`isolate sticky top-0 z-30 -mx-4 overflow-hidden border-b border-slate-200 bg-slate-50 px-3 py-2 shadow-sm transition-[padding] duration-300 dark:border-slate-800 dark:bg-slate-950 md:top-0 md:-mx-6 md:px-6 ${desktopHeaderCompact ? "md:py-2" : "md:py-4"}`}>
+      <header className={`isolate sticky top-0 z-30 -mx-4 overflow-hidden border-b border-slate-200 bg-slate-50 px-3 py-2 shadow-sm transition-[padding] duration-300 dark:border-slate-800 dark:bg-slate-950 md:top-0 md:-mx-6 md:overflow-visible md:px-6 ${desktopHeaderCompact ? "md:py-2" : "md:py-4"}`}>
         <div className={`flex flex-wrap items-center justify-between gap-2 transition-[max-height,opacity,transform] duration-300 md:gap-4 ${desktopHeaderCompact ? "md:max-h-0 md:-translate-y-2 md:overflow-hidden md:opacity-0" : "md:max-h-96 md:translate-y-0 md:opacity-100"}`}>
           <div className="flex items-center gap-2 md:gap-3">
             <CalendarCheck className="h-6 w-6 text-emerald-600 md:h-7 md:w-7" />
