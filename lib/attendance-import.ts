@@ -154,7 +154,7 @@ export function parseAttendanceWorkbook(input: string | ArrayBuffer, type: 'stri
         divisionCode: divisionColumn === null ? '' : divisionCode(row[divisionColumn]),
         notes: [
           notesColumn === null ? '' : clean(row[notesColumn]),
-          statusColumn !== null && compact(clean(row[statusColumn])).includes('تاخيرمكرر') ? 'الطالب متأخر عدة مرات' : '',
+          statusColumn !== null && compact(clean(row[statusColumn])).includes('تاخيرمكرر') ? 'الطالب متأخر عدة مرات بواسطة جهاز البصمة' : '',
         ].filter(Boolean).join(' | '),
         lateCount: lateCountColumn === null ? null : parseCount(row[lateCountColumn]),
         entryTime: entryTimeColumn === null ? (statusColumn === null ? null : parseEntryTime(row[statusColumn])) : parseEntryTime(row[entryTimeColumn]),

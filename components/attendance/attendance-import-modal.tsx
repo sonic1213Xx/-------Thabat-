@@ -46,6 +46,36 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
     return false;
   }).length;
 
+  const buildRecords = () => {
+    const records: Array<{ studentId: string; status: string; date: string; notes: string; entryTime?: string; divisionId: string }> = [];
+    const scannedByDate = new Map<string, Set<string>>();
+    const importedDivisions = new Set<string>();
+
+    filteredReviews.forEach((review) => {
+      const date = review.row.date;
+      let matchedStudent: AttendanceImportStudent | undefined;
+      if (review.reason === "EXACT" && review.exactMatch) matchedStudent = review.exactMatch;
+      if (review.reason === "NEEDS_APPROVAL" && approvalChecked[review.row.sourceRow]) matchedStudent = review.candidates.find((candidate) => candidate.id === selectedMatches[review.row.sourceRow]);
+      if (review.row.divisionCode) importedDivisions.add(review.row.divisionCode);
+      if (matchedStudent?.divisionCode) importedDivisions.add(matchedStudent.divisionCode);
+      if (!matchedStudent) return;
+      const scanned = scannedByDate.get(date) ?? new Set<string>();
+      scanned.add(matchedStudent.id);
+      scannedByDate.set(date, scanned);
+      records.push({ studentId: matchedStudent.id, status: review.row.status, date, notes: review.row.notes, entryTime: review.row.entryTime ?? undefined, divisionId: matchedStudent.divisionCode ?? review.row.divisionCode });
+    });
+
+    Array.from(new Set(filteredReviews.map((review) => review.row.date).filter(Boolean))).forEach((date) => {
+      const scanned = scannedByDate.get(date) ?? new Set<string>();
+      students.filter((student) => student.isActive !== false && student.divisionCode && importedDivisions.has(student.divisionCode) && !scanned.has(student.id)).forEach((student) => {
+        records.push({ studentId: student.id, status: "ABSENT_UNEXCUSED", date, notes: "لم يتم تسجيل بصمة", divisionId: student.divisionCode! });
+      });
+    });
+    return records;
+  };
+
+  const estimatedRecords = buildRecords();
+
   const parseFile = async (file: File) => {
     setError("");
     try {
@@ -75,21 +105,7 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
   };
 
   const save = async () => {
-    const records = filteredReviews.flatMap((review) => {
-      // EXACT matches are auto-approved
-      if (review.reason === "EXACT" && review.exactMatch) {
-        return [{ studentId: review.exactMatch.id, status: review.row.status, date: review.row.date, notes: review.row.notes, entryTime: review.row.entryTime ?? undefined, divisionId: review.exactMatch.divisionCode ?? review.row.divisionCode }];
-      }
-      // NEEDS_APPROVAL requires checkbox to be checked
-      if (review.reason === "NEEDS_APPROVAL" && approvalChecked[review.row.sourceRow]) {
-        const selectedId = selectedMatches[review.row.sourceRow];
-        if (selectedId) {
-          const selectedStudent = review.candidates.find((candidate) => candidate.id === selectedId);
-          return [{ studentId: selectedId, status: review.row.status, date: review.row.date, notes: review.row.notes, entryTime: review.row.entryTime ?? undefined, divisionId: selectedStudent?.divisionCode ?? review.row.divisionCode }];
-        }
-      }
-      return [];
-    });
+    const records = estimatedRecords;
     if (!records.length) {
       setError("اختر مطابقة واحدة على الأقل قبل الحفظ.");
       return;
@@ -136,7 +152,7 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
           <div className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
               <div className="flex items-end gap-3"><label className="text-sm font-semibold">تصفية الشعبة</label><StyledSelect value={divisionFilter} onValueChange={setDivisionFilter} options={[{ value: "ALL", label: "كل الشعب" }, ...divisions.map((division) => ({ value: division, label: division }))]} /></div>
-            <div className="flex flex-wrap items-center gap-3 text-sm"><span>سيتم استيراد: {selectedCount}</span><button type="button" onClick={selectAllSuggestions} disabled={!approvalRows.length} className="rounded-md border border-emerald-600 px-3 py-2 font-semibold text-emerald-700 disabled:opacity-50">تأكيد الكل</button><button type="button" onClick={deselectAll} disabled={!Object.keys(approvalChecked).some((key) => approvalChecked[Number(key)])} className="rounded-md border border-slate-400 px-3 py-2 font-semibold text-slate-700 disabled:opacity-50 dark:text-slate-200">إلغاء الكل</button></div>
+            <div className="flex flex-wrap items-center gap-3 text-sm"><span>سيتم استيراد: {estimatedRecords.length} ({estimatedRecords.filter((record) => record.status === "ABSENT_UNEXCUSED").length} غياب لعدم تسجيل البصمة)</span><button type="button" onClick={selectAllSuggestions} disabled={!filteredReviews.length} className="rounded-md border border-emerald-600 px-3 py-2 font-semibold text-emerald-700 disabled:opacity-50">تأكيد الكل</button><button type="button" onClick={deselectAll} disabled={!filteredReviews.length} className="rounded-md border border-slate-400 px-3 py-2 font-semibold text-slate-700 disabled:opacity-50 dark:text-slate-200">إلغاء الكل</button></div>
             </div>
             <div className="max-h-[28rem] overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
               <table className="min-w-full text-sm">
@@ -144,7 +160,7 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
                 <tbody>{filteredReviews.map((review) => <ReviewRow key={review.row.sourceRow} review={review} selectedId={selectedMatches[review.row.sourceRow]} onSelect={(studentId) => setSelectedMatches((current) => ({ ...current, [review.row.sourceRow]: studentId }))} isApprovalChecked={approvalChecked[review.row.sourceRow] ?? false} onApprovalToggle={(checked) => setApprovalChecked((current) => ({ ...current, [review.row.sourceRow]: checked }))} />)}</tbody>
               </table>
             </div>
-            <div className="flex flex-wrap justify-end gap-3"><button type="button" onClick={() => setReviews([])} className="rounded-md bg-slate-100 px-4 py-2 text-sm dark:bg-slate-800">ملف جديد</button><button type="button" onClick={() => void save()} disabled={saving || !selectedCount} className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving && <Loader2 className="h-4 w-4 animate-spin" />} حفظ الحضور</button></div>
+            <div className="flex flex-wrap justify-end gap-3"><button type="button" onClick={() => setReviews([])} className="rounded-md bg-slate-100 px-4 py-2 text-sm dark:bg-slate-800">ملف جديد</button><button type="button" onClick={() => void save()} disabled={saving || !estimatedRecords.length} className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving && <Loader2 className="h-4 w-4 animate-spin" />} حفظ الحضور</button></div>
           </div>
         )}
         {error && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}

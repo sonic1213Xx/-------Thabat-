@@ -53,10 +53,10 @@ const options = (english: boolean, classroom: boolean) => [
   { value: "LATE", label: english ? "Late" : "متأخر" },
   ...(classroom ? [{ value: "ESCAPED", label: english ? "Escaped" : "هروب" }] : []),
 ];
-  const [startHour, startMinute] = getConfiguredLateTime().split(":").map(Number);
-  const schoolStartMinutes = startHour * 60 + startMinute;
 const lateDuration = (entryTime: string, english: boolean) => {
   const [hour, minute] = entryTime.split(":").map(Number);
+  const [startHour, startMinute] = getConfiguredLateTime().split(":").map(Number);
+  const schoolStartMinutes = startHour * 60 + startMinute;
   const total = hour * 60 + minute - schoolStartMinutes;
   if (total <= 0) return english ? "after start time" : "بعد بداية الدوام";
   return total >= 60 ? `${Math.floor(total / 60)} ${english ? "hour" : "ساعة"} ${total % 60} ${english ? "minutes" : "دقيقة"}` : `${total} ${english ? "minutes" : "دقيقة"}`;
@@ -256,34 +256,33 @@ export default function AttendancePage() {
     void load().catch(() => setMessage("تعذر تحميل الحضور."));
   }, [date, mode, divisionKey, session?.id, attendanceRevision, selectedSubject]);
 
-  const setStudentStatus = (studentId: string, status: Status) => {
-    if (statuses[studentId] === "LEFT_WITH_PERMISSION") return;
+  const applyStatus = (studentIds: string[], status: Status) => {
+    const eligibleIds = studentIds.filter((studentId) => statuses[studentId] !== "LEFT_WITH_PERMISSION");
     const entryTime = status === "LATE" ? new Date().toTimeString().slice(0, 5) : null;
-    setStatuses((current) => ({ ...current, [studentId]: status }));
-    setEntryTimes((current) => ({ ...current, [studentId]: entryTime }));
-    // Only add automatic late note for school attendance, not classroom attendance
-    if (status === "LATE" && !isClassroomPage) setNotes((current) => ({ ...current, [studentId]: `${english ? "Entry time" : "وقت الدخول"}: ${entryTime} | ${english ? "Late by" : "التأخر"}: ${lateDuration(entryTime!, english)}` }));
+    setStatuses((current) => ({ ...current, ...Object.fromEntries(eligibleIds.map((studentId) => [studentId, status])) }));
+    setEntryTimes((current) => ({ ...current, ...Object.fromEntries(eligibleIds.map((studentId) => [studentId, entryTime])) }));
+    if (status === "LATE" && !isClassroomPage) setNotes((current) => ({ ...current, ...Object.fromEntries(eligibleIds.map((studentId) => [studentId, `${english ? "Entry time" : "وقت الدخول"}: ${entryTime} | ${english ? "Late by" : "التأخر"}: ${lateDuration(entryTime!, english)}`])) }));
   };
-  const setDivisionStatus = (code: string, status: Status) =>
+  const setStudentStatus = (studentId: string, status: Status) => applyStatus([studentId], status);
+  const setDivisionStatus = (code: string, status: Status) => applyStatus(students.filter((student) => student.divisionCode === code).map((student) => student.id), status);
+  const setMasterStatus = (status: Status) => applyStatus(students.map((student) => student.id), status);
+  const clearMasterStatus = () => {
+    const hasNotes = Object.values(notes).some((note) => note.trim());
+    if (hasNotes && !window.confirm("تنبيه: سيتم حذف جميع الملاحظات وتفريغ حالات الحضور. هل تريد المتابعة؟")) return;
+    const eligibleStudents = students.filter((student) => statuses[student.id] !== "LEFT_WITH_PERMISSION");
     setStatuses((current) => ({
       ...current,
-      ...Object.fromEntries(
-        students
-          .filter((student) => student.divisionCode === code)
-          .filter((student) => statuses[student.id] !== "LEFT_WITH_PERMISSION")
-          .map((student) => [student.id, status]),
-      ),
+      ...Object.fromEntries(eligibleStudents.map((student) => [student.id, null])),
     }));
-  const setMasterStatus = (status: Status) =>
-    setStatuses((current) => ({
+    setNotes((current) => ({
       ...current,
-      ...Object.fromEntries(students.filter((student) => statuses[student.id] !== "LEFT_WITH_PERMISSION").map((student) => [student.id, status])),
+      ...Object.fromEntries(students.map((student) => [student.id, ""])),
     }));
-  const clearMasterStatus = () =>
-    setStatuses((current) => ({
+    setEntryTimes((current) => ({
       ...current,
-      ...Object.fromEntries(students.filter((student) => current[student.id] !== "LEFT_WITH_PERMISSION").map((student) => [student.id, null])),
+      ...Object.fromEntries(students.map((student) => [student.id, null])),
     }));
+  };
   const save = async () => {
     if (!session?.id) return;
     const currentRecords = divisions.flatMap((group) =>

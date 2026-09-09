@@ -381,21 +381,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Student ID mismatch' }, { status: 400 })
     }
     
-    // Build new notes with VP edit notation
-    const vpEditNote = `تم التعديل من قبل الوكيل - ${user.name}`
-    let newNotes = body.notes || existing.notes || ''
-    
-    // Count how many times this record has been edited by checking notes
-    const editMatches = (newNotes + ' ' + (existing.notes || '')).match(/تم التعديل من قبل الوكيل/g) || []
+    const shouldMarkVicePrincipalEdit = vicePrincipalRoles.includes(user.role)
+    const vpEditNote = 'تم التعديل بواسطة الوكيل'
+    let newNotes = body.notes?.trim() || existing.notes || ''
+    const editMatches = (newNotes + ' ' + (existing.notes || '')).match(/تم التعديل بواسطة الوكيل/g) || []
     const editCount = editMatches.length + 1
-    
-    // Append VP edit note with timestamp
-    const timestamp = new Date().toLocaleString('ar-SA')
-    if (newNotes && !newNotes.includes(vpEditNote)) {
-      newNotes = `${newNotes} | ${vpEditNote} (مرة ${editCount}) - ${timestamp}`
-    } else if (!newNotes) {
-      newNotes = `${vpEditNote} (مرة ${editCount}) - ${timestamp}`
-    }
+    if (shouldMarkVicePrincipalEdit && !newNotes.includes(vpEditNote)) newNotes = [newNotes, vpEditNote].filter(Boolean).join(' | ')
     
     // Update the attendance record
     const updated = await prisma.attendance.update({

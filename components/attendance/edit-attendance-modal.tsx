@@ -135,7 +135,7 @@ export function EditAttendanceModal({
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || status === currentStatus}
+            disabled={saving || (status === currentStatus && notes === currentNotes)}
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
