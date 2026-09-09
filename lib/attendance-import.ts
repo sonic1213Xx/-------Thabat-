@@ -111,17 +111,21 @@ export function parseAttendanceWorkbook(input: string | ArrayBuffer, type: 'stri
   const rows: AttendanceImportRow[] = []
   workbook.SheetNames.forEach((sheetName) => {
     const values = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' }) as unknown[][]
+    console.log(`[ATTENDANCE IMPORT] Sheet "${sheetName}" has ${values.length} total rows`)
     const headerIndex = values.slice(0, 40).reduce((best, row, index) => {
       const headers = row.map(clean)
       const score = (Object.keys(fieldTerms) as Array<keyof typeof fieldTerms>).reduce((total, field) => total + (columnIndex(headers, field) === null ? 0 : field === 'name' ? 3 : 1), 0)
       return score > best.score ? { index, score } : best
     }, { index: 0, score: -1 }).index
     const headers = (values[headerIndex] ?? []).map(clean)
+    console.log(`[ATTENDANCE IMPORT] Header row at index ${headerIndex}:`, headers)
     let nameColumn = columnIndex(headers, 'name')
+    console.log(`[ATTENDANCE IMPORT] Name column detected at index: ${nameColumn}`)
     
     // Fallback: if no name column found, assume first non-empty column with text is the name
     if (nameColumn === null) {
       nameColumn = 0
+      console.log(`[ATTENDANCE IMPORT] Using fallback: first column (0) as name column`)
     }
     
     const divisionColumn = columnIndex(headers, 'division')
@@ -132,9 +136,16 @@ export function parseAttendanceWorkbook(input: string | ArrayBuffer, type: 'stri
     const dateColumns = dateColumn === null && statusColumn === null
       ? headers.map((header, index) => ({ index, date: excelDate(header) })).filter((item) => item.date)
       : []
+    console.log(`[ATTENDANCE IMPORT] Columns - Division: ${divisionColumn}, Date: ${dateColumn}, Status: ${statusColumn}`)
+    
+    let rowCount = 0
     values.slice(headerIndex + 1).forEach((row, index) => {
       const name = clean(row[nameColumn])
-      if (!name || headerMatches(name, [...fieldTerms.name])) return
+      if (!name || headerMatches(name, [...fieldTerms.name])) {
+        if (!name) console.log(`[ATTENDANCE IMPORT] Skipping row ${headerIndex + index + 2}: empty name`)
+        return
+      }
+      rowCount++
       const common = {
         sourceRow: headerIndex + index + 2,
         name,
@@ -148,6 +159,7 @@ export function parseAttendanceWorkbook(input: string | ArrayBuffer, type: 'stri
       })
       else rows.push({ ...common, date: dateColumn === null ? '' : excelDate(row[dateColumn]), status: statusColumn === null ? 'PRESENT' : parseStatus(row[statusColumn]) })
     })
+    console.log(`[ATTENDANCE IMPORT] Extracted ${rowCount} valid data rows from sheet "${sheetName}" (total rows in final array: ${rows.length})`)
   })
   const lateCounts = new Map<string, number>()
   rows.forEach((row) => {
