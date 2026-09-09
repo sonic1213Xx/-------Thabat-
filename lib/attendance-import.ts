@@ -38,12 +38,12 @@ const compact = (value: string) => value.normalize('NFKC').toLocaleLowerCase('ar
 const headerMatches = (header: string, terms: string[]) => terms.some((term) => compact(header).includes(compact(term)))
 
 const fieldTerms = {
-  name: ['اسم الطالب', 'اسم الطالبة', 'الاسم', 'student name', 'studentname', 'name'],
-  division: ['الشعبة', 'الفصل', 'الصف والفصل', 'division', 'class', 'section'],
-  date: ['التاريخ', 'اليوم', 'date', 'day'],
-  status: ['الحالة', 'الحضور', 'الغياب', 'status', 'attendance'],
-  notes: ['ملاحظات', 'ملاحظة', 'notes', 'note', 'remark'],
-  lateCount: ['عدد مرات التأخر', 'عدد التأخر', 'مرات التأخر', 'late count', 'latecount', 'tardies'],
+  name: ['اسم الطالب', 'اسم الطالبة', 'الاسم', 'اسم', 'طالب', 'student name', 'studentname', 'name', 'الاسم الكامل', 'الاسم كامل'],
+  division: ['الشعبة', 'الفصل', 'الصف والفصل', 'division', 'class', 'section', 'قسم', 'شعبة', 'صف'],
+  date: ['التاريخ', 'اليوم', 'date', 'day', 'اليوم', 'التاريخ الميلادي'],
+  status: ['الحالة', 'الحضور', 'الغياب', 'status', 'attendance', 'حالة الحضور', 'الحالة الحضور'],
+  notes: ['ملاحظات', 'ملاحظة', 'notes', 'note', 'remark', 'ملاحظ'],
+  lateCount: ['عدد مرات التأخر', 'عدد التأخر', 'مرات التأخر', 'late count', 'latecount', 'tardies', 'التأخر'],
 } as const
 
 function columnIndex(headers: string[], field: keyof typeof fieldTerms) {
@@ -117,8 +117,13 @@ export function parseAttendanceWorkbook(input: string | ArrayBuffer, type: 'stri
       return score > best.score ? { index, score } : best
     }, { index: 0, score: -1 }).index
     const headers = (values[headerIndex] ?? []).map(clean)
-    const nameColumn = columnIndex(headers, 'name')
-    if (nameColumn === null) return
+    let nameColumn = columnIndex(headers, 'name')
+    
+    // Fallback: if no name column found, assume first non-empty column with text is the name
+    if (nameColumn === null) {
+      nameColumn = 0
+    }
+    
     const divisionColumn = columnIndex(headers, 'division')
     const dateColumn = columnIndex(headers, 'date')
     const statusColumn = columnIndex(headers, 'status')
