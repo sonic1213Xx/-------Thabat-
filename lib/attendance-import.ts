@@ -18,6 +18,7 @@ export type AttendanceImportStudent = {
   id: string
   fullName: string
   divisionCode?: string | null
+  isActive?: boolean
 }
 
 export type AttendanceImportCandidate = AttendanceImportStudent & { score: number }
@@ -26,7 +27,8 @@ export type AttendanceImportReview = {
   row: AttendanceImportRow
   exactMatch: AttendanceImportStudent | null
   candidates: AttendanceImportCandidate[]
-  reason: 'EXACT' | 'REVIEW' | 'DIVISION_MISMATCH' | 'NO_MATCH' | 'INVALID'
+  reason: 'EXACT' | 'NEEDS_APPROVAL' | 'SKIP' | 'INVALID'
+  approvalConfirmed?: boolean
 }
 
 const MINIMUM_NAME_CONFIDENCE = 0.72
@@ -179,19 +181,58 @@ function similarity(left: string, right: string) {
 export function reviewAttendanceRows(rows: AttendanceImportRow[], students: AttendanceImportStudent[]): AttendanceImportReview[] {
   return rows.map((row) => {
     if (!row.date || !row.name || !row.status) return { row, exactMatch: null, candidates: [], reason: 'INVALID' }
-    const divisionStudents = row.divisionCode ? students.filter((student) => student.divisionCode === row.divisionCode) : students
+    
+    // Only match against active students (skip graduated ones)
+    const activeStudents = students.filter((s) => s.isActive !== false)
+    
+    // Filter by division if specified
+    const divisionStudents = row.divisionCode ? activeStudents.filter((student) => student.divisionCode === row.divisionCode) : activeStudents
+    
     const sourceParts = nameParts(row.name)
     const sourceFirst = sourceParts[0]
+    const sourceMiddle = sourceParts.length > 2 ? sourceParts.slice(1, -1).join('') : sourceParts.length > 1 ? '' : sourceParts[0]
     const sourceLast = sourceParts[sourceParts.length - 1]
-    const sharesFirstAndLast = (student: AttendanceImportStudent) => {
+    
+    // Check if first, middle, and last names match
+    const sharesNameParts = (student: AttendanceImportStudent) => {
       const studentParts = nameParts(student.fullName)
-      return Boolean(sourceFirst && sourceLast && studentParts[0] === sourceFirst && studentParts[studentParts.length - 1] === sourceLast)
+      if (!sourceFirst || !sourceLast) return false
+      
+      const studentFirst = studentParts[0]
+      const studentLast = studentParts[studentParts.length - 1]
+      const studentMiddle = studentParts.length > 2 ? studentParts.slice(1, -1).join('') : studentParts.length > 1 ? '' : studentParts[0]
+      
+      // First and last name must match
+      const firstLastMatch = studentFirst === sourceFirst && studentLast === sourceLast
+      
+      // If we have middle names, they should also match (or one is empty)
+      if (sourceMiddle && studentMiddle) {
+        return firstLastMatch && studentMiddle === sourceMiddle
+      }
+      
+      return firstLastMatch
     }
-    const exactMatch = divisionStudents.map((student) => ({ student, score: similarity(row.name, student.fullName) })).find(({ student, score }) => sharesFirstAndLast(student) && score >= MINIMUM_NAME_CONFIDENCE)?.student ?? null
-    if (exactMatch) return { row, exactMatch, candidates: [], reason: 'EXACT' }
-    const candidates = divisionStudents.filter(sharesFirstAndLast).map((student) => ({ ...student, score: similarity(row.name, student.fullName) })).filter((student) => student.score >= MINIMUM_NAME_CONFIDENCE).sort((left, right) => right.score - left.score).slice(0, 5)
-    if (candidates.length) return { row, exactMatch: null, candidates, reason: 'REVIEW' }
-    const nameMatchOutsideDivision = row.divisionCode && students.some(sharesFirstAndLast)
-    return { row, exactMatch: null, candidates: [], reason: nameMatchOutsideDivision ? 'DIVISION_MISMATCH' : 'NO_MATCH' }
+    
+    // Look for exact perfect match (all parts match with high similarity)
+    const exactMatch = divisionStudents
+      .filter(sharesNameParts)
+      .map((student) => ({ student, score: similarity(row.name, student.fullName) }))
+      .find(({ score }) => score >= 0.95) // 95% similarity for exact match
+      ?.student ?? null
+    
+    if (exactMatch) return { row, exactMatch, candidates: [], reason: 'EXACT', approvalConfirmed: true }
+    
+    // Look for approximate matches that need user confirmation (checkpoint)
+    const approximateCandidates = divisionStudents
+      .filter(sharesNameParts)
+      .map((student) => ({ ...student, score: similarity(row.name, student.fullName) }))
+      .filter((student) => student.score >= MINIMUM_NAME_CONFIDENCE)
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 5)
+    
+    if (approximateCandidates.length) return { row, exactMatch: null, candidates: approximateCandidates, reason: 'NEEDS_APPROVAL', approvalConfirmed: false }
+    
+    // Skip if not found (don't show anything)
+    return { row, exactMatch: null, candidates: [], reason: 'SKIP' }
   })
 }
