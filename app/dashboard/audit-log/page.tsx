@@ -22,6 +22,7 @@ const actionLabels: Record<string, { ar: string; en: string }> = {
   STUDENT_CREATED: { ar: 'إضافة طالب', en: 'Student created' }, STUDENT_UPDATED: { ar: 'تعديل بيانات طالب', en: 'Student updated' }, STUDENT_TRANSFERRED: { ar: 'نقل طالب', en: 'Student transferred' },
   WARNING_ISSUED: { ar: 'إصدار إنذار', en: 'Warning issued' }, INCIDENT_RECORDED: { ar: 'تسجيل واقعة', en: 'Incident recorded' }, GATE_PASS_ISSUED: { ar: 'إصدار تصريح خروج', en: 'Gate pass issued' },
   GRADEBOOK_SCORE_UPDATED: { ar: 'تحديث درجة', en: 'Grade updated' }, STUDENT_REFERRED_TO_VICE_PRINCIPAL: { ar: 'إحالة طالب لوكيل المدرسة', en: 'Student referred to vice principal' }, USER_LOGIN: { ar: 'تسجيل دخول', en: 'User signed in' }, BULK_IMPORT: { ar: 'استعادة من Excel', en: 'Bulk import' },
+  EDIT_ATTENDANCE: { ar: 'تعديل الحضور', en: 'Edit attendance' },
 }
 const typeLabels: Record<string, { ar: string; en: string }> = { Student: { ar: 'طلاب', en: 'Students' }, Warning: { ar: 'إنذارات', en: 'Warnings' }, Attendance: { ar: 'حضور', en: 'Attendance' }, Gradebook: { ar: 'درجات', en: 'Gradebook' }, Incident: { ar: 'وقائع', en: 'Incidents' }, GatePass: { ar: 'تصاريح', en: 'Gate passes' }, User: { ar: 'مستخدمون', en: 'Users' } }
 const roleLabels: Record<string, { ar: string; en: string }> = { PRINCIPAL: { ar: 'مدير المدرسة', en: 'Principal' }, VICE_PRINCIPAL: { ar: 'وكيل المدرسة', en: 'Vice principal' }, TEACHER: { ar: 'معلم', en: 'Teacher' } }
@@ -51,6 +52,7 @@ export default function AuditLogPage() {
   const [userId, setUserId] = useState('')
   const [userRole, setUserRole] = useState('')
   const [search, setSearch] = useState('')
+  const [showAbsentStudentsOnly, setShowAbsentStudentsOnly] = useState(false)
   const labels = english ? { eyebrow: 'Operations', title: 'Thabat Log', description: 'A clear timeline of important school operations.', filters: 'Filter activity', date: 'Date', type: 'Record type', action: 'Action', user: 'User', role: 'User role', all: 'All', results: 'results', clear: 'Clear filters', search: 'Search logs', searchPlaceholder: 'Search people, targets, or details', empty: 'No activity matches these filters.', loading: 'Loading activity...', operator: 'Operator', noDetails: 'No additional details', allUsers: 'All users', allRoles: 'All roles' } : { eyebrow: 'العمليات', title: 'سجل ثَبَت', description: 'خط زمني واضح لأهم العمليات والتغييرات داخل المدرسة.', filters: 'تصفية العمليات', date: 'التاريخ', type: 'نوع السجل', action: 'الإجراء', user: 'المستخدم', role: 'دور المستخدم', all: 'الكل', results: 'نتيجة', clear: 'مسح الفلاتر', search: 'بحث في السجل', searchPlaceholder: 'ابحث عن مستخدم أو هدف أو تفاصيل', empty: 'لا توجد عمليات تطابق هذه الفلاتر.', loading: 'جارٍ تحميل العمليات...', operator: 'المنفذ', noDetails: 'لا توجد تفاصيل إضافية', allUsers: 'جميع المستخدمين', allRoles: 'جميع الأدوار' }
 
   useEffect(() => {
@@ -75,10 +77,23 @@ export default function AuditLogPage() {
   }, [logs])
   const filteredLogs = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
-    return logs.filter((log) => (!userRole || log.userRole === userRole) && (!query || `${actionText(log.action, english)} ${log.targetName ?? ''} ${log.userName ?? ''} ${detailText(log.details, english)}`.toLocaleLowerCase().includes(query)))
-  }, [english, logs, search, userRole])
-  const hasFilters = Boolean(dateOnly || targetType || action || userId || userRole || search)
-  const clearFilters = () => { setDateOnly(''); setTargetType(''); setAction(''); setUserId(''); setUserRole(''); setSearch('') }
+    let filtered = logs.filter((log) => (!userRole || log.userRole === userRole) && (!query || `${actionText(log.action, english)} ${log.targetName ?? ''} ${log.userName ?? ''} ${detailText(log.details, english)}`.toLocaleLowerCase().includes(query)))
+    
+    if (showAbsentStudentsOnly) {
+      filtered = filtered.filter((log) => {
+        // Show EDIT_ATTENDANCE logs that involve absent statuses
+        if (log.action === 'EDIT_ATTENDANCE') {
+          const details = log.targetName ?? ''
+          return details.includes('ABSENT') || details.includes('غائب')
+        }
+        return false
+      })
+    }
+    
+    return filtered
+  }, [english, logs, search, userRole, showAbsentStudentsOnly])
+  const hasFilters = Boolean(dateOnly || targetType || action || userId || userRole || search || showAbsentStudentsOnly)
+  const clearFilters = () => { setDateOnly(''); setTargetType(''); setAction(''); setUserId(''); setUserRole(''); setSearch(''); setShowAbsentStudentsOnly(false) }
 
   return <div className="space-y-6" dir={dir}>
     <header className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm"><div className="relative z-10 flex flex-wrap items-end justify-between gap-5"><div><div className="mb-3 flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white"><Activity className="h-5 w-5" /></span><span className="text-sm font-semibold uppercase tracking-wider text-primary">{labels.eyebrow}</span></div><h1 className="text-3xl font-bold tracking-tight">{labels.title}</h1><p className="mt-2 max-w-xl text-sm text-card-foreground/65">{labels.description}</p></div><div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/50 px-4 py-3"><FileText className="h-5 w-5 text-primary" /><div><p className="text-2xl font-bold leading-none">{filteredLogs.length}</p><p className="mt-1 text-xs text-card-foreground/60">{labels.results}</p></div></div></div></header>
@@ -89,7 +104,7 @@ export default function AuditLogPage() {
       <label className="text-xs font-bold text-foreground/65">{labels.action}<StyledSelect forceDown value={action} onValueChange={setAction} placeholder={labels.all} aria-label={labels.action} className="mt-2" options={Object.keys(actionLabels).map((key) => ({ value: key, label: actionText(key, english) }))} /></label>
       <label className="text-xs font-bold text-foreground/65">{labels.user}<StyledSelect forceDown value={userId} onValueChange={setUserId} placeholder={labels.allUsers} aria-label={labels.user} className="mt-2" options={users.map((user) => ({ value: user.id, label: user.name }))} /></label>
       <label className="text-xs font-bold text-foreground/65">{labels.role}<StyledSelect forceDown value={userRole} onValueChange={setUserRole} placeholder={labels.allRoles} aria-label={labels.role} className="mt-2" options={Object.keys(roleLabels).map((role) => ({ value: role, label: roleText(role, english) }))} /></label>
-    </div></section>
+    </div><div className="mt-4 flex items-center gap-3"><label className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-2 cursor-pointer transition hover:bg-muted/50"><input type="checkbox" checked={showAbsentStudentsOnly} onChange={(event) => setShowAbsentStudentsOnly(event.target.checked)} className="rounded border-border/50" /><span className="text-sm font-medium text-foreground/75">{english ? 'Show absent students only' : 'إظهار الطلاب الغائبين فقط'}</span></label></div></section>
     {loading ? <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-12 text-center text-sm text-foreground/60"><Clock3 className="mx-auto mb-3 h-6 w-6 animate-pulse text-primary" />{labels.loading}</div> : filteredLogs.length ? <section className="space-y-3">{filteredLogs.map((log) => <article key={log.id} className="rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-sm"><div className="flex items-start gap-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-primary"><LogIcon type={log.targetType} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">{actionText(log.action, english)}</h2><time className="inline-flex items-center gap-1 text-xs text-foreground/50"><Clock3 className="h-3.5 w-3.5" />{log.relativeTime || log.timestamp || ''}</time></div><p className="mt-1 text-sm text-foreground/65">{typeText(log.targetType, english)}{log.targetName ? ` · ${log.targetName}` : ''}</p><p className="mt-3 text-sm text-foreground/75">{detailText(log.details, english)}</p><div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/60 pt-3 text-xs text-foreground/55"><span className="inline-flex items-center gap-1.5"><User className="h-3.5 w-3.5" />{labels.operator}: {log.userName || labels.noDetails}</span><span>{labels.role}: {roleText(log.userRole, english)}</span></div></div></div></article>)}</section> : <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-12 text-center text-sm text-foreground/60"><XCircle className="mx-auto mb-3 h-6 w-6 text-foreground/40" />{labels.empty}</div>}
   </div>
 }

@@ -333,3 +333,111 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unable to save attendance records' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const user = await getRequestUser(request)
+    if (!user?.isActive) return forbidden()
+    
+    // Only VICE_PRINCIPAL, PRINCIPAL, or VP roles can edit attendance
+    const canEdit = user.role === 'VICE_PRINCIPAL' || user.role === 'PRINCIPAL' || user.role?.startsWith('VP_')
+    if (!canEdit) return forbidden()
+    
+    const body = await request.json() as {
+      attendanceId: string
+      studentId: string
+      date: string
+      status: string
+      notes?: string
+    }
+    
+    if (!body.attendanceId || !body.studentId || !body.date || !body.status) {
+      return NextResponse.json({ error: 'attendanceId, studentId, date, and status are required' }, { status: 400 })
+    }
+    
+    if (!validStatuses.includes(body.status)) {
+      return NextResponse.json({ error: `Invalid status: ${body.status}` }, { status: 400 })
+    }
+    
+    // Fetch the existing attendance record
+    const existing = await prisma.attendance.findUnique({
+      where: { id: body.attendanceId },
+      include: { student: { select: { id: true, fullName: true, divisionCode: true } } }
+    })
+    
+    if (!existing) {
+      return NextResponse.json({ error: 'Attendance record not found' }, { status: 404 })
+    }
+    
+    // Verify studentId matches
+    if (existing.studentId !== body.studentId) {
+      return NextResponse.json({ error: 'Student ID mismatch' }, { status: 400 })
+    }
+    
+    // Build new notes with VP edit notation
+    const vpEditNote = `تم التعديل من قبل الوكيل - ${user.name}`
+    let newNotes = body.notes || existing.notes || ''
+    
+    // Count how many times this record has been edited by checking notes
+    const editMatches = (newNotes + ' ' + (existing.notes || '')).match(/تم التعديل من قبل الوكيل/g) || []
+    const editCount = editMatches.length + 1
+    
+    // Append VP edit note with timestamp
+    const timestamp = new Date().toLocaleString('ar-SA')
+    if (newNotes && !newNotes.includes(vpEditNote)) {
+      newNotes = `${newNotes} | ${vpEditNote} (مرة ${editCount}) - ${timestamp}`
+    } else if (!newNotes) {
+      newNotes = `${vpEditNote} (مرة ${editCount}) - ${timestamp}`
+    }
+    
+    // Update the attendance record
+    const updated = await prisma.attendance.update({
+      where: { id: body.attendanceId },
+      data: {
+        status: body.status,
+        notes: newNotes,
+        updatedAt: new Date(),
+        markedBy: user.id,
+        markedByName: user.name
+      }
+    })
+    
+    // Create audit log entry
+    const oldStatus = existing.status
+    const newStatus = body.status
+    const statusChanged = oldStatus !== newStatus
+    
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: 'EDIT_ATTENDANCE',
+        targetType: 'Attendance',
+        targetId: body.attendanceId,
+        targetName: `${existing.student.fullName} - ${body.date}`,
+        studentId: body.studentId,
+        details: JSON.stringify({
+          editedBy: user.name,
+          editedByRole: user.role,
+          editCount,
+          statusChanged,
+          timestamp: new Date().toISOString()
+        }),
+        oldValue: statusChanged ? oldStatus : null,
+        newValue: statusChanged ? newStatus : null,
+        dateOnly: getDateOnly(new Date()),
+        timeOnly: getTimeOnly(new Date())
+      }
+    })
+    
+    return NextResponse.json({ 
+      success: true, 
+      data: updated,
+      message: `تم تحديث الحضور بنجاح (التعديل رقم ${editCount})`
+    })
+  } catch (error) {
+    console.error('Attendance PATCH error:', error)
+    return NextResponse.json({ error: 'Unable to update attendance record' }, { status: 500 })
+  }
+}

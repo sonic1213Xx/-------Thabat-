@@ -13,6 +13,7 @@ import { runExport } from "@/lib/export-feedback";
 import { fetchCached, invalidateCached } from "@/lib/client-cache";
 import { AttendanceLogsModal } from "@/components/attendance/attendance-logs-modal";
 import { AttendanceImportModal } from "@/components/attendance/attendance-import-modal";
+import { EditAttendanceModal } from "@/components/attendance/edit-attendance-modal";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { usePathname, useRouter } from "next/navigation";
 import { getConfiguredClassroomDefaultAttendance, getConfiguredLateTime } from "@/lib/school-settings";
@@ -98,6 +99,15 @@ export default function AttendancePage() {
   const [logsOpen, setLogsOpen] = useState(false);
   const [attendanceImportOpen, setAttendanceImportOpen] = useState(false);
   const [attendanceRevision, setAttendanceRevision] = useState(0);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<{
+    id: string;
+    studentId: string;
+    studentName: string;
+    date: string;
+    status: Status;
+    notes: string;
+  } | null>(null);
   const studentsRequestRef = useRef<string | null>(null);
   const attendanceRequestRef = useRef<string | null>(null);
   const hasFetchedRef = useRef<string | null>(null);
@@ -737,6 +747,24 @@ export default function AttendancePage() {
           <p className="py-12 text-center text-slate-500">{text.empty}</p>
         )}
       </main>
+      <EditAttendanceModal
+        open={editModalOpen}
+        studentName={editingRecord?.studentName ?? ""}
+        date={editingRecord?.date ?? date}
+        currentStatus={editingRecord?.status ?? "UNMARKED"}
+        currentNotes={editingRecord?.notes ?? ""}
+        attendanceId={editingRecord?.id ?? ""}
+        studentId={editingRecord?.studentId ?? ""}
+        userId={session?.id ?? ""}
+        onClose={() => {
+          setEditModalOpen(false);
+          setEditingRecord(null);
+        }}
+        onSaved={() => {
+          setAttendanceRevision((prev) => prev + 1);
+          void invalidateCached(`attendance:${date}:${selectedDivision}`);
+        }}
+      />
       {saving &&
         typeof document !== "undefined" &&
         createPortal(
