@@ -6,6 +6,7 @@ import { ArrowLeft, CalendarDays, Check, ChevronDown, ClipboardList, Download, F
 import { Modal } from '@/components/ui/modal'
 import { getCurrentProfile, getSession } from '@/lib/auth'
 import { AttendanceStatusSelect } from '@/components/ui/attendance-status-select'
+import { StyledSelect } from '@/components/ui/styled-select'
 import { exportAttendancePdf } from '@/lib/export-attendance-pdf'
 import { exportAttendanceWorkbook } from '@/lib/export-attendance-fixed'
 import { useToast } from '@/components/toast-provider'
@@ -20,6 +21,8 @@ const statusOptions = (english: boolean) => [
   { value: 'ABSENT_EXCUSED', label: english ? 'Excused' : 'غياب بعذر' },
   { value: 'LATE', label: english ? 'Late' : 'متأخر' },
 ]
+
+const filterStatusOptions = (english: boolean) => [{ value: 'ALL', label: english ? 'All statuses' : 'كل الحالات' }, ...statusOptions(english)]
 
 export function AttendanceLogsModal({ open, onClose, english }: { open: boolean; onClose: () => void; english: boolean }) {
   const session = getSession()
@@ -140,7 +143,7 @@ export function AttendanceLogsModal({ open, onClose, english }: { open: boolean;
 
   return <Modal open={open} onOpenChange={(nextOpen) => !nextOpen && handleClose()} className="max-w-6xl">
     <div className="space-y-5">
-      {selectedDate && selectedDivision && <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0) }} aria-label={english ? 'Filter by status' : 'تصفية حسب الحالة'} className="rounded-lg border border-border bg-transparent px-3 py-2 text-sm"><option value="ALL">{english ? 'All statuses' : 'كل الحالات'}</option>{statusOptions(english).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>}
+      {selectedDate && selectedDivision && <StyledSelect value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(0) }} aria-label={english ? 'Filter by status' : 'تصفية حسب الحالة'} options={filterStatusOptions(english)} className="h-9 w-44 rounded-lg px-2 text-xs" />}
       <div className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-emerald-600" /><div><h2 className="text-xl font-bold">{english ? 'Attendance logs' : 'سجل الحضور والغياب'}</h2><p className="text-xs text-muted-foreground">{selectedDate ? (english ? 'Choose a division to edit this day' : 'اختر شعبة لتعديل هذا اليوم') : (english ? 'Choose a saved day' : 'اختر يوماً محفوظاً')}</p></div></div>
 
       {!selectedDate ? <>

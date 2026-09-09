@@ -94,6 +94,7 @@ export default function AttendancePage() {
     useState<string[]>([]);
   const [templateSelectionReady, setTemplateSelectionReady] = useState(false);
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
+  const [desktopHeaderCompact, setDesktopHeaderCompact] = useState(false);
   const [exportType, setExportType] = useState<"EXCEL" | "PDF">("EXCEL");
   const [exportCalendar, setExportCalendar] = useState<AttendanceCalendar>("both");
   const [isExporting, setIsExporting] = useState(false);
@@ -129,6 +130,27 @@ export default function AttendancePage() {
       document.body.style.overflow = previousOverflow;
     };
   }, [saving]);
+  useEffect(() => {
+    let previousScrollY = window.scrollY;
+    let frame = 0;
+    const handleScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!window.matchMedia("(min-width: 768px)").matches) return;
+        const currentScrollY = window.scrollY;
+        const scrollDelta = currentScrollY - previousScrollY;
+        if (currentScrollY <= 96) setDesktopHeaderCompact(false);
+        else if (scrollDelta > 2) setDesktopHeaderCompact(true);
+        else if (scrollDelta < -2) setDesktopHeaderCompact(false);
+        previousScrollY = currentScrollY;
+      });
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
   const assigned = profile?.assigned_divisions ?? [];
   const divisions = useMemo<DivisionGroup[]>(
     () =>
@@ -469,8 +491,8 @@ export default function AttendancePage() {
 
   return (
     <div className="attendance-page space-y-6" dir={dir}>
-      <header className="isolate sticky top-0 z-30 -mx-4 overflow-hidden border-b border-slate-200 bg-slate-50 px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-950 md:top-2 md:-mx-6 md:px-6 md:py-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 md:gap-4">
+      <header className={`isolate sticky top-0 z-30 -mx-4 overflow-hidden border-b border-slate-200 bg-slate-50 px-3 py-2 shadow-sm transition-[padding] duration-300 dark:border-slate-800 dark:bg-slate-950 md:top-0 md:-mx-6 md:px-6 ${desktopHeaderCompact ? "md:py-2" : "md:py-4"}`}>
+        <div className={`flex flex-wrap items-center justify-between gap-2 transition-[max-height,opacity,transform] duration-300 md:gap-4 ${desktopHeaderCompact ? "md:max-h-0 md:-translate-y-2 md:overflow-hidden md:opacity-0" : "md:max-h-96 md:translate-y-0 md:opacity-100"}`}>
           <div className="flex items-center gap-2 md:gap-3">
             <CalendarCheck className="h-6 w-6 text-emerald-600 md:h-7 md:w-7" />
             <h1 className="text-xl font-bold md:text-2xl">{text.title}</h1>
@@ -523,7 +545,7 @@ export default function AttendancePage() {
             </button>}
           </div>
         </div>
-        <div className="mt-2 flex max-w-full items-center gap-1.5 overflow-x-auto pb-0.5 md:mt-3 md:flex-wrap md:gap-2 md:overflow-visible">
+        <div className={`mt-2 flex max-w-full items-center gap-1.5 overflow-x-auto pb-0.5 transition-[margin,gap] duration-300 md:mt-3 md:gap-2 ${desktopHeaderCompact ? "md:mt-0 md:flex-nowrap md:overflow-x-auto" : "md:flex-wrap md:overflow-visible"}`}>
           <span className="shrink-0 text-xs font-semibold md:text-sm">{text.skip}</span>
           <button
             type="button"
