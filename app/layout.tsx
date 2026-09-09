@@ -15,7 +15,11 @@ export const metadata: Metadata = {
   title: 'ثَبَت - Thabat School Operations',
   description: 'Modern operational logbook and audit engine for Saudi schools',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/icons/app-icon-light.png', media: '(prefers-color-scheme: light)' },
+      { url: '/icons/app-icon-dark.png', media: '(prefers-color-scheme: dark)' },
+    ],
+    apple: '/icons/app-icon-light.png',
   },
 }
 

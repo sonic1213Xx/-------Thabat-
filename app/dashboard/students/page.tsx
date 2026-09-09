@@ -232,7 +232,14 @@ export default function StudentsPage() {
     setTeacherProfiles(
       profiles
         .filter((profile) => profile.role === "TEACHER")
-        .map(({ id, name, role, subject }) => ({ id, name, role, subject })),
+        .map(({ id, name, role, subject, subjectsTaught, teachingAssignments }) => ({
+          id,
+          name,
+          role,
+          subject,
+          subjectsTaught,
+          teachingAssignments,
+        })),
     );
     const profileAssignments = Object.fromEntries(
       profiles.map((item) => [item.id, item.assigned_divisions ?? []]),

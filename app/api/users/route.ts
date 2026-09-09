@@ -47,7 +47,9 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json() as UserBody
     const id = body.id?.trim()
     if (!id || !body.name?.trim() || !body.role || !getRoleDefinition(body.role)) return NextResponse.json({ error: 'Invalid profile.' }, { status: 400 })
-    const user = await prisma.user.update({ where: { id }, data: { name: body.name.trim(), role: body.role, ...(body.locale ? { locale: body.locale } : {}), ...(body.password ? { password: await bcrypt.hash(body.password, 12) } : {}), assignedDivisions: JSON.stringify(body.divisions ?? []), subjectsTaught: JSON.stringify(body.subjectsTaught ?? []), teachingAssignments: JSON.stringify(body.teachingAssignments ?? []) } })
+    const existing = await prisma.user.findUnique({ where: { id }, select: { assignedDivisions: true, subjectsTaught: true, teachingAssignments: true } })
+    if (!existing) return NextResponse.json({ error: 'Profile not found.' }, { status: 404 })
+    const user = await prisma.user.update({ where: { id }, data: { name: body.name.trim(), role: body.role, ...(body.locale ? { locale: body.locale } : {}), ...(body.password ? { password: await bcrypt.hash(body.password, 12) } : {}), ...(body.divisions !== undefined ? { assignedDivisions: JSON.stringify(body.divisions) } : {}), ...(body.subjectsTaught !== undefined ? { subjectsTaught: JSON.stringify(body.subjectsTaught) } : {}), ...(body.teachingAssignments !== undefined ? { teachingAssignments: JSON.stringify(body.teachingAssignments) } : {}) } })
     return NextResponse.json({ data: responseUser(user) })
   } catch (error) {
     console.error('User update failed:', error)
