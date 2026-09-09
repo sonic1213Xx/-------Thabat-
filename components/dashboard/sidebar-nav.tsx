@@ -132,7 +132,7 @@ export function SidebarNav() {
       'border-r border-slate-200/80 bg-white/90 shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/95',
       'md:sticky md:top-0 h-screen overflow-hidden'
     )} dir={dir}>
-      <div className="flex items-center justify-between border-b border-slate-200/80 px-4 py-3 dark:border-slate-800/80">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 px-4 dark:border-slate-800/80">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-600/20">
             <LayoutDashboard className="h-4 w-4" />
