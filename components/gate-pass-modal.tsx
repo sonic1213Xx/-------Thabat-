@@ -51,7 +51,7 @@ export function GatePassModal({
   const student = students.find((item) => item.id === studentId);
   useEffect(() => {
     if (!issuedPass?.qrToken) return;
-    void QRCode.toDataURL(issuedPass.qrToken, { width: 150, margin: 1 }).then(setQrImage).catch(() => setQrImage(""));
+    void QRCode.toDataURL(issuedPass.qrToken, { width: 600, margin: 2, errorCorrectionLevel: "H" }).then(setQrImage).catch(() => setQrImage(""));
   }, [issuedPass]);
   useEffect(() => {
     if (!initialPass) {

@@ -43,6 +43,8 @@ model User {
   referralsCreated TeacherReferral[] @relation("TeacherReferralCreator")
   referralsReceived TeacherReferral[] @relation("TeacherReferralRecipient")
   agentActions   AgentAction[]
+  supportReports SupportReport[] @relation("SupportReportReporter")
+  resolvedReports SupportReport[] @relation("SupportReportResolver")
 
   @@index([username])
   @@index([role])
@@ -415,6 +417,26 @@ model AgentAction {
 
   @@index([userId, createdAt])
   @@index([status])
+}
+
+model SupportReport {
+  id          String   @id @default(cuid())
+  reporterId  String
+  reporter    User     @relation("SupportReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  category    String
+  title       String
+  description String
+  page        String?
+  status      String   @default("OPEN")
+  creatorNote String?
+  resolvedById String?
+  resolvedBy  User?    @relation("SupportReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([reporterId, createdAt])
+  @@index([status, createdAt])
+  @@index([category])
 }
 
 

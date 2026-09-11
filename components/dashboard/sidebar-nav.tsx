@@ -26,6 +26,7 @@ import {
   Bell,
   User,
   FileText,
+  MessageSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
@@ -67,6 +68,7 @@ export function SidebarNav() {
     { label: t('teachersLounge'), href: '/dashboard/teachers-lounge', icon: Coffee, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'TEACHER' || session.role === 'PRINCIPAL' || session.role === 'VICE_PRINCIPAL')) },
     { label: t('auditLog'), href: '/dashboard/audit-log', icon: Clock, visible: Boolean(session && hasPermission(session.role, 'audit_log', 'read')) },
     { label: t('reports'), href: '/dashboard/reports', icon: BarChart3, visible: Boolean(session && hasPermission(session.role, 'reports', 'read')) },
+    { label: locale === 'ar' ? 'مركز البلاغات' : 'Reports Center', href: '/dashboard/support-reports', icon: MessageSquare, visible: Boolean(session) },
     { label: t('settings'), href: '/dashboard/settings', icon: Settings },
     { label: t('rolesAndPermissions'), href: '/dashboard/settings/roles', icon: ShieldAlert, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL')) },
     { label: locale === 'ar' ? 'ماسح تصاريح الخروج' : 'Gate pass scanner', href: '/dashboard/gate-security', icon: ScanLine, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL' || session.role === 'GATE_SECURITY')) },

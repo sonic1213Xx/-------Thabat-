@@ -105,7 +105,7 @@ export function MoeDocument({
           <div className="max-h-[80vh] overflow-y-auto p-2">
             <article
               id="moe-document"
-              className="mx-auto max-w-3xl text-slate-900"
+              className="printable-moe mx-auto max-w-3xl text-slate-900"
               dir="rtl"
             >
               <header className="border-b-2 border-slate-900 pb-5 text-center">
