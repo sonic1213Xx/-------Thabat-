@@ -30,6 +30,7 @@ export const AUTH_STORAGE_KEY = 'thabat-session'
 export const AUTH_PERSISTENCE_KEY = 'thabat-session-persistent'
 export const PROFILES_STORAGE_KEY = 'thabat-profiles'
 export const SIGNATURES_STORAGE_KEY = 'thabat-profile-signatures'
+export const WELCOME_LOGIN_KEY = 'thabat-welcome-login'
 let runtimeSession: SessionUser | null = null
 
 export function authenticate(id: string, password: string): SessionUser | null {
@@ -119,6 +120,7 @@ export function setSession(user: SessionUser, remember = true): void {
     localStorage.setItem(AUTH_PERSISTENCE_KEY, 'true')
   }
   else sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user))
+  localStorage.setItem(WELCOME_LOGIN_KEY, `${user.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`)
   window.dispatchEvent(new CustomEvent('thabat-session-changed', { detail: user }))
 }
 

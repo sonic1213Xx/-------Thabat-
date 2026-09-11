@@ -139,7 +139,7 @@ export default function TeacherReferralsPage() {
         date: "Incident date",
         time: "Incident time",
         location: "Location",
-        action: "Immediate action taken",
+        action: "Action taken by the teacher before referral",
         notes: "Additional teacher notes",
         submit: "Send to vice principal",
         log: isTeacher ? "My referral history" : "Incoming referrals",
@@ -172,7 +172,7 @@ export default function TeacherReferralsPage() {
         date: "تاريخ الواقعة",
         time: "وقت الواقعة",
         location: "المكان",
-        action: "الإجراء الفوري المتخذ",
+        action: "الإجراء الذي اتخذه المعلم قبل إرسال الإحالة",
         notes: "ملاحظات إضافية من المعلم",
         submit: "إرسال إلى وكيل المدرسة",
         log: isTeacher ? "سجل إحالاتي" : "الإحالات الواردة",
@@ -629,8 +629,8 @@ export default function TeacherReferralsPage() {
                 onChange={(event) => setActionTaken(event.target.value)}
                 placeholder={
                   english
-                    ? "What action did you take immediately?"
-                    : "ما الإجراء الفوري الذي اتخذته؟"
+                    ? "What did you do as the teacher before sending this referral?"
+                    : "ماذا فعلت بصفتك المعلم قبل إرسال هذه الإحالة؟"
                 }
                 className={`${inputClass} mt-1 min-h-24`}
               />
