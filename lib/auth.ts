@@ -84,11 +84,19 @@ export function getSession(): SessionUser | null {
   if (typeof window === 'undefined') return null
   try {
     if (runtimeSession) return runtimeSession
+
+    // Check persistent (localStorage) session first
     const storedSession = localStorage.getItem(AUTH_STORAGE_KEY)
     const persistence = localStorage.getItem(AUTH_PERSISTENCE_KEY)
-    const value = persistence === 'true' || (storedSession && persistence === null) ? storedSession : null
-    if (!value && storedSession) localStorage.removeItem(AUTH_STORAGE_KEY)
-    const session = value ? JSON.parse(value) as SessionUser : null
+    const persistentValue = persistence === 'true' ? storedSession : null
+
+    // Fall back to session-only (sessionStorage) session for users who didn't check "remember me"
+    const sessionValue = persistentValue ?? sessionStorage.getItem(AUTH_STORAGE_KEY)
+
+    // If there's a stale localStorage entry with no valid persistence flag, clean it up
+    if (!persistentValue && storedSession) localStorage.removeItem(AUTH_STORAGE_KEY)
+
+    const session = sessionValue ? JSON.parse(sessionValue) as SessionUser : null
     if (session && typeof document !== 'undefined' && !document.cookie.includes('THABAT_USER_ID=')) {
       document.cookie = `THABAT_USER_ID=${encodeURIComponent(session.id)}; Max-Age=31536000; Path=/; SameSite=Lax`
     }
@@ -111,6 +119,7 @@ export function setSession(user: SessionUser, remember = true): void {
     localStorage.setItem(AUTH_PERSISTENCE_KEY, 'true')
   }
   else sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user))
+  window.dispatchEvent(new CustomEvent('thabat-session-changed', { detail: user }))
 }
 
 export function clearSession(): void {
@@ -120,4 +129,6 @@ export function clearSession(): void {
   localStorage.removeItem(AUTH_PERSISTENCE_KEY)
   sessionStorage.removeItem(AUTH_STORAGE_KEY)
   document.cookie = 'THABAT_USER_ID=; Max-Age=0; Path=/; SameSite=Lax'
+  window.dispatchEvent(new CustomEvent('thabat-session-changed', { detail: null }))
 }
+

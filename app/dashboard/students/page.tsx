@@ -266,10 +266,7 @@ export default function StudentsPage() {
     }
   }, [currentRole, currentUserId, division, teacherAssignments]);
 
-  useEffect(() => {
-    setDivision(null);
-    setStudents([]);
-  }, [setIsLoading]);
+
 
   useEffect(() => {
     if (window.location.search.includes("action=import")) setIsImportOpen(true);

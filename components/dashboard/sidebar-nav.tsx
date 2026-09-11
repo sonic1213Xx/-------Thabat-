@@ -40,7 +40,20 @@ export function SidebarNav() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [navigating, setNavigating] = useState(false)
-  const session = getSession()
+  const [session, setSession] = useState(() => getSession())
+
+  // Re-read session whenever it changes (login, logout, or storage events)
+  useEffect(() => {
+    setSession(getSession())
+    const handleSessionChange = () => setSession(getSession())
+    window.addEventListener('thabat-session-changed', handleSessionChange)
+    window.addEventListener('storage', handleSessionChange)
+    return () => {
+      window.removeEventListener('thabat-session-changed', handleSessionChange)
+      window.removeEventListener('storage', handleSessionChange)
+    }
+  }, [])
+
   const navItems = [
     { label: t('dashboard'), href: '/dashboard', icon: LayoutDashboard },
     { label: t('students'), href: '/dashboard/students', icon: Users },
