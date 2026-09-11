@@ -41,3 +41,16 @@ coverage/
 *.pem
 .vercel
 .env*
+
+# Data files & Spreadsheets (PII Protection)
+*.xlsx
+*.xls
+*.csv
+!public/gradebook-templates/*.xlsx
+
+# Loose documents and media
+/*.pdf
+/*.png
+/*.jpg
+/*.jpeg
+!public/**/*

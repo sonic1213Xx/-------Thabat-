@@ -46,9 +46,11 @@ export default function WarningsPage() {
   useEffect(() => {
     async function loadWarnings() {
       try {
+        const session = getSession()
+        const headers = session?.id ? { 'x-thabat-user-id': session.id } : undefined
         const [warningsJson, studentsJson] = await Promise.all([
-          fetchCached<{ data?: WarningRecord[] }>('dashboard:warnings:all', '/api/warnings'),
-          fetchCached<{ data?: StudentOption[] }>('dashboard:students:all', '/api/students'),
+          fetchCached<{ data?: WarningRecord[] }>('dashboard:warnings:all', '/api/warnings', headers ? { headers } : undefined),
+          fetchCached<{ data?: StudentOption[] }>('dashboard:students:all', '/api/students', headers ? { headers } : undefined),
         ])
         setWarnings(warningsJson.data ?? [])
         setStudents((studentsJson.data ?? []).map((student: StudentOption) => ({ id: student.id, fullName: student.fullName, divisionCode: student.divisionCode, gradeLevel: student.gradeLevel })))

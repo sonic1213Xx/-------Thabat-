@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
+import { getSession } from '@/lib/auth'
 
 const headers = ['م', 'اسم الطلاب/ة', 'الرقم الأكاديمي', 'الهوية الوطنية', 'الشعبة', 'مشاركة - الفترة 1 (10)', 'مهام أدائية - الفترة 1 (30)', 'اختبار قصير - الفترة 1 (10)', 'جانب عملي - الفترة 1 (10)', 'مشاركة - الفترة 2 (10)', 'مهام أدائية - الفترة 2 (30)', 'اختبار قصير - الفترة 2 (10)', 'جانب عملي - الفترة 2 (10)', 'المجموع النهائي (60)']
 
@@ -201,7 +202,8 @@ export function exportGradebookToPdf(divisionName: string, studentsData: Gradebo
 }
 
 export async function exportEmptyGradebookTemplates(divisionCodes: string[], period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
-  const response = await fetch('/api/students')
+  const session = getSession()
+  const response = await fetch('/api/students', session?.id ? { headers: { 'x-thabat-user-id': session.id } } : undefined)
   const json = await response.json() as { data?: GradebookStudent[] }
   const students = json.data ?? []
   const templatePath = period === 'period1' ? '/gradebook-templates/term-1.xlsx' : period === 'period2' ? '/gradebook-templates/term-2.xlsx' : '/gradebook-templates/both-terms.xlsx'
@@ -265,7 +267,8 @@ const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => (
 
 export async function exportEmptyGradebookTemplatesToPdf(divisionCodes: string[]) {
   if (typeof window === 'undefined') return
-  const response = await fetch('/api/students')
+  const session = getSession()
+  const response = await fetch('/api/students', session?.id ? { headers: { 'x-thabat-user-id': session.id } } : undefined)
   const json = await response.json() as { data?: GradebookStudent[] }
   const students = json.data ?? []
   let schoolName = ''

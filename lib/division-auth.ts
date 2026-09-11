@@ -12,6 +12,7 @@ export const MANAGEMENT_ROLES = new Set([
 
 type DivisionUser = {
   id: string
+  name: string
   role: string
   isActive: boolean
   assignedDivisions: string
@@ -51,6 +52,7 @@ export async function authorizeDivisions(request: NextRequest, requireManagement
     where: { id: userId },
     select: {
       id: true,
+      name: true,
       role: true,
       isActive: true,
       assignedDivisions: true,

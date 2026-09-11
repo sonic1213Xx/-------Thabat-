@@ -6,8 +6,9 @@ export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json() as { studentIds?: string[]; performedByUserId?: string }
     const studentIds = Array.from(new Set(body.studentIds ?? []))
-    if (!studentIds.length || !body.performedByUserId) return NextResponse.json({ error: 'Students and acting user are required.' }, { status: 400 })
-    const actor = await prisma.user.findUnique({ where: { id: body.performedByUserId }, select: { id: true, role: true, isActive: true } })
+    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id') || body.performedByUserId
+    if (!studentIds.length || !requestUserId) return NextResponse.json({ error: 'Students and acting user are required.' }, { status: 400 })
+    const actor = await prisma.user.findUnique({ where: { id: requestUserId }, select: { id: true, role: true, isActive: true } })
     if (!actor?.isActive || (!isCreatorRole(actor.role) && actor.role !== 'PRINCIPAL')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     const result = await prisma.student.deleteMany({ where: { id: { in: studentIds } } })
     return NextResponse.json({ data: { count: result.count } })

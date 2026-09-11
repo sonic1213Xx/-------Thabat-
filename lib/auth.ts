@@ -88,7 +88,11 @@ export function getSession(): SessionUser | null {
     const persistence = localStorage.getItem(AUTH_PERSISTENCE_KEY)
     const value = persistence === 'true' || (storedSession && persistence === null) ? storedSession : null
     if (!value && storedSession) localStorage.removeItem(AUTH_STORAGE_KEY)
-    return value ? JSON.parse(value) as SessionUser : null
+    const session = value ? JSON.parse(value) as SessionUser : null
+    if (session && typeof document !== 'undefined' && !document.cookie.includes('THABAT_USER_ID=')) {
+      document.cookie = `THABAT_USER_ID=${encodeURIComponent(session.id)}; Max-Age=31536000; Path=/; SameSite=Lax`
+    }
+    return session
   } catch {
     return null
   }

@@ -11,12 +11,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as { studentIds?: string[]; toDivision?: string; reason?: string; performedByUserId?: string }
     const studentIds = Array.from(new Set(body.studentIds ?? []))
     const toDivision = body.toDivision?.trim() ?? ''
-    if (!studentIds.length || !isValidDivisionCode(toDivision) || !body.performedByUserId) return NextResponse.json({ error: 'Students, target division, and acting user are required.' }, { status: 400 })
+    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id') || body.performedByUserId
+    if (!studentIds.length || !isValidDivisionCode(toDivision) || !requestUserId) return NextResponse.json({ error: 'Students, target division, and acting user are required.' }, { status: 400 })
     const [actor, students] = await Promise.all([
-      prisma.user.findUnique({ where: { id: body.performedByUserId } }),
+      prisma.user.findUnique({ where: { id: requestUserId } }),
       prisma.student.findMany({ where: { id: { in: studentIds } } }),
     ])
-    if (!actor || !students.length || students.length !== studentIds.length) return NextResponse.json({ error: 'Acting user or students were not found.' }, { status: 404 })
+    if (!actor || !actor.isActive || !students.length || students.length !== studentIds.length) return NextResponse.json({ error: 'Acting user or students were not found.' }, { status: 404 })
     const originalGrades = await prisma.gradebookScore.findMany({ where: { studentId: { in: studentIds } } })
     const recipients = (await prisma.user.findMany({ where: { role: 'TEACHER', isActive: true }, select: { id: true, assignedDivisions: true } })).filter((teacher) => parseDivisions(teacher.assignedDivisions).includes(toDivision))
     const now = new Date()

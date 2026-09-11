@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { getSession } from "@/lib/auth";
 
 type EditableStudent = {
   id: string;
@@ -48,10 +49,14 @@ export function BulkStudentEditor({
     setError("");
     try {
       const updated = [];
+      const session = getSession();
       for (const row of rows) {
         const response = await fetch("/api/students", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.id ? { "x-thabat-user-id": session.id } : {}),
+          },
           body: JSON.stringify({
             studentId: row.id,
             fullName: row.fullName,

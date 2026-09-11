@@ -39,7 +39,13 @@ export async function GET(request: NextRequest) {
     }
 
     const divisionAuthorization = await authorizeDivisions(request)
-    if (divisionAuthorization.status === 200 && divisionAuthorization.isTeacher) {
+    if (divisionAuthorization.status !== 200) {
+      return NextResponse.json(
+        { error: divisionAuthorization.error },
+        { status: divisionAuthorization.status },
+      )
+    }
+    if (divisionAuthorization.isTeacher) {
       where.AND = [{ divisionCode: { in: divisionAuthorization.divisionCodes } }]
     }
 
@@ -104,6 +110,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authorization = await authorizeDivisions(request, true)
+    if (authorization.status !== 200) {
+      return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+    }
+
     const body = await request.json()
     const {
       fullName,
@@ -118,7 +129,6 @@ export async function POST(request: NextRequest) {
       divisionCode,
       behaviorScore,
       attendanceScore,
-      createdByUserId,
     } = body as {
       fullName?: string
       arabicName?: string
@@ -155,7 +165,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const actor = await getActor(createdByUserId)
+    const actor = authorization.user
 
     const existingStudent = await prisma.student.findUnique({
       where: { nationalId },
@@ -233,6 +243,11 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const authorization = await authorizeDivisions(request, true)
+    if (authorization.status !== 200) {
+      return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+    }
+
     const body = await request.json() as { studentId?: string; fullName?: string; academicId?: string; gpa?: number | string | null; parentPhone?: string; nationalId?: string; divisionId?: string; divisionCode?: string; gradeLevel?: number | null; level?: string; conductNotes?: string }
     if (!body.studentId || !body.fullName?.trim()) return NextResponse.json({ error: 'Student and name are required.' }, { status: 400 })
     const student = await prisma.student.update({
@@ -260,6 +275,11 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const authorization = await authorizeDivisions(request, true)
+    if (authorization.status !== 200) {
+      return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+    }
+
     const studentId = new URL(request.url).searchParams.get('id')
     if (!studentId) return NextResponse.json({ error: 'Student id is required.' }, { status: 400 })
     await prisma.student.delete({ where: { id: studentId } })
@@ -272,6 +292,11 @@ export async function DELETE(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const authorization = await authorizeDivisions(request, true)
+    if (authorization.status !== 200) {
+      return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+    }
+
     const body = await request.json()
     const {
       studentId,

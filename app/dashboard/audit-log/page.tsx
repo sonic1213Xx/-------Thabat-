@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Activity, CalendarDays, CheckCircle2, Clock3, FileText, Filter, RotateCcw, Search, ShieldAlert, User, Users, XCircle } from 'lucide-react'
 import { useLanguage } from '@/components/language-provider'
 import { StyledSelect } from '@/components/ui/styled-select'
+import { getSession } from '@/lib/auth'
 
 type AuditLogRecord = {
   id: string
@@ -63,7 +64,8 @@ export default function AuditLogPage() {
       if (targetType) params.set('targetType', targetType)
       if (action) params.set('action', action)
       if (userId) params.set('userId', userId)
-      try { const response = await fetch(`/api/audit-log?${params}`); const json = await response.json(); setLogs(json.data ?? []) } catch { setLogs([]) } finally { setLoading(false) }
+      const session = getSession()
+      try { const response = await fetch(`/api/audit-log?${params}`, session?.id ? { headers: { 'x-thabat-user-id': session.id } } : undefined); const json = await response.json(); setLogs(json.data ?? []) } catch { setLogs([]) } finally { setLoading(false) }
     }
     void loadLogs()
   }, [action, dateOnly, targetType, userId])

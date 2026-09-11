@@ -13,6 +13,11 @@ function normalizePositiveInteger(value: string | null, fallback: number, max?: 
 
 export async function GET(request: NextRequest) {
   try {
+    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
+    if (!requestUserId) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
+    const currentUser = await prisma.user.findUnique({ where: { id: requestUserId }, select: { id: true, role: true, isActive: true } })
+    if (!currentUser || !currentUser.isActive) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
+
     const { searchParams } = new URL(request.url)
     const dateOnly = searchParams.get('dateOnly') || undefined
     const userId = searchParams.get('userId') || undefined
@@ -44,7 +49,9 @@ export async function GET(request: NextRequest) {
       prisma.auditLog.findMany({
         where,
         include: {
-          user: true,
+          user: {
+            select: { id: true, name: true, role: true },
+          },
           student: true,
         },
         orderBy: {

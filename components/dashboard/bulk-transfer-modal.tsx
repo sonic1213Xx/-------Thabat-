@@ -20,7 +20,7 @@ export function BulkTransferModal({ open, students, divisions, onClose, onTransf
     if (!session || !targetDivision) return
     setSaving(true)
     try {
-      const response = await fetch('/api/students/transfer/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentIds: students.map((student) => student.id), toDivision: targetDivision, reason, performedByUserId: session.id }) })
+      const response = await fetch('/api/students/transfer/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(session?.id ? { 'x-thabat-user-id': session.id } : {}) }, body: JSON.stringify({ studentIds: students.map((student) => student.id), toDivision: targetDivision, reason, performedByUserId: session.id }) })
       if (!response.ok) throw new Error(locale === 'ar' ? 'تعذر نقل الطلاب.' : 'Unable to transfer students.')
       onTransferred()
       onClose()

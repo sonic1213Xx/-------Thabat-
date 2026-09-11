@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { formatRelativeTimeArabic, getDateOnly, getTimeOnly } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { authorizeDivisions } from '@/lib/division-auth'
 
 type ImportRow = {
   name?: string
@@ -16,6 +17,11 @@ type ImportRow = {
 
 export async function POST(request: NextRequest) {
   try {
+    const authorization = await authorizeDivisions(request, true)
+    if (authorization.status !== 200) {
+      return NextResponse.json({ error: authorization.error }, { status: authorization.status })
+    }
+
     const body = await request.json() as { rows?: ImportRow[]; divisions?: string[]; createdByUserId?: string }
     const rows = Array.isArray(body.rows) ? body.rows : []
     if (!rows.length) return NextResponse.json({ error: 'لا توجد صفوف صالحة للاستيراد.' }, { status: 400 })
@@ -23,7 +29,7 @@ export async function POST(request: NextRequest) {
     const actor = body.createdByUserId
       ? await prisma.user.findUnique({ where: { id: body.createdByUserId }, select: { id: true, name: true, role: true } })
       : null
-    const fallbackActor = actor ?? await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true, role: true } }) ?? await prisma.user.create({ data: { username: 'system', name: 'نظام ثَبَت', password: 'system-managed', role: 'PRINCIPAL', isActive: true }, select: { id: true, name: true, role: true } })
+    const fallbackActor = actor ?? authorization.user
 
     const now = new Date()
     const validRows = rows.filter((row) => (typeof row.name === 'string' && row.name.trim()) || (typeof row.academicId === 'string' && row.academicId.trim()))

@@ -34,7 +34,7 @@ export default function VicePrincipalPage() {
 
   useEffect(() => {
     if (!session || !can(session.role, "can_approve_gate_passes")) { window.location.href = "/dashboard"; return; }
-    void fetchCached<{ data?: Student[] }>("dashboard:students:all", "/api/students").then((json) => setStudents(json.data ?? []));
+    void fetchCached<{ data?: Student[] }>("dashboard:students:all", "/api/students", session?.id ? { headers: { "x-thabat-user-id": session.id } } : undefined).then((json) => setStudents(json.data ?? []));
   }, []);
 
   useEffect(() => {

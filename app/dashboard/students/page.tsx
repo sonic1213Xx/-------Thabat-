@@ -284,6 +284,7 @@ export default function StudentsPage() {
         }>(
           `dashboard:divisions:${session?.id}:${session?.role}`,
           "/api/divisions",
+          session?.id ? { headers: { "x-thabat-user-id": session.id } } : undefined,
         );
         const nextDivisions = json.data ?? [];
         setDivisions(nextDivisions);
@@ -323,6 +324,7 @@ export default function StudentsPage() {
       if (!division) return;
       await withMinimumDelay(async () => {
         try {
+          const session = getSession();
           const url =
             division === "all"
               ? "/api/students"
@@ -330,6 +332,7 @@ export default function StudentsPage() {
           const json = await fetchCached<{ data?: StudentRecord[] }>(
             `dashboard:students:${division}`,
             url,
+            session?.id ? { headers: { "x-thabat-user-id": session.id } } : undefined,
           );
           setStudents(json.data ?? []);
         } catch (error) {

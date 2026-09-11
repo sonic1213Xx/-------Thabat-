@@ -7,6 +7,11 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
+    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
+    if (!requestUserId) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
+    const user = await prisma.user.findUnique({ where: { id: requestUserId }, select: { id: true, isActive: true } })
+    if (!user || !user.isActive) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
+
     const { searchParams } = new URL(request.url)
     const studentId = searchParams.get('studentId') || undefined
     const dateOnly = searchParams.get('dateOnly') || undefined
@@ -55,7 +60,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const requestUserId = request.headers.get('x-thabat-user-id')
+    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
     if (!requestUserId) return NextResponse.json({ error: 'Authenticated user is required.' }, { status: 401 })
     const body = await request.json()
     const {
