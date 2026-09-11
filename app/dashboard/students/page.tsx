@@ -266,8 +266,6 @@ export default function StudentsPage() {
     }
   }, [currentRole, currentUserId, division, teacherAssignments]);
 
-
-
   useEffect(() => {
     if (window.location.search.includes("action=import")) setIsImportOpen(true);
   }, []);
