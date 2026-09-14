@@ -57,14 +57,16 @@ export default function LoginPage() {
       enterDashboard(result.data)
       return
     }
-    let user: ReturnType<typeof authenticate> = null
+    let user: AuthenticatedUser | null = null
+    let requestCompleted = false
     try {
       const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, password }) })
       const result = await response.json() as { data?: AuthenticatedUser }
+      requestCompleted = true
       user = result.data ?? null
       if (result.data) saveProfile({ ...result.data, password, createdAt: new Date().toISOString(), lastActivity: new Date().toISOString(), assigned_divisions: result.data.assigned_divisions ?? [], subjectsTaught: result.data.subjectsTaught ?? [], teachingAssignments: result.data.teachingAssignments ?? [] })
     } catch { /* Fall back to the built-in development credentials below. */ }
-    user ??= authenticate(id, password)
+    if (!requestCompleted) user = authenticate(id, password)
     if (!user) {
       setError(locale === 'ar' ? 'رقم الهوية أو كلمة المرور غير صحيحة.' : 'Incorrect ID number or password.')
       return
