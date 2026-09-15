@@ -77,6 +77,15 @@ interface StudentRecord {
   isActive?: boolean;
 }
 
+function normalizeDivisionValue(value?: string | null) {
+  const normalized = value?.trim() ?? "";
+  return normalized.match(/\d{3}/)?.[0] ?? normalized;
+}
+
+function divisionDisplayLabel(value?: string | null) {
+  return normalizeDivisionValue(value) || "—";
+}
+
 export default function StudentsPage() {
   const { t, locale } = useLanguage();
   const reducedMotion = useReducedMotion();
@@ -362,14 +371,22 @@ export default function StudentsPage() {
   );
 
   const visibleStudents = useMemo(() => {
+    const divisionStudents =
+      division && division !== "all"
+        ? students.filter(
+            (student) =>
+              normalizeDivisionValue(student.divisionCode) ===
+              normalizeDivisionValue(division),
+          )
+        : students;
     const query = deferredStudentSearch.trim().toLocaleLowerCase();
-    if (!query) return students;
-    return students.filter((student) =>
+    if (!query) return divisionStudents;
+    return divisionStudents.filter((student) =>
       `${student.fullName} ${student.arabicName ?? ""} ${student.academicId ?? ""} ${student.nationalId ?? ""} ${student.divisionCode ?? ""}`
         .toLocaleLowerCase()
         .includes(query),
     );
-  }, [deferredStudentSearch, students]);
+  }, [deferredStudentSearch, division, students]);
   const totalPages = Math.max(
     1,
     Math.ceil(visibleStudents.length / studentsPerPage),
@@ -1081,7 +1098,7 @@ export default function StudentsPage() {
                     ? t("chooseDivisionToView")
                     : division === "all"
                       ? t("showAllStudents")
-                      : `${t("division")}: ${division}`}
+                      : `${t("division")}: ${divisionDisplayLabel(division)}`}
                 </span>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -1116,7 +1133,7 @@ export default function StudentsPage() {
                       : [{ value: "all", label: t("showAll") }]),
                     ...assignedDivisionOptions.map((code) => ({
                       value: code,
-                      label: code,
+                      label: divisionDisplayLabel(code),
                     })),
                   ]}
                   className="min-w-44"
@@ -1193,9 +1210,9 @@ export default function StudentsPage() {
                         </h2>
                         <p className="mt-1 text-xs text-slate-500">
                           {student.academicId || "—"} ·{" "}
-                          {student.divisionCode ||
-                            student.divisionId ||
-                            t("unspecified")}
+                          {divisionDisplayLabel(
+                            student.divisionCode || student.divisionId,
+                          )}
                         </p>
                       </div>
                       <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
@@ -1443,9 +1460,9 @@ export default function StudentsPage() {
                               </td>
                               <td className="px-4 py-3">
                                 <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                                  {student.divisionCode ||
-                                    student.divisionId ||
-                                    `${t("unspecified")} / غير معين`}
+                                  {divisionDisplayLabel(
+                                    student.divisionCode || student.divisionId,
+                                  )}
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
