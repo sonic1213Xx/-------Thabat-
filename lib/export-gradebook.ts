@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth'
 
 const headers = ['م', 'اسم الطلاب/ة', 'الرقم الأكاديمي', 'الهوية الوطنية', 'الشعبة', 'مشاركة - الفترة 1 (10)', 'مهام أدائية - الفترة 1 (30)', 'اختبار قصير - الفترة 1 (10)', 'جانب عملي - الفترة 1 (10)', 'مشاركة - الفترة 2 (10)', 'مهام أدائية - الفترة 2 (30)', 'اختبار قصير - الفترة 2 (10)', 'جانب عملي - الفترة 2 (10)', 'المجموع النهائي (60)']
 
-const normalizeDivisionLabel = (value: string) => value.trim().replace(/^(?:الشعبة|division)\s+/i, '').trim() || value.trim()
+export const normalizeDivisionLabel = (value: string) => value.trim().replace(/^(?:الشعبة|division)\s+/i, '').trim() || value.trim()
 
 export type GradebookStudent = {
   id: string

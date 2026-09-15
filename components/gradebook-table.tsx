@@ -8,6 +8,7 @@ import {
   exportEmptyGradebookTemplates,
   exportGradebookToExcel,
   exportGradebookToPdf,
+  normalizeDivisionLabel,
   type GradebookExportMetadata,
   type GradebookPeriod,
   type GradebookStudent,
@@ -418,7 +419,7 @@ export function GradebookTable({
             {readOnly ? labels.readOnly : labels.active}
           </p>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-            {divisionName}
+            {normalizeDivisionLabel(divisionName)}
           </h2>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">

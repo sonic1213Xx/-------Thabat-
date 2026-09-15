@@ -1031,7 +1031,9 @@ export default function StudentsPage() {
                   />
                   <span className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm font-semibold transition hover:border-emerald-400 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-500 peer-checked:border-emerald-600 peer-checked:bg-emerald-600 peer-checked:text-white">
                     <span>
-                      {locale === "ar" ? `الشعبة ${code}` : `Division ${code}`}
+                      {locale === "ar"
+                        ? `الشعبة ${divisionDisplayLabel(code)}`
+                        : `Division ${divisionDisplayLabel(code)}`}
                     </span>
                     {templateDivisions.includes(code) && (
                       <span aria-hidden="true">✓</span>
