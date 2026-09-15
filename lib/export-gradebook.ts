@@ -4,6 +4,8 @@ import { getSession } from '@/lib/auth'
 
 const headers = ['م', 'اسم الطلاب/ة', 'الرقم الأكاديمي', 'الهوية الوطنية', 'الشعبة', 'مشاركة - الفترة 1 (10)', 'مهام أدائية - الفترة 1 (30)', 'اختبار قصير - الفترة 1 (10)', 'جانب عملي - الفترة 1 (10)', 'مشاركة - الفترة 2 (10)', 'مهام أدائية - الفترة 2 (30)', 'اختبار قصير - الفترة 2 (10)', 'جانب عملي - الفترة 2 (10)', 'المجموع النهائي (60)']
 
+const normalizeDivisionLabel = (value: string) => value.trim().replace(/^(?:الشعبة|division)\s+/i, '').trim() || value.trim()
+
 export type GradebookStudent = {
   id: string
   studentId?: string
@@ -66,6 +68,7 @@ const removeUnusedStudentRows = (worksheet: ExcelJS.Worksheet, studentCount: num
 
 export type GradebookExportMetadata = { schoolName?: string; teacherName?: string; subject?: string; principalName?: string }
 export async function exportGradebookToExcel(divisionName: string, studentsData: GradebookStudent[], customCategories: GradebookCustomCategory[] = [], customScores: Record<string, Record<string, number | null>> = {}, finalMaximum = 60, configuredFields: GradebookCustomCategory[] = [], period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
+  const displayDivision = normalizeDivisionLabel(divisionName)
   const templatePath = period === 'period1' ? '/gradebook-templates/term-1.xlsx' : period === 'period2' ? '/gradebook-templates/term-2.xlsx' : '/gradebook-templates/both-terms.xlsx'
   const templateResponse = await fetch(templatePath)
   if (templateResponse.ok) {
@@ -96,7 +99,7 @@ export async function exportGradebookToExcel(divisionName: string, studentsData:
       setCenteredTextCell(row.getCell('B'), student.fullName)
       setIdentifierCell(row.getCell('C'), student.academicId ?? student.studentId)
       setIdentifierCell(row.getCell('D'), student.nationalId)
-      setIdentifierCell(row.getCell('E'), student.divisionCode ?? divisionName)
+      setIdentifierCell(row.getCell('E'), normalizeDivisionLabel(student.divisionCode ?? displayDivision))
       writeTerm(row, student, period === 'period2' ? period2Keys : period1Keys, ['F', 'G', 'H', 'I'], 'J')
       if (period === 'both') writeTerm(row, student, period2Keys, ['K', 'L', 'M', 'N'], 'O')
     })
@@ -115,7 +118,7 @@ export async function exportGradebookToExcel(divisionName: string, studentsData:
         const row = customWorksheet.addRow([
           index + 1,
           student.fullName,
-          student.divisionCode ?? divisionName,
+          normalizeDivisionLabel(student.divisionCode ?? displayDivision),
           ...customCategories.map((category) => customScores[student.id]?.[category.key] ?? ''),
         ])
         row.eachCell((cell) => {
@@ -126,11 +129,11 @@ export async function exportGradebookToExcel(divisionName: string, studentsData:
     }
     applyDubaiFont(worksheet)
     const buffer = await workbook.xlsx.writeBuffer()
-    saveAs(new Blob([buffer]), `كشف_درجات_${divisionName}.xlsx`)
+    saveAs(new Blob([buffer]), `كشف_درجات_${displayDivision}.xlsx`)
     return
   }
   const workbook = new ExcelJS.Workbook()
-  const worksheet = workbook.addWorksheet(divisionName)
+  const worksheet = workbook.addWorksheet(displayDivision)
   worksheet.views = [{ rtl: true } as unknown as ExcelJS.WorksheetView]
   const fields = configuredFields.length ? configuredFields : [
     { key: 'participationPeriod1', label: 'مشاركة - الفترة 1', max: 10 }, { key: 'performancePeriod1', label: 'مهام أدائية - الفترة 1', max: 30 }, { key: 'quizPeriod1', label: 'اختبار قصير - الفترة 1', max: 10 }, { key: 'practicalPeriod1', label: 'جانب عملي - الفترة 1', max: 10 },
@@ -164,7 +167,7 @@ export async function exportGradebookToExcel(divisionName: string, studentsData:
       student.fullName,
       student.academicId ?? student.studentId ?? '',
       student.nationalId ?? '',
-      student.divisionCode ?? divisionName,
+      normalizeDivisionLabel(student.divisionCode ?? displayDivision),
       ...selectedFields.map((field) => customScores[student.id]?.[field.key] ?? student[field.key as keyof GradebookStudent] ?? ''),
       ...customCategories.map((category) => customScores[student.id]?.[category.key] ?? ''),
       (() => {
@@ -182,22 +185,23 @@ export async function exportGradebookToExcel(divisionName: string, studentsData:
   })
 
   const buffer = await workbook.xlsx.writeBuffer()
-  saveAs(new Blob([buffer]), `كشف_درجات_${divisionName}.xlsx`)
+  saveAs(new Blob([buffer]), `كشف_درجات_${displayDivision}.xlsx`)
 }
 
 export function exportGradebookToPdf(divisionName: string, studentsData: GradebookStudent[], fields: GradebookCustomCategory[], finalMaximum = 60, period: GradebookPeriod = 'both', metadata: GradebookExportMetadata = {}) {
   if (typeof window === 'undefined') return
+  const displayDivision = normalizeDivisionLabel(divisionName)
   const selectedFields = fields.filter((field) => period === 'both' || (period === 'period1' ? field.key.toLowerCase().includes('period1') || !field.key.toLowerCase().includes('period2') : field.key.toLowerCase().includes('period2') || !field.key.toLowerCase().includes('period1')))
   const headers = ['م', 'اسم الطلاب/ة', 'الرقم الأكاديمي', 'الهوية الوطنية', 'الشعبة', ...selectedFields.map((field) => `${field.label} (${field.max})`), `المجموع النهائي (${finalMaximum})`]
   const rows = studentsData.map((student, index) => {
     const total = selectedFields.reduce((sum, field) => sum + Number(student[field.key as keyof GradebookStudent] ?? 0), 0)
     const maximum = selectedFields.reduce((sum, field) => sum + field.max, 0)
     const finalScore = maximum ? Math.round((total / maximum) * finalMaximum * 100) / 100 : 0
-    return `<tr><td>${index + 1}</td><td>${escapeHtml(student.fullName)}</td><td>${escapeHtml(student.academicId ?? student.studentId ?? '')}</td><td>${escapeHtml(student.nationalId ?? '')}</td><td>${escapeHtml(student.divisionCode ?? divisionName)}</td>${selectedFields.map((field) => `<td>${student[field.key as keyof GradebookStudent] ?? ''}</td>`).join('')}<td><strong>${finalScore}</strong></td></tr>`
+    return `<tr><td>${index + 1}</td><td>${escapeHtml(student.fullName)}</td><td>${escapeHtml(student.academicId ?? student.studentId ?? '')}</td><td>${escapeHtml(student.nationalId ?? '')}</td><td>${escapeHtml(normalizeDivisionLabel(student.divisionCode ?? displayDivision))}</td>${selectedFields.map((field) => `<td>${student[field.key as keyof GradebookStudent] ?? ''}</td>`).join('')}<td><strong>${finalScore}</strong></td></tr>`
   }).join('')
   const printWindow = window.open('', '_blank', 'width=1100,height=800')
   if (!printWindow) return
-  printWindow.document.write(`<html dir="rtl"><head><title>كشف درجات ${escapeHtml(divisionName)}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1{text-align:center;font-size:22px}h2{text-align:center;font-size:18px}p{text-align:right;margin:6px 0}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #9ca3af;padding:8px;text-align:center}th{background:#d9ead3;font-weight:700}td:nth-child(2){text-align:right}@media print{body{padding:0}}</style></head><body><h1>${escapeHtml(metadata.schoolName ?? '')}</h1><h2>كشف درجات ${escapeHtml(divisionName)}</h2><p>المادة: ${escapeHtml(metadata.subject ?? '')} | المعلم: ${escapeHtml(metadata.teacherName ?? '')} | مدير المدرسة: ${escapeHtml(metadata.principalName ?? '')}</p><table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>{window.print();window.onafterprint=()=>window.close()}</script></body></html>`)
+  printWindow.document.write(`<html dir="rtl"><head><title>كشف درجات ${escapeHtml(displayDivision)}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1{text-align:center;font-size:22px}h2{text-align:center;font-size:18px}p{text-align:right;margin:6px 0}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #9ca3af;padding:8px;text-align:center}th{background:#d9ead3;font-weight:700}td:nth-child(2){text-align:right}@media print{body{padding:0}}</style></head><body><h1>${escapeHtml(metadata.schoolName ?? '')}</h1><h2>كشف درجات ${escapeHtml(displayDivision)}</h2><p>المادة: ${escapeHtml(metadata.subject ?? '')} | المعلم: ${escapeHtml(metadata.teacherName ?? '')} | مدير المدرسة: ${escapeHtml(metadata.principalName ?? '')}</p><table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>{window.print();window.onafterprint=()=>window.close()}</script></body></html>`)
   printWindow.document.close()
 }
 
@@ -210,7 +214,7 @@ export async function exportEmptyGradebookTemplates(divisionCodes: string[], per
   const templateResponse = await fetch(templatePath)
   if (!templateResponse.ok) throw new Error('Unable to load the gradebook template.')
   const templateBuffer = await templateResponse.arrayBuffer()
-  const uniqueCodes = Array.from(new Set(divisionCodes)).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
+  const uniqueCodes = Array.from(new Set(divisionCodes.map(normalizeDivisionLabel))).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
   if (!uniqueCodes.length) return
 
   const workbook = new ExcelJS.Workbook()
@@ -253,7 +257,7 @@ export async function exportEmptyGradebookTemplates(divisionCodes: string[], per
       setCenteredTextCell(row.getCell('B'), student.fullName)
       setIdentifierCell(row.getCell('C'), student.academicId ?? student.studentId)
       setIdentifierCell(row.getCell('D'), student.nationalId)
-      setIdentifierCell(row.getCell('E'), student.divisionCode ?? divisionCode)
+      setIdentifierCell(row.getCell('E'), normalizeDivisionLabel(student.divisionCode ?? divisionCode))
     })
     removeUnusedStudentRows(worksheet, Math.min(divisionStudents.length, getStudentRows(worksheet).capacity))
     applyDubaiFont(worksheet)
@@ -273,8 +277,8 @@ export async function exportEmptyGradebookTemplatesToPdf(divisionCodes: string[]
   const students = json.data ?? []
   let schoolName = ''
   try { schoolName = (JSON.parse(localStorage.getItem('thabat-settings') ?? '{}') as { schoolName?: string }).schoolName ?? '' } catch { schoolName = '' }
-  const sections = Array.from(new Set(divisionCodes)).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })).map((divisionCode) => {
-    const rows = students.filter((student) => student.divisionCode === divisionCode).sort((left, right) => left.fullName.localeCompare(right.fullName, 'ar')).map((student, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(student.fullName)}</td><td>${escapeHtml(student.academicId ?? student.studentId ?? '')}</td><td>${escapeHtml(student.nationalId ?? '')}</td><td>${escapeHtml(student.divisionCode ?? divisionCode)}</td>${Array.from({ length: 9 }, () => '<td></td>').join('')}</tr>`).join('')
+  const sections = Array.from(new Set(divisionCodes.map(normalizeDivisionLabel))).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })).map((divisionCode) => {
+    const rows = students.filter((student) => normalizeDivisionLabel(student.divisionCode ?? '') === divisionCode).sort((left, right) => left.fullName.localeCompare(right.fullName, 'ar')).map((student, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(student.fullName)}</td><td>${escapeHtml(student.academicId ?? student.studentId ?? '')}</td><td>${escapeHtml(student.nationalId ?? '')}</td><td>${escapeHtml(normalizeDivisionLabel(student.divisionCode ?? divisionCode))}</td>${Array.from({ length: 9 }, () => '<td></td>').join('')}</tr>`).join('')
     return `<section><h2>الشعبة ${escapeHtml(divisionCode)}</h2><table><thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></section>`
   }).join('')
   const printWindow = window.open('', '_blank', 'width=1200,height=800')
