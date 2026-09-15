@@ -50,6 +50,18 @@ model User {
   @@index([role])
 }
 
+model SchoolSettings {
+  id                String   @id @default("school")
+  schoolName        String   @default("مدرسة السلمية الثانوية")
+  lateTime          String   @default("07:00")
+  defaultAttendance String   @default("UNMARKED")
+  attendanceNotes   Boolean  @default(false)
+  absenceAlerts     Boolean  @default(true)
+  warningAlerts     Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+  updatedBy         String?
+}
+
 // ============ Student Model ============
 // Student records with academic performance and edit tracking
 model Student {

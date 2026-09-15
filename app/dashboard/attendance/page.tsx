@@ -16,7 +16,6 @@ import { EditAttendanceModal } from "@/components/attendance/edit-attendance-mod
 import { StyledSelect } from "@/components/ui/styled-select";
 import { Modal } from "@/components/ui/modal";
 import { usePathname, useRouter } from "next/navigation";
-import { getConfiguredClassroomDefaultAttendance, getConfiguredLateTime } from "@/lib/school-settings";
 import { normalizeDivisionCode } from "@/lib/utils";
 
 type Status =
@@ -54,9 +53,9 @@ const options = (english: boolean, classroom: boolean) => [
   { value: "LATE", label: english ? "Late" : "متأخر" },
   ...(classroom ? [{ value: "ESCAPED", label: english ? "Escaped" : "هروب" }] : []),
 ];
-const lateDuration = (entryTime: string, english: boolean) => {
+const lateDuration = (entryTime: string, english: boolean, lateTime: string) => {
   const [hour, minute] = entryTime.split(":").map(Number);
-  const [startHour, startMinute] = getConfiguredLateTime().split(":").map(Number);
+  const [startHour, startMinute] = lateTime.split(":").map(Number);
   const schoolStartMinutes = startHour * 60 + startMinute;
   const total = hour * 60 + minute - schoolStartMinutes;
   if (total <= 0) return english ? "after start time" : "بعد بداية الدوام";
@@ -82,6 +81,7 @@ export default function AttendancePage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const mode: "SCHOOL" | "CLASS" = isClassroomPage ? "CLASS" : "SCHOOL";
   const [students, setStudents] = useState<Student[]>([]);
+  const [sharedAttendanceSettings, setSharedAttendanceSettings] = useState<{ lateTime: string; defaultAttendance: "UNMARKED" | "PRESENT" }>({ lateTime: "07:00", defaultAttendance: "UNMARKED" });
   const [statuses, setStatuses] = useState<Record<string, Status | null>>({});
   const [entryTimes, setEntryTimes] = useState<Record<string, string | null>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -116,6 +116,19 @@ export default function AttendancePage() {
   const hasFetchedRef = useRef<string | null>(null);
   const [attendanceLoadedKey, setAttendanceLoadedKey] = useState<string | null>(null);
   const initialAttendanceMapRef = useRef<Map<string, { status: Status; note: string }>>(new Map());
+  useEffect(() => {
+    if (!session?.id) return;
+    void fetch("/api/settings/attendance", { headers: { "x-thabat-user-id": session.id } })
+      .then((response) => response.ok ? response.json() as Promise<{ data?: { lateTime?: string; defaultAttendance?: string } }> : null)
+      .then((result) => {
+        if (!result?.data) return;
+        setSharedAttendanceSettings({
+          lateTime: result.data.lateTime ?? "07:00",
+          defaultAttendance: result.data.defaultAttendance === "PRESENT" ? "PRESENT" : "UNMARKED",
+        });
+      })
+      .catch(() => undefined);
+  }, [session?.id]);
   useEffect(() => {
     if (isTeacher && !classroom) router.replace("/dashboard/class-attendance");
   }, [classroom, isTeacher, router]);
@@ -244,7 +257,7 @@ export default function AttendancePage() {
           headers: { "x-thabat-user-id": session.id },
         });
         const records = response.data ?? [];
-        const classroomDefault = mode === "CLASS" ? getConfiguredClassroomDefaultAttendance() : "UNMARKED";
+        const classroomDefault = mode === "CLASS" ? sharedAttendanceSettings.defaultAttendance : "UNMARKED";
         setStatuses(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.status === "UNMARKED" ? classroomDefault : record.status ?? classroomDefault])));
         setEntryTimes(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.entryTime ?? null])));
         setNotes(Object.fromEntries(records.map((record) => [record.studentId ?? record.id, record.notes ?? ""])));
@@ -259,14 +272,14 @@ export default function AttendancePage() {
       }
     };
     void load().catch(() => setMessage("تعذر تحميل الحضور."));
-  }, [date, mode, divisionKey, session?.id, attendanceRevision, selectedSubject]);
+  }, [date, mode, divisionKey, session?.id, attendanceRevision, selectedSubject, sharedAttendanceSettings.defaultAttendance]);
 
   const applyStatus = (studentIds: string[], status: Status) => {
     const eligibleIds = studentIds.filter((studentId) => statuses[studentId] !== "LEFT_WITH_PERMISSION");
     const entryTime = status === "LATE" ? new Date().toTimeString().slice(0, 5) : null;
     setStatuses((current) => ({ ...current, ...Object.fromEntries(eligibleIds.map((studentId) => [studentId, status])) }));
     setEntryTimes((current) => ({ ...current, ...Object.fromEntries(eligibleIds.map((studentId) => [studentId, entryTime])) }));
-    if (status === "LATE" && !isClassroomPage) setNotes((current) => ({ ...current, ...Object.fromEntries(eligibleIds.map((studentId) => [studentId, `${english ? "Entry time" : "وقت الدخول"}: ${entryTime} | ${english ? "Late by" : "التأخر"}: ${lateDuration(entryTime!, english)}`])) }));
+    if (status === "LATE" && !isClassroomPage) setNotes((current) => ({ ...current, ...Object.fromEntries(eligibleIds.map((studentId) => [studentId, `${english ? "Entry time" : "وقت الدخول"}: ${entryTime} | ${english ? "Late by" : "التأخر"}: ${lateDuration(entryTime!, english, sharedAttendanceSettings.lateTime)}`])) }));
   };
   const setStudentStatus = (studentId: string, status: Status) => applyStatus([studentId], status);
   const setDivisionStatus = (code: string, status: Status) => applyStatus(students.filter((student) => student.divisionCode === code).map((student) => student.id), status);

@@ -37,8 +37,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem(settingsKey)
-    if (!saved) return
-    try { setSettings({ ...defaultSettings, ...JSON.parse(saved) as Partial<SavedSettings> }) } catch { window.localStorage.removeItem(settingsKey) }
+    if (saved) {
+      try { setSettings((current) => ({ ...current, ...JSON.parse(saved) as Partial<SavedSettings> })) } catch { window.localStorage.removeItem(settingsKey) }
+    }
+    const session = getSession()
+    void fetch('/api/settings/attendance', { headers: session?.id ? { 'x-thabat-user-id': session.id } : undefined })
+      .then((response) => response.ok ? response.json() as Promise<{ data?: Partial<SavedSettings> }> : null)
+      .then((result) => { if (result?.data) setSettings((current) => ({ ...current, ...result.data })) })
+      .catch(() => undefined)
   }, [settingsKey])
 
   useEffect(() => {
@@ -48,11 +54,26 @@ export default function SettingsPage() {
     return () => window.clearInterval(timer)
   }, [dangerOpen, wipeStep])
 
-  const updateSettings = (changes: Partial<SavedSettings>) => setSettings((current) => { const next = { ...current, ...changes }; window.localStorage.setItem(settingsKey, JSON.stringify(next)); return next })
-  const saveAttendanceSettings = () => {
-    window.localStorage.setItem(settingsKey, JSON.stringify(settings))
-    window.dispatchEvent(new CustomEvent('thabat-settings-changed'))
-    toast.success(english ? 'Attendance settings saved' : 'تم حفظ إعدادات الحضور')
+  const updateSettings = (changes: Partial<SavedSettings>) => setSettings((current) => {
+    const next = { ...current, ...changes }
+    const attendanceKeys = ['lateTime', 'defaultAttendance', 'attendanceNotes', 'absenceAlerts', 'warningAlerts']
+    if (!Object.keys(changes).some((key) => attendanceKeys.includes(key))) window.localStorage.setItem(settingsKey, JSON.stringify(next))
+    return next
+  })
+  const saveAttendanceSettings = async () => {
+    const session = getSession()
+    try {
+      const response = await fetch('/api/settings/attendance', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(session?.id ? { 'x-thabat-user-id': session.id } : {}) },
+        body: JSON.stringify(settings),
+      })
+      if (!response.ok) throw new Error('Unable to save attendance settings')
+      window.dispatchEvent(new CustomEvent('thabat-settings-changed'))
+      toast.success(english ? 'Attendance settings saved for the school' : 'تم حفظ إعدادات الحضور للمدرسة')
+    } catch {
+      toast.error(english ? 'Unable to save attendance settings' : 'تعذر حفظ إعدادات الحضور')
+    }
   }
   const applyLateTime = saveAttendanceSettings
   const copy = english ? {
