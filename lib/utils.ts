@@ -217,5 +217,5 @@ export function getDivisionLabel(code: string): string {
 export function isValidDivisionCode(code: string | null | undefined): boolean {
   if (!code) return false
   const normalized = code.trim()
-  return normalized.length > 0 && /^[A-Za-z0-9\-_\u0600-\u06FF]+$/.test(normalized)
+  return normalized.length > 0 && /^[A-Za-z0-9\-_\u0600-\u06FF\s]+$/.test(normalized)
 }
