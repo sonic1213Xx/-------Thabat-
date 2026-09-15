@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
+import { getConfiguredSchoolNameForExport } from '@/lib/school-settings'
 
 export type StudentRecord = {
   fullName?: string | null
@@ -145,7 +146,9 @@ export function createThabatExcelWorkbook(students: StudentRecord[]): ExcelJS.Wo
 }
 
 export async function exportThabatExcelReport(students: StudentRecord[]): Promise<void> {
+  const schoolName = await getConfiguredSchoolNameForExport()
   const workbook = createThabatExcelWorkbook(students)
   const buffer = await workbook.xlsx.writeBuffer()
-  saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'thabat-report.xlsx')
+  const safeSchoolName = schoolName.replace(/[<>:"/\\|?*]/g, '-')
+  saveAs(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `${safeSchoolName}-report.xlsx`)
 }

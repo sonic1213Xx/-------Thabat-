@@ -15,6 +15,24 @@ export function getConfiguredSchoolName(): string {
   }
 }
 
+export async function getConfiguredSchoolNameForExport(): Promise<string> {
+  const fallback = getConfiguredSchoolName()
+  if (typeof window === 'undefined') return fallback
+  try {
+    const sessionValue = localStorage.getItem('thabat-session') ?? sessionStorage.getItem('thabat-session')
+    const session = sessionValue ? JSON.parse(sessionValue) as { id?: string } : null
+    const response = await fetch('/api/settings/attendance', {
+      headers: session?.id ? { 'x-thabat-user-id': session.id } : undefined,
+      cache: 'no-store',
+    })
+    if (!response.ok) return fallback
+    const result = await response.json() as { data?: { schoolName?: string } }
+    return result.data?.schoolName?.trim() || fallback
+  } catch {
+    return fallback
+  }
+}
+
 export function getConfiguredLateTime(): string {
   if (typeof window === 'undefined') return DEFAULT_LATE_TIME
   try {

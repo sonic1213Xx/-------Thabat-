@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { getConfiguredSchoolName } from '@/lib/school-settings'
+import { getConfiguredSchoolNameForExport } from '@/lib/school-settings'
 
 export type AttendanceExportStudent = {
   id: string;
@@ -169,7 +169,7 @@ export async function exportAttendanceWorkbook(
   dailyOnly = false,
   calendar: AttendanceCalendar = "both",
 ) {
-  const schoolName = getConfiguredSchoolName()
+  const schoolName = await getConfiguredSchoolNameForExport()
   const records = suppliedStudents.filter(
     (student) =>
       student.divisionCode && new Set(divisionCodes).has(student.divisionCode),
