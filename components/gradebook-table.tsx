@@ -260,11 +260,16 @@ export function GradebookTable({
       schoolName = "";
     }
     const profiles = getProfiles();
+    const session = getSession();
     const teacherProfile = profiles.find((profile) => profile.id === teacherId);
     const principalProfile = profiles.find((profile) => profile.role === "PRINCIPAL");
     return {
       schoolName,
-      teacherName: teacherProfile?.role === "TEACHER" ? teacherProfile.name : undefined,
+      teacherName:
+        teacherProfile?.role === "TEACHER" &&
+        (session?.role === "TEACHER" || teacherId !== session?.id)
+          ? teacherProfile.name
+          : undefined,
       subject,
       principalName: principalProfile?.name,
     };

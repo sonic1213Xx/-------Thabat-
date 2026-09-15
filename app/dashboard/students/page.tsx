@@ -117,7 +117,8 @@ export default function StudentsPage() {
     }
     return {
       schoolName,
-      teacherName: currentProfile?.name ?? session?.name,
+      teacherName:
+        currentProfile?.role === "TEACHER" ? currentProfile.name : undefined,
       principalName: principalProfile?.name,
       subject: currentSubject || availableSubjects[0],
     };
