@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FileText, TrendingUp, Users } from 'lucide-react'
+import { FileText, Save, TrendingUp, Users } from 'lucide-react'
 import { useLanguage } from '@/components/language-provider'
 import { ReportExportButton } from '@/components/report-export-button'
+import { useToast } from '@/components/toast-provider'
 import { fetchCached } from '@/lib/client-cache'
 
 export default function ReportsPage() {
-  const { t } = useLanguage()
+  const { t, locale } = useLanguage()
+  const { toast } = useToast()
   const [students, setStudents] = useState<any[]>([])
   const [warnings, setWarnings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,6 +40,15 @@ export default function ReportsPage() {
     ? Math.round(students.reduce((sum, item) => sum + (item.behaviorScore || 0), 0) / students.length)
     : 0
 
+  const handleSave = () => {
+    localStorage.setItem('thabat-report-snapshot', JSON.stringify({
+      savedAt: new Date().toISOString(),
+      students,
+      warnings,
+    }))
+    toast.success(locale === 'ar' ? 'تم حفظ التقرير بنجاح' : 'Report saved successfully')
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -45,7 +56,17 @@ export default function ReportsPage() {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('reports')}</h1>
           <p className="text-slate-600 dark:text-slate-400">{t('reportsDescription')}</p>
         </div>
-        <ReportExportButton students={students} label="تصدير التقرير" />
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleSave}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-600 px-4 py-3 font-semibold text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
+          >
+            <Save className="h-4 w-4" />
+            {locale === 'ar' ? 'حفظ التقرير' : 'Save report'}
+          </button>
+          <ReportExportButton students={students} label="تصدير التقرير" />
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
