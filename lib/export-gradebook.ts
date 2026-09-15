@@ -250,7 +250,7 @@ export async function exportEmptyGradebookTemplates(divisionCodes: string[], per
     worksheet.getCell('C2').value = metadata.schoolName ?? ''
     worksheet.getCell('B3').value = `المعلم : ${metadata.teacherName ?? ''}`
     worksheet.getCell('C4').value = `مدير المدرسة : ${metadata.principalName ?? ''}`
-    const divisionStudents = students.filter((student) => student.divisionCode === divisionCode)
+    const divisionStudents = students.filter((student) => normalizeDivisionLabel(student.divisionCode ?? '') === divisionCode)
     divisionStudents.slice(0, getStudentRows(worksheet).capacity).forEach((student, index) => {
       const row = worksheet.getRow(11 + index)
       setIdentifierCell(row.getCell('A'), index + 1)

@@ -262,7 +262,12 @@ export function GradebookTable({
     const profiles = getProfiles();
     const teacherProfile = profiles.find((profile) => profile.id === teacherId);
     const principalProfile = profiles.find((profile) => profile.role === "PRINCIPAL");
-    return { schoolName, teacherName: teacherProfile?.name, subject, principalName: principalProfile?.name };
+    return {
+      schoolName,
+      teacherName: teacherProfile?.role === "TEACHER" ? teacherProfile.name : undefined,
+      subject,
+      principalName: principalProfile?.name,
+    };
   };
   const addColumn = () =>
     setCategorySettings((current) => [
