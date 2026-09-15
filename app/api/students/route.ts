@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 
-import { getDateOnly, getTimeOnly, formatRelativeTimeArabic, isValidDivisionCode } from '@/lib/utils'
+import { getDateOnly, getTimeOnly, formatRelativeTimeArabic, isValidDivisionCode, normalizeDivisionCode } from '@/lib/utils'
 
 import { prisma } from '@/lib/prisma'
 import { authorizeDivisions } from '@/lib/division-auth'
@@ -91,7 +91,10 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({
-      data: students,
+      data: students.map((student) => ({
+        ...student,
+        divisionCode: normalizeDivisionCode(student.divisionCode),
+      })),
       meta: {
         division: division ?? 'all',
         total: students.length,

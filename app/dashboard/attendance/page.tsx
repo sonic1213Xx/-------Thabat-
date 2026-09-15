@@ -18,6 +18,7 @@ import { StyledSelect } from "@/components/ui/styled-select";
 import { Modal } from "@/components/ui/modal";
 import { usePathname, useRouter } from "next/navigation";
 import { getConfiguredClassroomDefaultAttendance, getConfiguredLateTime } from "@/lib/school-settings";
+import { normalizeDivisionCode } from "@/lib/utils";
 
 type Status =
   | "UNMARKED"
@@ -197,7 +198,10 @@ export default function AttendancePage() {
         const payloads = await Promise.all(
         responses.map((response) => response instanceof Response ? response.json() : response),
         );
-        setStudents(payloads.flatMap((payload) => payload.data ?? []));
+        setStudents(payloads.flatMap((payload) => payload.data ?? []).map((student) => ({
+          ...student,
+          divisionCode: normalizeDivisionCode(student.divisionCode),
+        })));
       } finally {
         setLoadingStudents(false);
       }

@@ -114,6 +114,24 @@ export function getDivisionNameArabic(code: string): string {
   return divisions[code] || code
 }
 
+export function normalizeDivisionCode(value?: string | null): string {
+  const normalized = value?.trim() ?? ''
+  if (!normalized) return ''
+
+  const numericCode = normalized.match(/\b([1-3]\d{2})\b/)?.[1]
+  if (numericCode) return numericCode
+
+  const section = normalized.match(/(?:الشعبة|division)\s*([12])\b/i)?.[1]
+  if (!section) return normalized
+
+  const grade = /الثاني|الرابع|second|2nd|4th/i.test(normalized)
+    ? '2'
+    : /الثالث|السادس|third|3rd|6th/i.test(normalized)
+      ? '3'
+      : '1'
+  return `${grade}0${section}`
+}
+
 /**
  * Get grade level name in Arabic
  */

@@ -59,6 +59,7 @@ import {
   TeacherInspectionView,
   type TeacherProfile,
 } from "@/components/teacher-inspection-view";
+import { normalizeDivisionCode } from "@/lib/utils";
 
 interface StudentRecord {
   id: string;
@@ -78,8 +79,7 @@ interface StudentRecord {
 }
 
 function normalizeDivisionValue(value?: string | null) {
-  const normalized = value?.trim() ?? "";
-  return normalized.match(/\d{3}/)?.[0] ?? normalized;
+  return normalizeDivisionCode(value);
 }
 
 function divisionDisplayLabel(value?: string | null) {
