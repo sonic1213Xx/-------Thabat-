@@ -9,7 +9,7 @@ import { ConfirmModal } from '@/components/dashboard/confirm-modal'
 import { DivisionsLoadingSkeleton } from '@/components/dashboard/tab-loading-skeleton'
 import { useTabLoading } from '@/components/dashboard/use-tab-loading'
 import { useLanguage } from '@/components/language-provider'
-import { fetchCached } from '@/lib/client-cache'
+import { fetchCached, invalidateCached } from '@/lib/client-cache'
 import { getCurrentProfile, getSession } from '@/lib/auth'
 import { DivisionStudentsModal } from '@/components/division-students-modal'
 
@@ -134,15 +134,20 @@ export default function DivisionsPage() {
 
   const confirmDeleteDivision = async () => {
     if (!deletingDivision) return
+    const divisionToDelete = deletingDivision
 
     try {
-      const response = await fetch(`/api/divisions/${deletingDivision.id}`, { method: 'DELETE', headers: session?.id ? { 'x-thabat-user-id': session.id } : undefined })
+      const response = await fetch(`/api/divisions/${divisionToDelete.id}`, { method: 'DELETE', headers: session?.id ? { 'x-thabat-user-id': session.id } : undefined })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) {
         throw new Error(result.error || t('divisionDeleted'))
       }
 
       setDeletingDivision(null)
+      setSelectedDivision((current) => current?.id === divisionToDelete.id ? null : current)
+      setDivisions((current) => current.filter((division) => division.id !== divisionToDelete.id))
+      invalidateCached(`dashboard:divisions:${session?.id}:${session?.role}`)
+      invalidateCached('dashboard:students:all')
       await loadData()
       router.refresh()
     } catch (error) {
@@ -229,10 +234,10 @@ export default function DivisionsPage() {
                 <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{division.code}</h3>
               </div>
               <div className="flex items-center gap-2">
-                {canManageDivisions && <button type="button" onClick={() => openEditModal(division)} aria-label={t('editDivision')} className="rounded-md p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+                {canManageDivisions && <button type="button" onClick={(event) => { event.stopPropagation(); openEditModal(division) }} aria-label={t('editDivision')} className="rounded-md p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
                   <Pencil className="h-4 w-4" />
                 </button>}
-                {canManageDivisions && <button type="button" onClick={() => setDeletingDivision(division)} aria-label={t('deleteDivision')} className="rounded-md p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
+                {canManageDivisions && <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedDivision(null); setDeletingDivision(division) }} aria-label={t('deleteDivision')} className="rounded-md p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                   <Trash2 className="h-4 w-4" />
                 </button>}
               </div>
@@ -285,10 +290,10 @@ export default function DivisionsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        {canManageDivisions && <button type="button" onClick={() => openEditModal(division)} aria-label="تعديل الشعبة" className="rounded-md p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+                        {canManageDivisions && <button type="button" onClick={(event) => { event.stopPropagation(); openEditModal(division) }} aria-label="تعديل الشعبة" className="rounded-md p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
                           <Pencil className="h-4 w-4" />
                         </button>}
-                        {canManageDivisions && <button type="button" onClick={() => setDeletingDivision(division)} aria-label="حذف الشعبة" className="rounded-md p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
+                        {canManageDivisions && <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedDivision(null); setDeletingDivision(division) }} aria-label="حذف الشعبة" className="rounded-md p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                           <Trash2 className="h-4 w-4" />
                         </button>}
                       </div>

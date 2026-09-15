@@ -315,6 +315,8 @@ export default function StudentsPage() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
     async function loadStudents() {
       if (!division) return;
       await withMinimumDelay(async () => {
@@ -329,7 +331,7 @@ export default function StudentsPage() {
             url,
             session?.id ? { headers: { "x-thabat-user-id": session.id } } : undefined,
           );
-          setStudents(json.data ?? []);
+          if (active) setStudents(json.data ?? []);
         } catch (error) {
           console.error("Failed to fetch students:", error);
         }
@@ -337,6 +339,9 @@ export default function StudentsPage() {
     }
 
     loadStudents();
+    return () => {
+      active = false;
+    };
   }, [division, withMinimumDelay]);
 
   const hasDivisions = divisions.length > 0 || students.length > 0;
