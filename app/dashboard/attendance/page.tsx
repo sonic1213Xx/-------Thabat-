@@ -378,6 +378,7 @@ export default function AttendancePage() {
   };
   const exportRecord = (student: Student) => ({
     ...student,
+    studentId: student.id,
     id: student.academicId || student.nationalId || student.id,
     status: statuses[student.id] ?? "UNMARKED",
   });
