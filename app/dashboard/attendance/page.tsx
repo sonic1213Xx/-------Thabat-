@@ -89,6 +89,7 @@ export default function AttendancePage() {
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingStudents, setLoadingStudents] = useState(true);
+  const [loadingSharedSettings, setLoadingSharedSettings] = useState(true);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [message, setMessage] = useState("");
   const [attendanceTemplateDivisions, setAttendanceTemplateDivisions] =
@@ -117,7 +118,10 @@ export default function AttendancePage() {
   const [attendanceLoadedKey, setAttendanceLoadedKey] = useState<string | null>(null);
   const initialAttendanceMapRef = useRef<Map<string, { status: Status; note: string }>>(new Map());
   useEffect(() => {
-    if (!session?.id) return;
+    if (!session?.id) {
+      setLoadingSharedSettings(false);
+      return;
+    }
     void fetch("/api/settings/attendance", { headers: { "x-thabat-user-id": session.id } })
       .then((response) => response.ok ? response.json() as Promise<{ data?: { lateTime?: string; defaultAttendance?: string } }> : null)
       .then((result) => {
@@ -127,7 +131,8 @@ export default function AttendancePage() {
           defaultAttendance: result.data.defaultAttendance === "PRESENT" ? "PRESENT" : "UNMARKED",
         });
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setLoadingSharedSettings(false));
   }, [session?.id]);
   useEffect(() => {
     if (isTeacher && !classroom) router.replace("/dashboard/class-attendance");
@@ -486,7 +491,7 @@ export default function AttendancePage() {
             : "border-slate-200 dark:border-slate-700";
 
         const attendanceKey = `${session?.id ?? "anonymous"}:${date}:${mode}:${divisionKey}:${attendanceRevision}`;
-        const isLoading = loadingStudents || loadingAttendance || (Boolean(students.length && divisions.length && session?.id) && attendanceLoadedKey !== attendanceKey);
+        const isLoading = loadingSharedSettings || loadingStudents || loadingAttendance || (Boolean(students.length && divisions.length && session?.id) && attendanceLoadedKey !== attendanceKey);
 
   return (
     <div className="attendance-page space-y-6" dir={dir}>
