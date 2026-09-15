@@ -336,6 +336,6 @@ export async function exportAttendanceWorkbook(
     new Blob([buffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
-    `حضور_ثانوية_النجاح_${date}.xlsx`,
+    `حضور_${schoolName.replace(/[<>:"/\\|?*]/g, "-")}_${date}.xlsx`,
   );
 }
