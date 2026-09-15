@@ -33,6 +33,7 @@ export default function SupportReportsPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [creatorNote, setCreatorNote] = useState<Record<string, string>>({})
+  const [draftStatus, setDraftStatus] = useState<Record<string, Report['status']>>({})
   const [updating, setUpdating] = useState<string | null>(null)
   const labels = english
     ? { eyebrow: 'Product support', title: 'Reports Center', description: 'Send a private bug report, fix request, or product suggestion to the Creator.', form: 'Send a report', category: 'Report type', bug: 'Bug', fix: 'Needs fixing', suggestion: 'Suggestion', subject: 'Short title', subjectPlaceholder: 'What should we know?', details: 'Details', detailsPlaceholder: 'Explain what happened, what you expected, and any useful steps to reproduce it.', send: 'Submit report', sending: 'Submitting...', yours: 'Your reports', all: 'All submitted reports', empty: 'No reports yet.', submitted: 'Submitted', note: 'Creator note', notePlaceholder: 'Add an update for the reporter', save: 'Save update', status: 'Status', page: 'Page', open: 'Open', inProgress: 'In progress', resolved: 'Resolved', closed: 'Closed', success: 'Report submitted.', error: 'Something went wrong. Please try again.' }
@@ -68,12 +69,19 @@ export default function SupportReportsPage() {
   }
 
   const updateReport = async (report: Report, nextStatus: Report['status']) => {
+    if (nextStatus !== report.status) {
+      setDraftStatus((current) => ({ ...current, [report.id]: nextStatus }))
+      setReports((current) => current.map((item) => item.id === report.id ? { ...item, status: nextStatus } : item))
+      return
+    }
     setUpdating(report.id)
     const session = getSession()
     try {
-      const response = await fetch('/api/support-reports', { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(session?.id ? { 'x-thabat-user-id': session.id } : {}) }, body: JSON.stringify({ id: report.id, status: nextStatus, creatorNote: creatorNote[report.id] ?? report.creatorNote ?? '' }) })
+      const statusToSave = draftStatus[report.id] ?? report.status
+      const response = await fetch('/api/support-reports', { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(session?.id ? { 'x-thabat-user-id': session.id } : {}) }, body: JSON.stringify({ id: report.id, status: statusToSave, creatorNote: creatorNote[report.id] ?? report.creatorNote ?? '' }) })
       if (!response.ok) throw new Error()
       await loadReports()
+      setDraftStatus((current) => { const next = { ...current }; delete next[report.id]; return next })
     } catch { setMessage(labels.error) } finally { setUpdating(null) }
   }
 
