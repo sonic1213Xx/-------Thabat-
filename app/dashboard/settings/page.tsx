@@ -10,7 +10,7 @@ import { AttendanceStatusSelect } from '@/components/ui/attendance-status-select
 import { Modal } from '@/components/ui/modal'
 import { getSession } from '@/lib/auth'
 import { isCreatorRole } from '@/lib/permissions'
-import { CLASSROOM_SETTINGS_KEY, DEFAULT_LATE_TIME, DEFAULT_SCHOOL_NAME, SETTINGS_KEY } from '@/lib/school-settings'
+import { DEFAULT_LATE_TIME, DEFAULT_SCHOOL_NAME } from '@/lib/school-settings'
 
 type SavedSettings = { schoolName: string; lateTime: string; defaultAttendance: 'UNMARKED' | 'PRESENT'; attendanceNotes: boolean; absenceAlerts: boolean; warningAlerts: boolean }
 const defaultSettings: SavedSettings = { schoolName: DEFAULT_SCHOOL_NAME, lateTime: DEFAULT_LATE_TIME, defaultAttendance: 'UNMARKED', attendanceNotes: false, absenceAlerts: true, warningAlerts: true }
@@ -34,19 +34,14 @@ export default function SettingsPage() {
   const [countdown, setCountdown] = useState(5)
   const canDeleteAllData = isCreatorRole(getSession()?.role)
   const isTeacher = getSession()?.role === 'TEACHER'
-  const settingsKey = isTeacher ? CLASSROOM_SETTINGS_KEY : SETTINGS_KEY
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(settingsKey)
-    if (saved) {
-      try { setSettings((current) => ({ ...current, ...JSON.parse(saved) as Partial<SavedSettings> })) } catch { window.localStorage.removeItem(settingsKey) }
-    }
     const session = getSession()
     void fetch('/api/settings/attendance', { headers: session?.id ? { 'x-thabat-user-id': session.id } : undefined })
       .then((response) => response.ok ? response.json() as Promise<{ data?: Partial<SavedSettings> }> : null)
       .then((result) => { if (result?.data && !settingsDirtyRef.current) setSettings((current) => ({ ...current, ...result.data })) })
       .catch(() => undefined)
-  }, [settingsKey])
+  }, [])
 
   useEffect(() => {
     if (!dangerOpen || wipeStep !== 2) return
@@ -57,10 +52,7 @@ export default function SettingsPage() {
 
   const updateSettings = (changes: Partial<SavedSettings>) => setSettings((current) => {
     settingsDirtyRef.current = true
-    const next = { ...current, ...changes }
-    const attendanceKeys = ['lateTime', 'defaultAttendance', 'attendanceNotes', 'absenceAlerts', 'warningAlerts']
-    if (!Object.keys(changes).some((key) => attendanceKeys.includes(key))) window.localStorage.setItem(settingsKey, JSON.stringify(next))
-    return next
+    return { ...current, ...changes }
   })
   const saveAttendanceSettings = async () => {
     const session = getSession()
@@ -74,19 +66,18 @@ export default function SettingsPage() {
       const result = await response.json() as { data?: SavedSettings }
       if (result.data) {
         setSettings(result.data)
-        window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(result.data))
       }
       settingsDirtyRef.current = false
       window.dispatchEvent(new CustomEvent('thabat-settings-changed'))
-      toast.success(english ? 'Attendance settings saved for the school' : 'تم حفظ إعدادات الحضور للمدرسة')
+      toast.success(english ? 'Settings saved for the whole school' : 'تم حفظ الإعدادات للمدرسة بالكامل')
     } catch {
       toast.error(english ? 'Unable to save attendance settings' : 'تعذر حفظ إعدادات الحضور')
     }
   }
   const copy = english ? {
-    title: 'Settings', description: 'The few controls used most often by your school team.', school: 'School information', schoolName: 'School name', identifier: 'School ID 1047 · Secondary · Eastern Province', attendance: 'Attendance preferences', saveAttendance: 'Save attendance settings', lateTime: 'Late after', lateTimeHint: 'Students marked late after this time.', defaultStatus: 'Default status', unmarked: 'Leave unmarked', present: 'Mark present', notes: 'Require a note for absences', notifications: 'Notifications', absence: 'Attendance escalation alerts', warnings: 'Warning and transfer alerts', appearance: 'Appearance', language: 'Language', english: 'English', arabic: 'Arabic', theme: 'Theme', light: 'Light', dark: 'Dark', danger: 'Danger zone', dangerDescription: 'Permanently remove all school records and attendance data.', deleteAll: 'Delete all data'
+    title: 'Settings', description: 'The few controls used most often by your school team.', school: 'School information', schoolName: 'School name', identifier: 'School ID 1047 · Secondary · Eastern Province', attendance: 'Attendance preferences', saveSettings: 'Save settings', lateTime: 'Late after', lateTimeHint: 'Students marked late after this time.', defaultStatus: 'Default status', unmarked: 'Leave unmarked', present: 'Mark present', notes: 'Require a note for absences', notifications: 'Notifications', absence: 'Attendance escalation alerts', warnings: 'Warning and transfer alerts', appearance: 'Appearance', language: 'Language', english: 'English', arabic: 'Arabic', theme: 'Theme', light: 'Light', dark: 'Dark', danger: 'Danger zone', dangerDescription: 'Permanently remove all school records and attendance data.', deleteAll: 'Delete all data'
   } : {
-    title: 'الإعدادات', description: 'أهم الإعدادات التي يستخدمها فريق المدرسة يومياً.', school: 'معلومات المدرسة', schoolName: 'اسم المدرسة', identifier: 'الرقم 1047 · التعليم الثانوي · المنطقة الشرقية', attendance: 'تفضيلات الحضور', saveAttendance: 'حفظ إعدادات الحضور', lateTime: 'يُعد الطالب متأخراً بعد', lateTimeHint: 'يتم تسجيل التأخر بعد هذا الوقت.', defaultStatus: 'الحالة الافتراضية', unmarked: 'اتركه دون تحديد', present: 'تسجيل حاضر', notes: 'طلب ملاحظة عند تسجيل الغياب', notifications: 'التنبيهات', absence: 'تنبيهات تصعيد الحضور', warnings: 'تنبيهات الإنذارات والنقل', appearance: 'المظهر', language: 'اللغة', english: 'English', arabic: 'العربية', theme: 'المظهر', light: 'فاتح', dark: 'داكن', danger: 'منطقة الخطر', dangerDescription: 'حذف جميع سجلات المدرسة والحضور نهائياً.', deleteAll: 'حذف جميع البيانات'
+    title: 'الإعدادات', description: 'أهم الإعدادات التي يستخدمها فريق المدرسة يومياً.', school: 'معلومات المدرسة', schoolName: 'اسم المدرسة', identifier: 'الرقم 1047 · التعليم الثانوي · المنطقة الشرقية', attendance: 'تفضيلات الحضور', saveSettings: 'حفظ الإعدادات', lateTime: 'يُعد الطالب متأخراً بعد', lateTimeHint: 'يتم تسجيل التأخر بعد هذا الوقت.', defaultStatus: 'الحالة الافتراضية', unmarked: 'اتركه دون تحديد', present: 'تسجيل حاضر', notes: 'طلب ملاحظة عند تسجيل الغياب', notifications: 'التنبيهات', absence: 'تنبيهات تصعيد الحضور', warnings: 'تنبيهات الإنذارات والنقل', appearance: 'المظهر', language: 'اللغة', english: 'English', arabic: 'العربية', theme: 'المظهر', light: 'فاتح', dark: 'داكن', danger: 'منطقة الخطر', dangerDescription: 'حذف جميع سجلات المدرسة والحضور نهائياً.', deleteAll: 'حذف جميع البيانات'
   }
 
   const openWipe = () => { setDangerOpen(true); setWipeStep(1); setPassword(''); setWipeError(''); setCountdown(5) }
@@ -106,15 +97,15 @@ export default function SettingsPage() {
     try {
       const response = await fetch('/api/admin/reset-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: session?.id ?? '10', password }) })
       if (!response.ok) { const result = await response.json() as { error?: string }; setWipeError(result.error ?? (english ? 'Unable to delete data.' : 'تعذر حذف البيانات.')); return }
-      window.localStorage.removeItem(SETTINGS_KEY); window.location.reload()
+      window.location.reload()
     } catch { setWipeError(english ? 'Unable to delete data.' : 'تعذر حذف البيانات.') } finally { setWipeBusy(false) }
   }
 
   return <div className="space-y-6" dir={locale === 'ar' ? 'rtl' : 'ltr'}>
-    <div><h1 className="text-3xl font-bold text-slate-900 dark:text-white">{copy.title}</h1><p className="text-slate-600 dark:text-slate-400">{copy.description}</p></div>
+    <div className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-3xl font-bold text-slate-900 dark:text-white">{copy.title}</h1><p className="text-slate-600 dark:text-slate-400">{copy.description}</p></div><button type="button" onClick={() => void saveAttendanceSettings()} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"><Save className="h-4 w-4" />{copy.saveSettings}</button></div>
     <div className="grid gap-5 lg:grid-cols-2">
       <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"><div className="mb-5 flex items-center gap-3"><Building2 className="h-5 w-5 text-emerald-600" /><h2 className="text-xl font-bold text-slate-900 dark:text-white">{copy.school}</h2></div><label className="block"><span className="mb-2 block text-sm text-slate-600 dark:text-slate-300">{copy.schoolName}</span><input value={settings.schoolName} onChange={(event) => updateSettings({ schoolName: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-start dark:border-slate-700 dark:bg-slate-950" /></label><p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">{copy.identifier}</p></section>
-      <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"><div className="mb-5 flex items-center gap-3"><CalendarCheck className="h-5 w-5 text-blue-600" /><h2 className="text-xl font-bold text-slate-900 dark:text-white">{copy.attendance}</h2></div><label className="block"><span className="mb-2 block text-sm text-slate-600 dark:text-slate-300">{copy.defaultStatus}</span><AttendanceStatusSelect value={settings.defaultAttendance} onValueChange={(value) => updateSettings({ defaultAttendance: value as SavedSettings['defaultAttendance'] })} options={[{ value: 'UNMARKED', label: copy.unmarked }, { value: 'PRESENT', label: copy.present }]} english={english} /></label>{!isTeacher && <label className="mt-4 block"><span className="mb-2 block text-sm text-slate-600 dark:text-slate-300">{copy.lateTime}</span><div><input type="time" value={settings.lateTime} onChange={(event) => updateSettings({ lateTime: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950" /></div><span className="mt-1 block text-xs text-slate-500">{copy.lateTimeHint}</span></label>}<label className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300"><span>{copy.notes}</span><Toggle checked={settings.attendanceNotes} onChange={(checked) => updateSettings({ attendanceNotes: checked })} /></label><button type="button" onClick={() => void saveAttendanceSettings()} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"><Save className="h-4 w-4" />{copy.saveAttendance}</button></section>
+      <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"><div className="mb-5 flex items-center gap-3"><CalendarCheck className="h-5 w-5 text-blue-600" /><h2 className="text-xl font-bold text-slate-900 dark:text-white">{copy.attendance}</h2></div><label className="block"><span className="mb-2 block text-sm text-slate-600 dark:text-slate-300">{copy.defaultStatus}</span><AttendanceStatusSelect value={settings.defaultAttendance} onValueChange={(value) => updateSettings({ defaultAttendance: value as SavedSettings['defaultAttendance'] })} options={[{ value: 'UNMARKED', label: copy.unmarked }, { value: 'PRESENT', label: copy.present }]} english={english} /></label>{!isTeacher && <label className="mt-4 block"><span className="mb-2 block text-sm text-slate-600 dark:text-slate-300">{copy.lateTime}</span><div><input type="time" value={settings.lateTime} onChange={(event) => updateSettings({ lateTime: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950" /></div><span className="mt-1 block text-xs text-slate-500">{copy.lateTimeHint}</span></label>}<label className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300"><span>{copy.notes}</span><Toggle checked={settings.attendanceNotes} onChange={(checked) => updateSettings({ attendanceNotes: checked })} /></label></section>
       <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"><div className="mb-5 flex items-center gap-3"><Bell className="h-5 w-5 text-orange-600" /><h2 className="text-xl font-bold text-slate-900 dark:text-white">{copy.notifications}</h2></div><div className="space-y-4"><label className="flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300"><span>{copy.absence}</span><Toggle checked={settings.absenceAlerts} onChange={(checked) => updateSettings({ absenceAlerts: checked })} /></label><label className="flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300"><span>{copy.warnings}</span><Toggle checked={settings.warningAlerts} onChange={(checked) => updateSettings({ warningAlerts: checked })} /></label></div></section>
       <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"><div className="mb-5 flex items-center gap-3"><Sun className="h-5 w-5 text-emerald-600" /><h2 className="text-xl font-bold text-slate-900 dark:text-white">{copy.appearance}</h2></div><div className="space-y-4"><div className="flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300"><span>{copy.language}</span><div className="flex rounded-lg border border-slate-200 p-1 dark:border-slate-700"><button type="button" onClick={() => { if (!english) toggleLocale() }} className={`rounded-md px-3 py-1.5 ${english ? 'bg-emerald-600 text-white' : ''}`}>{copy.english}</button><button type="button" onClick={() => { if (english) toggleLocale() }} className={`rounded-md px-3 py-1.5 ${!english ? 'bg-emerald-600 text-white' : ''}`}>{copy.arabic}</button></div></div><div className="flex items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300"><span>{copy.theme}</span><div className="flex rounded-lg border border-slate-200 p-1 dark:border-slate-700"><button type="button" onClick={() => setTheme('light')} className={`flex items-center gap-1 rounded-md px-3 py-1.5 ${theme === 'light' ? 'bg-emerald-600 text-white' : ''}`}><Sun className="h-3.5 w-3.5" />{copy.light}</button><button type="button" onClick={() => setTheme('dark')} className={`flex items-center gap-1 rounded-md px-3 py-1.5 ${theme === 'dark' ? 'bg-emerald-600 text-white' : ''}`}><Moon className="h-3.5 w-3.5" />{copy.dark}</button></div></div></div></section>
     </div>
