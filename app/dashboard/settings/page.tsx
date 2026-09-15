@@ -10,7 +10,7 @@ import { AttendanceStatusSelect } from '@/components/ui/attendance-status-select
 import { Modal } from '@/components/ui/modal'
 import { getSession } from '@/lib/auth'
 import { isCreatorRole } from '@/lib/permissions'
-import { CLASSROOM_SETTINGS_KEY, DEFAULT_LATE_TIME, DEFAULT_SCHOOL_NAME, SETTINGS_KEY } from '@/lib/school-settings'
+import { DEFAULT_LATE_TIME, DEFAULT_SCHOOL_NAME, SETTINGS_KEY } from '@/lib/school-settings'
 
 type SavedSettings = { schoolName: string; lateTime: string; defaultAttendance: 'UNMARKED' | 'PRESENT'; attendanceNotes: boolean; absenceAlerts: boolean; warningAlerts: boolean }
 const defaultSettings: SavedSettings = { schoolName: DEFAULT_SCHOOL_NAME, lateTime: DEFAULT_LATE_TIME, defaultAttendance: 'UNMARKED', attendanceNotes: false, absenceAlerts: true, warningAlerts: true }
@@ -33,19 +33,14 @@ export default function SettingsPage() {
   const [countdown, setCountdown] = useState(5)
   const canDeleteAllData = isCreatorRole(getSession()?.role)
   const isTeacher = getSession()?.role === 'TEACHER'
-  const settingsKey = isTeacher ? CLASSROOM_SETTINGS_KEY : SETTINGS_KEY
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(settingsKey)
-    if (saved) {
-      try { setSettings((current) => ({ ...current, ...JSON.parse(saved) as Partial<SavedSettings> })) } catch { window.localStorage.removeItem(settingsKey) }
-    }
     const session = getSession()
     void fetch('/api/settings/attendance', { headers: session?.id ? { 'x-thabat-user-id': session.id } : undefined })
       .then((response) => response.ok ? response.json() as Promise<{ data?: Partial<SavedSettings> }> : null)
       .then((result) => { if (result?.data) setSettings((current) => ({ ...current, ...result.data })) })
       .catch(() => undefined)
-  }, [settingsKey])
+  }, [])
 
   useEffect(() => {
     if (!dangerOpen || wipeStep !== 2) return
@@ -54,12 +49,7 @@ export default function SettingsPage() {
     return () => window.clearInterval(timer)
   }, [dangerOpen, wipeStep])
 
-  const updateSettings = (changes: Partial<SavedSettings>) => setSettings((current) => {
-    const next = { ...current, ...changes }
-    const attendanceKeys = ['lateTime', 'defaultAttendance', 'attendanceNotes', 'absenceAlerts', 'warningAlerts']
-    if (!Object.keys(changes).some((key) => attendanceKeys.includes(key))) window.localStorage.setItem(settingsKey, JSON.stringify(next))
-    return next
-  })
+  const updateSettings = (changes: Partial<SavedSettings>) => setSettings((current) => ({ ...current, ...changes }))
   const saveAttendanceSettings = async () => {
     const session = getSession()
     try {
