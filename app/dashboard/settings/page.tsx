@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, Bell, Building2, CalendarCheck, Moon, Save, Sun, Trash2, X } from 'lucide-react'
 import { useLanguage } from '@/components/language-provider'
@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const english = locale === 'en'
   const [settings, setSettings] = useState(defaultSettings)
+  const settingsDirtyRef = useRef(false)
   const [dangerOpen, setDangerOpen] = useState(false)
   const [wipeStep, setWipeStep] = useState<1 | 2>(1)
   const [password, setPassword] = useState('')
@@ -43,7 +44,7 @@ export default function SettingsPage() {
     const session = getSession()
     void fetch('/api/settings/attendance', { headers: session?.id ? { 'x-thabat-user-id': session.id } : undefined })
       .then((response) => response.ok ? response.json() as Promise<{ data?: Partial<SavedSettings> }> : null)
-      .then((result) => { if (result?.data) setSettings((current) => ({ ...current, ...result.data })) })
+      .then((result) => { if (result?.data && !settingsDirtyRef.current) setSettings((current) => ({ ...current, ...result.data })) })
       .catch(() => undefined)
   }, [settingsKey])
 
@@ -55,6 +56,7 @@ export default function SettingsPage() {
   }, [dangerOpen, wipeStep])
 
   const updateSettings = (changes: Partial<SavedSettings>) => setSettings((current) => {
+    settingsDirtyRef.current = true
     const next = { ...current, ...changes }
     const attendanceKeys = ['lateTime', 'defaultAttendance', 'attendanceNotes', 'absenceAlerts', 'warningAlerts']
     if (!Object.keys(changes).some((key) => attendanceKeys.includes(key))) window.localStorage.setItem(settingsKey, JSON.stringify(next))
@@ -69,6 +71,12 @@ export default function SettingsPage() {
         body: JSON.stringify(settings),
       })
       if (!response.ok) throw new Error('Unable to save attendance settings')
+      const result = await response.json() as { data?: SavedSettings }
+      if (result.data) {
+        setSettings(result.data)
+        window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(result.data))
+      }
+      settingsDirtyRef.current = false
       window.dispatchEvent(new CustomEvent('thabat-settings-changed'))
       toast.success(english ? 'Attendance settings saved for the school' : 'تم حفظ إعدادات الحضور للمدرسة')
     } catch {
