@@ -132,6 +132,19 @@ export function normalizeDivisionCode(value?: string | null): string {
   return `${grade}0${section}`
 }
 
+export function getGradeLevelFromDivisionCode(
+  divisionCode?: string | null,
+  gradeLevel?: number | null,
+): number | null {
+  const asciiCode = divisionCode?.replace(/[٠-٩]/g, (digit) =>
+    String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)),
+  )
+  const normalizedCode = normalizeDivisionCode(asciiCode)
+  const divisionGrade = normalizedCode.match(/^([1-3])\d{2}$/)?.[1]
+  if (divisionGrade) return Number(divisionGrade)
+  return gradeLevel && gradeLevel >= 1 && gradeLevel <= 3 ? gradeLevel : null
+}
+
 /**
  * Get grade level name in Arabic
  */

@@ -32,6 +32,8 @@ import { Modal } from "@/components/ui/modal";
 import {
   getStoredDivisions,
   getStoredTeamId,
+  getGradeLevelFromDivisionCode,
+  normalizeDivisionCode,
   setStoredDivisions,
 } from "@/lib/utils";
 import { TransferModal } from "@/components/dashboard/transfer-modal";
@@ -40,7 +42,6 @@ import { ConfirmModal } from "@/components/dashboard/confirm-modal";
 import { StudentsLoadingSkeleton } from "@/components/dashboard/tab-loading-skeleton";
 import { useTabLoading } from "@/components/dashboard/use-tab-loading";
 import { useLanguage } from "@/components/language-provider";
-import { getGradeLevelArabic } from "@/lib/utils";
 import { can } from "@/lib/roles";
 import { hasPermission } from "@/lib/permissions";
 import { getProfiles, getSession, type TeachingAssignment } from "@/lib/auth";
@@ -59,7 +60,7 @@ import {
   TeacherInspectionView,
   type TeacherProfile,
 } from "@/components/teacher-inspection-view";
-import { normalizeDivisionCode } from "@/lib/utils";
+import type { TranslationKey } from "@/lib/translations";
 
 interface StudentRecord {
   id: string;
@@ -84,6 +85,21 @@ function normalizeDivisionValue(value?: string | null) {
 
 function divisionDisplayLabel(value?: string | null) {
   return normalizeDivisionValue(value) || "—";
+}
+
+function studentGradeLabel(
+  student: Pick<StudentRecord, "divisionCode" | "gradeLevel">,
+  t: (key: TranslationKey) => string,
+  fallback: string,
+) {
+  const gradeLevel = getGradeLevelFromDivisionCode(
+    student.divisionCode,
+    student.gradeLevel,
+  );
+  if (gradeLevel === 1) return t("firstSecondary");
+  if (gradeLevel === 2) return t("secondSecondary");
+  if (gradeLevel === 3) return t("thirdSecondary");
+  return fallback;
 }
 
 export default function StudentsPage() {
@@ -362,7 +378,7 @@ export default function StudentsPage() {
           ...availableDivisionCodes,
           ...divisions.map((item) => item.code),
           ...students.map((student) => student.divisionCode),
-        ]),
+        ].map(normalizeDivisionValue).filter(Boolean)),
       )
         .filter((code): code is string => Boolean(code))
         .sort((left, right) =>
@@ -1219,9 +1235,7 @@ export default function StudentsPage() {
                         </p>
                       </div>
                       <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                        {student.gradeLevel
-                          ? getGradeLevelArabic(student.gradeLevel)
-                          : "—"}
+                        {studentGradeLabel(student, t, "—")}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
@@ -1469,9 +1483,7 @@ export default function StudentsPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                                {student.gradeLevel
-                                  ? getGradeLevelArabic(student.gradeLevel)
-                                  : "غير معين"}
+                                {studentGradeLabel(student, t, t("unassigned"))}
                               </td>
                               <td className="px-4 py-3">
                                 {student.behaviorScore}

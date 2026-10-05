@@ -21,7 +21,7 @@ import { TabLoadingSkeleton } from './tab-loading-skeleton'
 import { useLanguage } from '@/components/language-provider'
 import { getCurrentProfile, getSession } from '@/lib/auth'
 import { fetchCached, invalidateCached } from '@/lib/client-cache'
-import { normalizeDivisionCode } from '@/lib/utils'
+import { getGradeLevelFromDivisionCode, normalizeDivisionCode } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
 import { PillNav, type PillNavItem } from '@/components/dashboard/pill-nav'
 import { UpdateLogTab } from '@/components/dashboard/update-log-tab'
@@ -34,13 +34,6 @@ type ApiStudent = {
   behaviorScore: number
   attendanceScore: number
   createdAt?: string
-}
-
-function getStudentGradeLevel(student: Pick<ApiStudent, 'divisionCode' | 'gradeLevel'>): number | null {
-  const normalizedCode = normalizeDivisionCode(student.divisionCode?.replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit))))
-  const divisionGrade = normalizedCode.match(/^([1-3])\d{2}$/)?.[1]
-  if (divisionGrade) return Number(divisionGrade)
-  return student.gradeLevel && student.gradeLevel >= 1 && student.gradeLevel <= 3 ? student.gradeLevel : null
 }
 
 type ApiWarning = {
@@ -267,7 +260,7 @@ function StudentTabView({ students }: { students: ApiStudent[] }) {
       <p className="mt-2 text-slate-600 dark:text-slate-400">{t('currentStudents')}</p>
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {students.slice(0, 10).map((student) => {
-          const gradeLevel = getStudentGradeLevel(student)
+          const gradeLevel = getGradeLevelFromDivisionCode(student.divisionCode, student.gradeLevel)
           const gradeName = gradeLevel === 1 ? t('firstSecondary') : gradeLevel === 2 ? t('secondSecondary') : gradeLevel === 3 ? t('thirdSecondary') : t('unspecified')
           return (
             <div key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
