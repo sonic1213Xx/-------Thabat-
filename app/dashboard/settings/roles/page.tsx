@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Lock, Pencil, Trash2, UserPlus, X } from "lucide-react";
+import { Check, Eye, EyeOff, Lock, Pencil, Trash2, UserPlus, X } from "lucide-react";
 import { StyledSelect } from "@/components/ui/styled-select";
 import {
   DEFAULT_ROLES,
@@ -58,6 +58,7 @@ export default function RolesPage() {
     "PRINCIPAL",
   );
   const [profiles, setProfiles] = useState<Profile[]>(getProfiles());
+  const [profilesError, setProfilesError] = useState("");
   const [divisions, setDivisions] = useState<string[]>([]);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [resettingProfile, setResettingProfile] = useState<Profile | null>(
@@ -71,6 +72,7 @@ export default function RolesPage() {
   }));
   const [adminId, setAdminId] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [verificationActive, setVerificationActive] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState("");
   const emptyProfile = {
@@ -89,7 +91,14 @@ export default function RolesPage() {
     const loadDatabaseProfiles = async () => {
       try {
         const response = await fetch('/api/users', { cache: 'no-store' });
-        if (!response.ok) return;
+        if (!response.ok) {
+          setProfilesError(response.status === 401
+            ? locale === "ar" ? "انتهت الجلسة أو يلزم تسجيل الدخول لتحميل الملفات." : "Your session is missing or expired. Sign in again to load profiles."
+            : response.status === 403
+              ? locale === "ar" ? "ليس لديك صلاحية لتحميل الملفات." : "You are not authorized to load profiles."
+              : locale === "ar" ? "تعذر تحميل الملفات من قاعدة البيانات." : "Unable to load profiles from the database.");
+          return;
+        }
         const json = await response.json() as { data?: Array<{ id: string; name: string; role: AppRole; assigned_divisions?: string[]; subjectsTaught?: string[]; teachingAssignments?: TeachingAssignment[] }> };
         const localProfiles = getProfiles();
         const databaseProfiles: Profile[] = (json.data ?? []).map((item) => ({
@@ -105,8 +114,10 @@ export default function RolesPage() {
           subject: item.subjectsTaught?.[0] ?? '',
         }));
         setProfiles(databaseProfiles);
+        setProfilesError("");
       } catch {
         setProfiles(getProfiles());
+        setProfilesError(locale === "ar" ? "تعذر الاتصال بقاعدة البيانات لتحميل الملفات." : "Could not connect to the database to load profiles.");
       }
     };
     void loadDatabaseProfiles();
@@ -309,7 +320,7 @@ export default function RolesPage() {
         </div>
         <div className="p-5">
           <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">{currentSession?.role === "PRINCIPAL" ? (locale === "ar" ? "لديك صلاحية المدير لإدارة الأدوار وملفات الموظفين وإعدادات النظام." : "You have Principal access to manage roles, employee profiles, and system settings.") : t("creatorInstructions")}</p>
-          {currentSession?.role !== "PRINCIPAL" && <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><input value={adminId} onChange={(event) => setAdminId(event.target.value)} placeholder={t("creatorId")} className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2.5 dark:border-emerald-900 dark:bg-slate-950/60" /><input value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} type="password" placeholder={locale === "ar" ? "كلمة المرور" : "Password"} className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2.5 dark:border-emerald-900 dark:bg-slate-950/60" /><button type="button" onClick={activateCreatorMode} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">{locale === "ar" ? "تفعيل" : "Activate"}</button></div>}
+          {currentSession?.role !== "PRINCIPAL" && <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><input value={adminId} onChange={(event) => setAdminId(event.target.value)} placeholder={t("creatorId")} className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2.5 dark:border-emerald-900 dark:bg-slate-950/60" /><div className="relative"><input value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} type={showAdminPassword ? "text" : "password"} placeholder={locale === "ar" ? "كلمة المرور" : "Password"} className="w-full rounded-xl border border-emerald-200 bg-white/80 px-3 py-2.5 pe-10 dark:border-emerald-900 dark:bg-slate-950/60" /><button type="button" onClick={() => setShowAdminPassword((visible) => !visible)} aria-label={showAdminPassword ? (locale === "ar" ? "إخفاء كلمة المرور" : "Hide password") : (locale === "ar" ? "إظهار كلمة المرور" : "Show password")} aria-pressed={showAdminPassword} title={showAdminPassword ? (locale === "ar" ? "إخفاء كلمة المرور" : "Hide password") : (locale === "ar" ? "إظهار كلمة المرور" : "Show password")} className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"><span className="sr-only">{showAdminPassword ? (locale === "ar" ? "إخفاء كلمة المرور" : "Hide password") : (locale === "ar" ? "إظهار كلمة المرور" : "Show password")}</span>{showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div><button type="button" onClick={activateCreatorMode} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700">{locale === "ar" ? "تفعيل" : "Activate"}</button></div>}
         </div>
       </section>
       <section className="rounded-xl border border-border bg-card shadow-sm">
@@ -582,6 +593,7 @@ export default function RolesPage() {
             {locale === "ar" ? "الملفات الحالية" : "Current profiles"}
           </h2>
         </div>
+        {profilesError && <p role="alert" className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">{profilesError}</p>}
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800">
             <tr>

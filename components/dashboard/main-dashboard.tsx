@@ -357,7 +357,11 @@ function DivisionsTabView({ divisions, students }: { divisions: Array<{ id: stri
         ))}
       </div>
       <Modal open={Boolean(selectedDivision)} onOpenChange={(open) => !open && setSelectedDivision(null)} className="max-w-3xl">
-        <div className="space-y-4"><div><h2 className="text-xl font-bold">{selectedDivision ? `${t('divisionLabel')} ${selectedDivision}` : ''}</h2><p className="text-sm text-slate-500">{t('divisionDetails')}</p></div><div className="max-h-[60vh] overflow-auto rounded-lg border"><table className="min-w-full text-sm"><thead className="bg-slate-50 dark:bg-slate-800"><tr><th className="p-3 text-start">{t('students')}</th><th className="p-3 text-start">{t('gradeLevel')}</th><th className="p-3 text-start">{t('behaviorScore')}</th><th className="p-3 text-start">{t('attendanceScore')}</th></tr></thead><tbody>{students.filter((student) => student.divisionCode === selectedDivision).map((student) => <tr key={student.id} className="border-t"><td className="p-3 font-semibold">{student.fullName}</td><td className="p-3">{student.gradeLevel}</td><td className="p-3">{student.behaviorScore}</td><td className="p-3">{student.attendanceScore}</td></tr>)}</tbody></table></div></div>
+        <div className="space-y-4"><div><h2 className="text-xl font-bold">{selectedDivision ? `${t('divisionLabel')} ${selectedDivision}` : ''}</h2><p className="text-sm text-slate-500">{t('divisionDetails')}</p></div><div className="max-h-[60vh] overflow-auto rounded-lg border"><table className="min-w-full text-sm"><thead className="bg-slate-50 dark:bg-slate-800"><tr><th className="p-3 text-start">{t('students')}</th><th className="p-3 text-start">{t('gradeLevel')}</th><th className="p-3 text-start">{t('behaviorScore')}</th><th className="p-3 text-start">{t('attendanceScore')}</th></tr></thead><tbody>{students.filter((student) => student.divisionCode === selectedDivision).map((student) => {
+          const gradeLevel = getGradeLevelFromDivisionCode(student.divisionCode ?? selectedDivision, student.gradeLevel)
+          const gradeName = gradeLevel === 1 ? t('firstSecondary') : gradeLevel === 2 ? t('secondSecondary') : gradeLevel === 3 ? t('thirdSecondary') : t('unspecified')
+          return <tr key={student.id} className="border-t"><td className="p-3 font-semibold">{student.fullName}</td><td className="p-3">{gradeName}</td><td className="p-3">{student.behaviorScore}</td><td className="p-3">{student.attendanceScore}</td></tr>
+        })}</tbody></table></div></div>
       </Modal>
     </div>
   )

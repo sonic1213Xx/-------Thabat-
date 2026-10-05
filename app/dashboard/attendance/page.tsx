@@ -16,7 +16,7 @@ import { EditAttendanceModal } from "@/components/attendance/edit-attendance-mod
 import { StyledSelect } from "@/components/ui/styled-select";
 import { Modal } from "@/components/ui/modal";
 import { usePathname, useRouter } from "next/navigation";
-import { normalizeDivisionCode } from "@/lib/utils";
+import { getGradeLevelFromDivisionCode, normalizeDivisionCode } from "@/lib/utils";
 
 type Status =
   | "UNMARKED"
@@ -74,7 +74,7 @@ export default function AttendancePage() {
   const teachingAssignments = profile?.teachingAssignments?.filter((assignment) => assignment.attendance !== false) ?? [];
   const subjects = Array.from(new Set(teachingAssignments.map((assignment) => assignment.subject).filter(Boolean)));
   const [selectedSubject, setSelectedSubject] = useState(subjects[0] ?? "");
-  const teachingDivisions = Array.from(new Set(teachingAssignments.filter((assignment) => !selectedSubject || assignment.subject === selectedSubject).flatMap((assignment) => assignment.divisions)));
+  const teachingDivisions = Array.from(new Set(teachingAssignments.filter((assignment) => !selectedSubject || assignment.subject === selectedSubject).flatMap((assignment) => assignment.divisions).map(normalizeDivisionCode).filter(Boolean)));
   const isClassroomPage = classroom;
   const canClassAttendance = isTeacher && isClassroomPage;
   const canExportAttendanceTemplates = Boolean(session);
@@ -149,7 +149,7 @@ export default function AttendancePage() {
       document.body.style.overflow = previousOverflow;
     };
   }, [saving]);
-  const assigned = profile?.assigned_divisions ?? [];
+  const assigned = Array.from(new Set((profile?.assigned_divisions ?? []).map(normalizeDivisionCode).filter(Boolean)));
   const divisions = useMemo<DivisionGroup[]>(
     () =>
       Array.from(
@@ -161,13 +161,14 @@ export default function AttendancePage() {
       )
             .filter((code) => !canClassAttendance || teachingDivisions.includes(code) || (isTeacher && assigned.includes(code)))
         .sort((a, b) => a.localeCompare(b, "en", { numeric: true }))
-        .map((code) => ({
-          code,
-          grade:
-            students.find((student) => student.divisionCode === code)
-              ?.gradeLevel ?? null,
-          students: students.filter((student) => student.divisionCode === code),
-        })),
+        .map((code) => {
+          const divisionStudents = students.filter((student) => student.divisionCode === code);
+          return {
+            code,
+            grade: getGradeLevelFromDivisionCode(code, divisionStudents[0]?.gradeLevel),
+            students: divisionStudents,
+          };
+        }),
     [students, canClassAttendance, teachingDivisions.join(","), isTeacher, assigned],
   );
   const divisionKey = divisions.map((group) => group.code).join(",");

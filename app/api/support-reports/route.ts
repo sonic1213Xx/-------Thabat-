@@ -78,3 +78,21 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Unable to update the report.' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request)
+    if (!user) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
+    if (user.role !== 'CREATOR') return NextResponse.json({ error: 'Only the Creator can delete reports.' }, { status: 403 })
+    const body = await request.json() as { id?: string }
+    const id = body.id?.trim()
+    if (!id) return NextResponse.json({ error: 'A report id is required.' }, { status: 400 })
+
+    const result = await prisma.supportReport.deleteMany({ where: { id } })
+    if (!result.count) return NextResponse.json({ error: 'Report not found.' }, { status: 404 })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Support report deletion failed:', error)
+    return NextResponse.json({ error: 'Unable to delete the report.' }, { status: 500 })
+  }
+}

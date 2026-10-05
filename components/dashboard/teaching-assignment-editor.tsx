@@ -3,6 +3,7 @@
 import { Check, Plus, Trash2 } from "lucide-react";
 import type { TeachingAssignment } from "@/lib/auth";
 import { StyledSelect } from "@/components/ui/styled-select";
+import { getGradeLevelFromDivisionCode } from "@/lib/utils";
 
 export function TeachingAssignmentEditor({
   assignments,
@@ -132,7 +133,7 @@ export function TeachingAssignmentEditor({
                 .filter(
                   (code) =>
                     !assignment.gradeLevel ||
-                    code.startsWith(String(assignment.gradeLevel)),
+                    getGradeLevelFromDivisionCode(code) === assignment.gradeLevel,
                 )
                 .map((code) => (
                   <label

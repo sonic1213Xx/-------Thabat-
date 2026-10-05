@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, GraduationCap, Languages, ShieldCheck, Sparkles } from 'lucide-react'
+import { BookOpen, CheckCircle2, Eye, GraduationCap, Languages, ShieldCheck, Sparkles, Trash2 } from 'lucide-react'
 import { useLanguage } from '@/components/language-provider'
 
 type UpdateEntry = {
@@ -13,12 +13,20 @@ export function UpdateLogTab() {
   const { locale } = useLanguage()
   const english = locale === 'en'
   const entries: UpdateEntry[] = english ? [
+    { icon: GraduationCap, title: 'Attendance divisions and grades', description: 'Teacher division assignments are normalized so class rosters load correctly. Attendance and the Dashboard Divisions tab infer grade labels from division codes when a student grade is missing.' },
+    { icon: Eye, title: 'Creator profile controls', description: 'Creator verification passwords can be shown or hidden, and profile loading now distinguishes authentication or server errors from an empty list.' },
+    { icon: CheckCircle2, title: 'In-place report status updates', description: 'Report status saves update the card without reloading the list, show per-report progress and success feedback, and persist through the server.' },
+    { icon: Trash2, title: 'Permanent report deletion', description: 'The Creator can confirm a permanent report deletion. The shared database record is deleted, so it will not appear in the reporter’s next fetch.' },
     { icon: BookOpen, title: 'Dashboard navigation', description: 'Overview, Students, Teams, and Divisions now share a wider animated tab bar. On phones, use the menu button; the selected tab is highlighted.' },
     { icon: GraduationCap, title: 'Student grade labels', description: 'When a saved grade is missing, division prefixes 1xx, 2xx, and 3xx display First, Second, and Third Secondary.' },
     { icon: ShieldCheck, title: 'Sign-in session check', description: 'The animated session check runs after a successful sign-in and does not replay when revisiting the dashboard.' },
     { icon: Sparkles, title: 'Loading feedback', description: 'Reports, Thabat Log, and Reports Center use a shared cube loader with language-aware text and theme-aware colors.' },
     { icon: Languages, title: 'Mobile and theme polish', description: 'Mobile menus have clearer outlines and selected states. The team-add control is easier to see in light and dark themes.' },
   ] : [
+    { icon: GraduationCap, title: 'الشعب والمرحلة في الحضور', description: 'تُوحّد رموز الشعب المكلف بها المعلم لتحميل كشف الفصل، وتُستنتج المرحلة في الحضور ولوحة الفصول من رمز الشعبة عند غيابها عن بيانات الطالب.' },
+    { icon: Eye, title: 'أدوات ملفات المُنشئ', description: 'يمكن إظهار كلمة مرور التحقق أو إخفاؤها، كما تميّز قائمة الملفات بين أخطاء الدخول أو الخادم وبين القائمة الفارغة.' },
+    { icon: CheckCircle2, title: 'تحديث حالة البلاغ دون إعادة تحميل', description: 'تُحدّث حالة البلاغ في مكانها مع مؤشر حفظ وحركة نجاح خاصة به، وتُحفظ الحالة على الخادم لتبقى عند العودة.' },
+    { icon: Trash2, title: 'حذف البلاغ نهائياً', description: 'يمكن للمُنشئ تأكيد حذف البلاغ نهائياً من قاعدة البيانات المشتركة، ولن يظهر لصاحب البلاغ عند تحميل القائمة.' },
     { icon: BookOpen, title: 'التنقل في لوحة التحكم', description: 'أصبحت نظرة عامة والطلاب والفرق والفصول ضمن شريط تنقل أعرض ومتحرك. على الهاتف، استخدم زر القائمة مع تمييز التبويب المحدد.' },
     { icon: GraduationCap, title: 'أسماء المراحل الدراسية', description: 'عند عدم وجود مرحلة محفوظة، تُستنتج من رمز الشعبة: 1xx للأول الثانوي، و2xx للثاني الثانوي، و3xx للثالث الثانوي.' },
     { icon: ShieldCheck, title: 'التحقق من الجلسة', description: 'يظهر تحقق الجلسة المتحرك بعد تسجيل الدخول بنجاح، ولا يعاد تشغيله عند العودة إلى لوحة التحكم.' },
