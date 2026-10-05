@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCached, invalidateDivisionCaches, setCached } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { authorizeDivisions } from '@/lib/division-auth'
+import { normalizeDivisionCode } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,16 +10,18 @@ export async function GET(request: NextRequest) {
     if (authorization.status !== 200) return NextResponse.json({ error: authorization.error }, { status: authorization.status })
 
     const { user, isTeacher, divisionCodes } = authorization
-    const cacheKey = `thabat:divisions:${user.id}:${user.role}`
+    const cacheKey = `thabat:divisions:v2:${user.id}:${user.role}`
     const cached = await getCached<Array<{ id: string; code: string; name: string; createdAt: Date; updatedAt: Date }>>(cacheKey)
     if (cached) return NextResponse.json({ data: cached }, { headers: { 'Cache-Control': 'private, no-store' } })
     const divisions = await prisma.division.findMany({
-      where: isTeacher ? { code: { in: divisionCodes } } : undefined,
       orderBy: { code: 'asc' },
       select: { id: true, code: true, name: true, createdAt: true, updatedAt: true },
     })
-    await setCached(cacheKey, divisions, 60)
-    return NextResponse.json({ data: divisions }, { headers: { 'Cache-Control': 'private, no-store' } })
+    const visibleDivisions = isTeacher
+      ? divisions.filter((division) => divisionCodes.includes(normalizeDivisionCode(division.code)))
+      : divisions
+    await setCached(cacheKey, visibleDivisions, 60)
+    return NextResponse.json({ data: visibleDivisions }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch {
     return NextResponse.json({ error: 'Unable to fetch divisions.' }, { status: 500 })
   }

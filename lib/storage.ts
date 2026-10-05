@@ -24,6 +24,8 @@ export const STORAGE_KEYS = {
   chatHistory: 'thabat-bot-history',
 } as const
 
+export const SESSION_CHECK_ANIMATION_KEY = 'thabat-session-check-animation-pending'
+
 const readJson = <T>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') return fallback
   try {

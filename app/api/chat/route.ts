@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from '@google/genai'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 import { formatRelativeTimeArabic } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -149,7 +150,8 @@ export async function POST(request: NextRequest) {
 
     const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content ?? ''
     const languageInstruction = getLanguageInstruction(latestUserMessage, body.screenContext?.locale)
-    const userId = request.cookies.get('THABAT_USER_ID')?.value
+    const userId = await getAuthenticatedUserId(request)
+    if (!userId) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
     const profile = userId
       ? await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true } })
       : null

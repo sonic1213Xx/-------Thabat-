@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 const categories = ['BUG', 'FIX', 'SUGGESTION'] as const
 const statuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const
@@ -7,12 +8,8 @@ const statuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const
 type Category = typeof categories[number]
 type Status = typeof statuses[number]
 
-function getUserId(request: NextRequest) {
-  return request.cookies.get('THABAT_USER_ID')?.value
-}
-
 async function getCurrentUser(request: NextRequest) {
-  const id = getUserId(request)
+  const id = await getAuthenticatedUserId(request)
   if (!id) return null
   const user = await prisma.user.findUnique({ where: { id }, select: { id: true, name: true, role: true, isActive: true } })
   return user?.isActive ? user : null

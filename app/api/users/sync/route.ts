@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getRoleDefinition } from '@/types/roles'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { id?: string; name?: string; role?: string; locale?: 'ar' | 'en'; assigned_divisions?: string[]; subjectsTaught?: string[]; teachingAssignments?: unknown[] }
-    if (!body.id || !body.name || !body.role || !getRoleDefinition(body.role)) return NextResponse.json({ error: 'Invalid profile.' }, { status: 400 })
-    const user = await prisma.user.upsert({
-      where: { id: body.id },
-      update: { name: body.name, role: body.role, ...(body.locale ? { locale: body.locale } : {}), ...(body.assigned_divisions !== undefined ? { assignedDivisions: JSON.stringify(body.assigned_divisions) } : {}), ...(body.subjectsTaught !== undefined ? { subjectsTaught: JSON.stringify(body.subjectsTaught) } : {}), ...(body.teachingAssignments !== undefined ? { teachingAssignments: JSON.stringify(body.teachingAssignments) } : {}) },
-      create: { id: body.id, username: body.id.toLowerCase(), name: body.name, password: 'local-profile', role: body.role, locale: body.locale === 'en' ? 'en' : 'ar', isActive: true, assignedDivisions: JSON.stringify(body.assigned_divisions ?? []), subjectsTaught: JSON.stringify(body.subjectsTaught ?? []), teachingAssignments: JSON.stringify(body.teachingAssignments ?? []) },
-    })
-    return NextResponse.json({ data: { id: user.id, role: user.role } })
+    const id = await getAuthenticatedUserId(request)
+    if (!id) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
+    const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
+    if (!user) return NextResponse.json({ error: 'Profile not found.' }, { status: 404 })
+    return NextResponse.json({ data: user })
   } catch (error) {
     console.error('Profile sync failed:', error)
     return NextResponse.json({ error: 'Unable to sync profile.' }, { status: 500 })

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 export const MANAGEMENT_ROLES = new Set([
   'CREATOR',
@@ -45,7 +46,7 @@ function getTeacherDivisionCodes(user: DivisionUser): string[] {
 }
 
 export async function authorizeDivisions(request: NextRequest, requireManagement = false): Promise<DivisionAuthorization> {
-  const userId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
+  const userId = await getAuthenticatedUserId(request)
   if (!userId) return { status: 401, error: 'Authentication is required.' }
 
   const user = await prisma.user.findUnique({
@@ -75,5 +76,3 @@ export async function authorizeDivisions(request: NextRequest, requireManagement
     divisionCodes: isTeacher ? getTeacherDivisionCodes(user) : [],
   }
 }
-
-// THABAT_USER_ID is an unsigned development/prototype user-context lookup, not a cryptographically signed session token.

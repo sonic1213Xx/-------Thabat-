@@ -76,6 +76,20 @@ npx prisma db push
 
 ---
 
+### Configure Authentication Secrets
+
+Set a private `SESSION_SECRET` in `.env.local` for signed, HttpOnly login sessions. Generate one with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+Do not commit the generated value. If `SESSION_SECRET` is omitted, the server derives a signing key from `DATABASE_URL` as a compatibility fallback; use a dedicated secret in every deployed environment.
+
+If running `npm run seed`, configure four different passwords first: `SEED_CREATOR_PASSWORD`, `SEED_PRINCIPAL_PASSWORD`, `SEED_VICE_PRINCIPAL_PASSWORD`, and `SEED_TEACHER_PASSWORD`. Each must be at least 12 characters. The seed script no longer uses shared default passwords.
+
+Existing databases keep their current password hashes. If they were seeded with an older repository version, change any previously shared/default account passwords immediately; removing the old login fallback does not rotate existing credentials.
+
 ### ✅ Step 6: Start Development Server
 
 ```bash

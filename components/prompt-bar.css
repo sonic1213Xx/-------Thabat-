@@ -1,0 +1,186 @@
+.prompt-bar {
+  --pb-bg: hsl(var(--card));
+  --pb-ink: hsl(var(--card-foreground));
+  --pb-radius: 16px;
+  --pb-press: 0.96;
+  --pb-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  width: 100%;
+  position: relative;
+  color: var(--pb-ink);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.prompt-bar__field {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--pb-radius);
+  background: var(--pb-bg);
+  transition: border-color 150ms ease;
+}
+
+.prompt-bar__field::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: radial-gradient(140% 120% at 0% 100%, rgb(52 211 153 / 0.2), transparent 62%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+
+.prompt-bar__field:focus-within {
+  border-color: hsl(var(--primary));
+}
+
+.prompt-bar__field[data-max]::before { opacity: 1; }
+
+.prompt-bar__sparks {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.prompt-bar__input {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  min-height: 22px;
+  max-height: 110px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pb-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  resize: none;
+  outline: none;
+  overflow-wrap: anywhere;
+}
+
+.prompt-bar__input:focus,
+.prompt-bar__input:focus-visible {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.prompt-bar__input::placeholder { color: hsl(var(--card-foreground) / 0.48); }
+
+@media (pointer: coarse) {
+  .prompt-bar__input { font-size: 16px; }
+}
+
+.prompt-bar__bar { position: relative; z-index: 1; display: flex; align-items: center; gap: 4px; }
+.prompt-bar__spacer { flex: 1 1 auto; }
+
+.prompt-bar__pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 138px;
+  height: 28px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: hsl(var(--card-foreground) / 0.68);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.prompt-bar__pick:hover,
+.prompt-bar__pick[aria-expanded='true'] {
+  background: hsl(var(--card-foreground) / 0.07);
+  color: hsl(var(--card-foreground));
+}
+
+.prompt-bar__menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  min-width: 164px;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.18);
+}
+
+.prompt-bar__menu-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.prompt-bar__menu-option:hover,
+.prompt-bar__menu-option[aria-pressed='true'] {
+  background: hsl(var(--muted));
+}
+
+.prompt-bar__send {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: hsl(var(--card-foreground) / 0.08);
+  color: hsl(var(--card-foreground) / 0.48);
+  cursor: default;
+  outline: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 180ms ease, color 180ms ease, transform 160ms var(--pb-ease-out);
+}
+
+.prompt-bar__send[data-armed] {
+  background: hsl(var(--primary));
+  color: white;
+  cursor: pointer;
+}
+
+.prompt-bar__send[data-armed]:active { transform: scale(var(--pb-press)); }
+.prompt-bar__send:disabled { opacity: 0.75; }
+.prompt-bar__glyph { display: block; width: 17px; height: 17px; transform-origin: 50% 50%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .prompt-bar__field, .prompt-bar__send { transition: none; }
+  .prompt-bar__send[data-armed]:active { transform: none; }
+}

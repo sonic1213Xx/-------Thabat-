@@ -6,7 +6,7 @@ export type SessionUser = { id: string; name: string; role: AppRole }
 export type TeachingAssignment = { id: string; subject: string; gradeLevel: number | null; divisions: string[]; attendance: boolean; gradebook: boolean }
 export type Profile = SessionUser & {
   locale?: Locale
-  password: string
+  password?: string
   createdAt: string
   lastActivity: string
   signature?: string
@@ -19,13 +19,6 @@ export type Profile = SessionUser & {
   subjectsTaught?: string[]
 }
 
-export const DEFAULT_CREDENTIALS = { id: '10', password: 'admin123', role: 'CREATOR' as AppRole, name: 'حسين' }
-const TEST_CREDENTIALS: Array<{ id: string; password: string; role: AppRole; name: string }> = [
-  DEFAULT_CREDENTIALS,
-  { id: '11', password: 'principal123', role: 'PRINCIPAL', name: 'مدير المدرسة' },
-  { id: '12', password: 'vp123', role: 'VICE_PRINCIPAL', name: 'وكيل شؤون الطلاب' },
-  { id: '13', password: 'teacher123', role: 'TEACHER', name: 'المعلم' },
-]
 export const AUTH_STORAGE_KEY = 'thabat-session'
 export const AUTH_PERSISTENCE_KEY = 'thabat-session-persistent'
 export const PROFILES_STORAGE_KEY = 'thabat-profiles'
@@ -33,19 +26,21 @@ export const SIGNATURES_STORAGE_KEY = 'thabat-profile-signatures'
 export const WELCOME_LOGIN_KEY = 'thabat-welcome-login'
 let runtimeSession: SessionUser | null = null
 
-export function authenticate(id: string, password: string): SessionUser | null {
-  const credentials = TEST_CREDENTIALS.find((item) => item.id === id.trim() && item.password === password)
-  if (credentials) return { id: credentials.id, name: credentials.name, role: credentials.role }
-  return null
-}
-
 export function getProfiles(): Profile[] {
   if (typeof window === 'undefined') return []
-  try { return JSON.parse(localStorage.getItem(PROFILES_STORAGE_KEY) ?? '[]') as Profile[] } catch { return [] }
+  try {
+    const profiles = JSON.parse(localStorage.getItem(PROFILES_STORAGE_KEY) ?? '[]') as Array<Profile & { password?: string }>
+    const sanitized = profiles.map(({ password: _password, ...profile }) => profile)
+    if (profiles.some((profile) => profile.password !== undefined)) localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(sanitized))
+    return sanitized
+  } catch { return [] }
 }
 
 export function saveProfile(profile: Profile): void {
-  if (typeof window !== 'undefined') localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify([...getProfiles().filter((item) => item.id !== profile.id), profile]))
+  if (typeof window !== 'undefined') {
+    const { password: _password, ...safeProfile } = profile
+    localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify([...getProfiles().filter((item) => item.id !== profile.id), safeProfile]))
+  }
 }
 
 export function deleteProfile(id: string): void {
@@ -55,7 +50,7 @@ export function deleteProfile(id: string): void {
 export function getCurrentProfile(): Profile | null {
   const session = getSession()
   if (!session) return null
-  if (session.id === DEFAULT_CREDENTIALS.id) return { ...DEFAULT_CREDENTIALS, password: DEFAULT_CREDENTIALS.password, createdAt: '', lastActivity: 'الآن', signature: getProfileSignature(session.id) ?? undefined }
+  if (session.id === '10') return { ...session, createdAt: '', lastActivity: 'الآن', signature: getProfileSignature(session.id) ?? undefined }
   return getProfiles().find((profile) => profile.id === session.id) ?? null
 }
 
@@ -98,9 +93,6 @@ export function getSession(): SessionUser | null {
     if (!persistentValue && storedSession) localStorage.removeItem(AUTH_STORAGE_KEY)
 
     const session = sessionValue ? JSON.parse(sessionValue) as SessionUser : null
-    if (session && typeof document !== 'undefined' && !document.cookie.includes('THABAT_USER_ID=')) {
-      document.cookie = `THABAT_USER_ID=${encodeURIComponent(session.id)}; Max-Age=31536000; Path=/; SameSite=Lax`
-    }
     return session
   } catch {
     return null
@@ -110,8 +102,6 @@ export function getSession(): SessionUser | null {
 export function setSession(user: SessionUser, remember = true): void {
   if (typeof window === 'undefined') return
   runtimeSession = user
-  // Prototype identity context for API routes; this is not a signed session token.
-  document.cookie = `THABAT_USER_ID=${encodeURIComponent(user.id)}; Max-Age=31536000; Path=/; SameSite=Lax`
   localStorage.removeItem(AUTH_STORAGE_KEY)
   localStorage.removeItem(AUTH_PERSISTENCE_KEY)
   sessionStorage.removeItem(AUTH_STORAGE_KEY)
@@ -130,7 +120,14 @@ export function clearSession(): void {
   localStorage.removeItem(AUTH_STORAGE_KEY)
   localStorage.removeItem(AUTH_PERSISTENCE_KEY)
   sessionStorage.removeItem(AUTH_STORAGE_KEY)
+  void fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined)
   document.cookie = 'THABAT_USER_ID=; Max-Age=0; Path=/; SameSite=Lax'
   window.dispatchEvent(new CustomEvent('thabat-session-changed', { detail: null }))
+}
+
+export function expireSession(): void {
+  if (typeof window === 'undefined') return
+  clearSession()
+  window.dispatchEvent(new CustomEvent('thabat-auth-expired'))
 }
 

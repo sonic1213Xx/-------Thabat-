@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 function previousDate(value?: string) {
   const date = value ? new Date(`${value}T00:00:00Z`) : new Date()
@@ -9,7 +10,7 @@ function previousDate(value?: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const actorId = request.headers.get('x-thabat-user-id')
+    const actorId = await getAuthenticatedUserId(request)
     const actor = actorId ? await prisma.user.findUnique({ where: { id: actorId }, select: { id: true, role: true, isActive: true } }) : null
     const cronAuthorized = Boolean(process.env.ATTENDANCE_ROLLOVER_SECRET && request.headers.get('x-rollover-secret') === process.env.ATTENDANCE_ROLLOVER_SECRET)
     if (!cronAuthorized && (!actor || !['PRINCIPAL', 'VICE_PRINCIPAL'].includes(actor.role))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 async function requestUser(request: NextRequest) {
-  const id = request.headers.get('x-thabat-user-id')
+  const id = await getAuthenticatedUserId(request)
   return id ? prisma.user.findUnique({ where: { id }, select: { id: true, role: true, isActive: true } }) : null
 }
 

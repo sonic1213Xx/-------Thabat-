@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json() as { id?: string; locale?: string }
-    const id = request.cookies.get('THABAT_USER_ID')?.value
+    const id = await getAuthenticatedUserId(request)
     const locale = body.locale === 'en' ? 'en' : body.locale === 'ar' ? 'ar' : null
     if (!id || !locale) return NextResponse.json({ error: 'An authenticated user and valid locale are required.' }, { status: 401 })
 

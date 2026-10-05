@@ -11,6 +11,7 @@ import { useTabLoading } from '@/components/dashboard/use-tab-loading'
 import { useLanguage } from '@/components/language-provider'
 import { fetchCached, invalidateCached } from '@/lib/client-cache'
 import { getCurrentProfile, getSession } from '@/lib/auth'
+import { normalizeDivisionCode } from '@/lib/utils'
 import { DivisionStudentsModal } from '@/components/division-students-modal'
 
 interface DivisionRecord {
@@ -37,7 +38,7 @@ export default function DivisionsPage() {
   const [selectedDivision, setSelectedDivision] = useState<DivisionSummary | null>(null)
   const session = getSession()
   const profile = getCurrentProfile()
-  const teachingCodes = Array.from(new Set(profile?.teachingAssignments?.flatMap((assignment) => assignment.divisions) ?? profile?.assigned_divisions ?? []))
+  const teachingCodes = Array.from(new Set((profile?.teachingAssignments?.flatMap((assignment) => assignment.divisions) ?? profile?.assigned_divisions ?? []).map(normalizeDivisionCode).filter(Boolean)))
   const readOnlyTeachingView = session?.role === 'TEACHER' || teachingCodes.length > 0
   const canManageDivisions = !readOnlyTeachingView
 
@@ -45,17 +46,17 @@ export default function DivisionsPage() {
     await withMinimumDelay(async () => {
       try {
         const [divisionsRes, studentsRes] = await Promise.all([
-          fetchCached<{ data?: DivisionRecord[] }>(`dashboard:divisions:${session?.id}:${session?.role}`, '/api/divisions'),
+          fetchCached<{ data?: DivisionRecord[] }>(`dashboard:divisions:v2:${session?.id}:${session?.role}`, '/api/divisions'),
           fetchCached<{ data?: any[] }>('dashboard:students:all', '/api/students'),
         ])
 
         if (!isActive()) return
         const loadedDivisions = divisionsRes.data ?? []
         const allowedCodes = session?.role === 'TEACHER'
-          ? new Set(loadedDivisions.map((division) => division.code))
+          ? new Set(loadedDivisions.map((division) => normalizeDivisionCode(division.code)))
           : new Set(teachingCodes)
-        if (isActive()) setDivisions(readOnlyTeachingView ? loadedDivisions.filter((division) => allowedCodes.has(division.code)) : loadedDivisions)
-        if (isActive()) setStudents(readOnlyTeachingView ? (studentsRes.data ?? []).filter((student) => allowedCodes.has(student.divisionCode)) : (studentsRes.data ?? []))
+        if (isActive()) setDivisions(readOnlyTeachingView ? loadedDivisions.filter((division) => allowedCodes.has(normalizeDivisionCode(division.code))) : loadedDivisions)
+        if (isActive()) setStudents(readOnlyTeachingView ? (studentsRes.data ?? []).filter((student) => allowedCodes.has(normalizeDivisionCode(student.divisionCode))) : (studentsRes.data ?? []))
       } catch (error) {
         console.error('Failed to load divisions:', error)
       }
@@ -71,7 +72,8 @@ export default function DivisionsPage() {
   }, [readOnlyTeachingView, teachingCodes.join(','), session?.id, session?.role])
 
   const divisionSummaries: DivisionSummary[] = (divisions.length ? divisions : []).map((division) => {
-    const filtered = students.filter((student) => student.divisionCode === division.code)
+    const divisionCode = normalizeDivisionCode(division.code)
+    const filtered = students.filter((student) => normalizeDivisionCode(student.divisionCode) === divisionCode)
     const averageBehavior = filtered.length
       ? Math.round(filtered.reduce((sum, student) => sum + (student.behaviorScore || 0), 0) / filtered.length)
       : 0
@@ -146,7 +148,7 @@ export default function DivisionsPage() {
       setDeletingDivision(null)
       setSelectedDivision((current) => current?.id === divisionToDelete.id ? null : current)
       setDivisions((current) => current.filter((division) => division.id !== divisionToDelete.id))
-      invalidateCached(`dashboard:divisions:${session?.id}:${session?.role}`)
+      invalidateCached(`dashboard:divisions:v2:${session?.id}:${session?.role}`)
       invalidateCached('dashboard:students:all')
       await loadData()
       router.refresh()
@@ -231,7 +233,7 @@ export default function DivisionsPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm text-slate-500">{t('divisionLabel')}</p>
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{division.code}</h3>
+                <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{normalizeDivisionCode(division.code) || division.code}</h3>
               </div>
               <div className="flex items-center gap-2">
                 {canManageDivisions && <button type="button" onClick={(event) => { event.stopPropagation(); openEditModal(division) }} aria-label={t('editDivision')} className="rounded-md p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
@@ -326,7 +328,7 @@ export default function DivisionsPage() {
         onConfirm={confirmDeleteDivision}
       />
 
-      {selectedDivision && <DivisionStudentsModal divisionCode={selectedDivision.code} students={students.filter((student) => student.divisionCode === selectedDivision.code)} onClose={() => setSelectedDivision(null)} />}
+      {selectedDivision && <DivisionStudentsModal divisionCode={normalizeDivisionCode(selectedDivision.code) || selectedDivision.code} students={students.filter((student) => normalizeDivisionCode(student.divisionCode) === normalizeDivisionCode(selectedDivision.code))} onClose={() => setSelectedDivision(null)} />}
     </div>
   )
 }

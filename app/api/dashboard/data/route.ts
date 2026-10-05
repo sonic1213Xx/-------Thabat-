@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getDateOnly } from '@/lib/utils'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
     const dateOnly = getDateOnly(new Date())
-    const userId = request.headers.get('x-thabat-user-id')
+    const userId = await getAuthenticatedUserId(request)
+    if (!userId) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
     const operations = [
       prisma.student.findMany({
         where: { isActive: true },

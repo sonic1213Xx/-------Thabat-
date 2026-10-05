@@ -191,18 +191,6 @@ export default function AttendancePage() {
     const load = async () => {
       setLoadingStudents(true);
       try {
-        const syncKey = session?.id ? `thabat-profile-synced:${session.id}` : null;
-        if (session && profile && (!syncKey || !window.sessionStorage.getItem(syncKey)))
-          await fetch("/api/users/sync", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: session.id,
-              name: session.name,
-              role: session.role,
-              assigned_divisions: profile.assigned_divisions ?? [],
-            }),
-          }).then(() => { if (syncKey) window.sessionStorage.setItem(syncKey, "true"); });
         const responses = canClassAttendance
           ? await Promise.all(
             allowedTeachingDivisions.map((code) =>

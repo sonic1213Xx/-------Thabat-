@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requirePermission } from '@/lib/permissions'
+import { requirePermission } from '@/lib/server-permissions'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
-  const body = await request.json() as { action?: 'approve' | 'reject' | 'scan'; actorId?: string }
-  const permission = body.action === 'scan' ? requirePermission(request, 'gate_passes', 'scan') : requirePermission(request, 'gate_passes', body.action === 'approve' ? 'approve' : 'update')
+  const body = await request.json() as { action?: 'approve' | 'reject' | 'scan' }
+  const actorId = await getAuthenticatedUserId(request)
+  const permission = await (body.action === 'scan' ? requirePermission(request, 'gate_passes', 'scan') : requirePermission(request, 'gate_passes', body.action === 'approve' ? 'approve' : 'update'))
   if (permission) return permission
-  if (!body.action || !body.actorId) return NextResponse.json({ error: 'action and actorId are required.' }, { status: 400 })
+  if (!body.action || !actorId) return NextResponse.json({ error: 'An authenticated action is required.' }, { status: 401 })
   const pass = await prisma.gatePass.findFirst({ where: { OR: [{ id: params.id }, { qrToken: params.id }] } })
   if (!pass) return NextResponse.json({ code: 'QR_UNKNOWN', error: 'Gate pass not found.' }, { status: 404 })
   if (body.action === 'approve') {
     if (pass.status !== 'PENDING') return NextResponse.json({ error: 'Only pending passes can be approved.' }, { status: 409 })
-    return NextResponse.json({ data: await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'APPROVED', approvedBy: body.actorId, approvedAt: new Date() } }) })
+    return NextResponse.json({ data: await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'APPROVED', approvedBy: actorId, approvedAt: new Date() } }) })
   }
   if (body.action === 'reject') {
     if (pass.status !== 'PENDING') return NextResponse.json({ error: 'Only pending passes can be rejected.' }, { status: 409 })
@@ -25,12 +27,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
   const now = new Date()
   const date = pass.departureDate
-  await prisma.attendance.upsert({ where: { studentId_date: { studentId: pass.studentId, date } }, update: { status: 'LEFT_WITH_PERMISSION', notes: `تصريح خروج: ${pass.reason}`, markedBy: body.actorId }, create: { studentId: pass.studentId, date, status: 'LEFT_WITH_PERMISSION', notes: `تصريح خروج: ${pass.reason}`, markedBy: body.actorId } })
-  return NextResponse.json({ data: await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'USED', scannedBy: body.actorId, scannedAt: now, attendanceState: 'LEFT_WITH_PERMISSION' } }) })
+  await prisma.attendance.upsert({ where: { studentId_date: { studentId: pass.studentId, date } }, update: { status: 'LEFT_WITH_PERMISSION', notes: `تصريح خروج: ${pass.reason}`, markedBy: actorId }, create: { studentId: pass.studentId, date, status: 'LEFT_WITH_PERMISSION', notes: `تصريح خروج: ${pass.reason}`, markedBy: actorId } })
+  return NextResponse.json({ data: await prisma.gatePass.update({ where: { id: pass.id }, data: { status: 'USED', scannedBy: actorId, scannedAt: now, attendanceState: 'LEFT_WITH_PERMISSION' } }) })
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  const permission = requirePermission(request, 'gate_passes', 'delete')
+  const permission = await requirePermission(request, 'gate_passes', 'delete')
   if (permission) return permission
   try {
     const pass = await prisma.gatePass.findUnique({ where: { id: params.id }, select: { id: true, status: true, studentId: true, departureDate: true } })

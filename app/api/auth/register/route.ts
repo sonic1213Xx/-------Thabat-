@@ -3,10 +3,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getRoleDefinition } from '@/types/roles'
 import type { TeachingAssignment } from '@/lib/auth'
+import { setSessionCookie } from '@/lib/server-session'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { id?: string; name?: string; password?: string; locale?: 'ar' | 'en'; divisions?: string[]; subjectsTaught?: string[]; teachingAssignments?: TeachingAssignment[] }
+    const body = await request.json() as { id?: string; name?: string; password?: string; remember?: boolean; locale?: 'ar' | 'en'; divisions?: string[]; subjectsTaught?: string[]; teachingAssignments?: TeachingAssignment[] }
     const username = body.id?.trim()
     const name = body.name?.trim()
     if (!username || !name || !body.password) return NextResponse.json({ error: 'Name, ID, and password are required' }, { status: 400 })
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     })
     const response = NextResponse.json({ data: { id: user.id, name: user.name, role: user.role, locale: user.locale, assigned_divisions: body.divisions ?? [], subjectsTaught: body.subjectsTaught ?? [], teachingAssignments: body.teachingAssignments ?? [] } }, { status: 201 })
     response.cookies.set('NEXT_LOCALE', user.locale, { maxAge: 31536000, path: '/', sameSite: 'lax' })
-    response.cookies.set('THABAT_USER_ID', user.id, { maxAge: 31536000, path: '/', sameSite: 'lax' })
+    setSessionCookie(response, user.id, body.remember === true)
     return response
   } catch (error) {
     console.error('Registration error:', error)

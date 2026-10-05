@@ -29,6 +29,7 @@ import {
   MessageSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { BranchedMenu, type BranchedMenuItem } from '@/components/dashboard/branched-menu'
 import { Modal } from '@/components/ui/modal'
 import { useLanguage } from '@/components/language-provider'
 import { getSession } from '@/lib/auth'
@@ -55,25 +56,46 @@ export function SidebarNav() {
     }
   }, [])
 
-  const navItems = [
-    { label: t('dashboard'), href: '/dashboard', icon: LayoutDashboard },
-    { label: t('students'), href: '/dashboard/students', icon: Users },
-    { label: t('teams'), href: '/dashboard/teams', icon: Users },
-    { label: t('divisions'), href: '/dashboard/divisions', icon: BookOpen },
-    { label: t('warnings'), href: '/dashboard/warnings', icon: AlertCircle, visible: session?.role !== 'TEACHER' },
-    { label: t('vicePrincipalCenter'), href: '/dashboard/vice-principal', icon: ShieldAlert, visible: Boolean(session && (can(session.role, 'can_approve_gate_passes') || session.role === 'GATE_SECURITY')) },
-    { label: locale === 'ar' ? 'حضور المدرسة' : 'School attendance', href: '/dashboard/attendance', icon: CalendarCheck, visible: session?.role !== 'TEACHER' },
-    { label: locale === 'ar' ? 'حضور الفصول' : 'Classroom attendance', href: '/dashboard/class-attendance', icon: CalendarCheck, visible: Boolean(session && (session.role === 'TEACHER' || hasPermission(session.role, 'attendance', 'read'))) },
-    { label: locale === 'ar' ? 'إحالات الطلاب' : 'Student referrals', href: '/dashboard/teacher-referrals', icon: FileText, visible: Boolean(session && (session.role === 'TEACHER' || session.role === 'CREATOR' || session.role === 'PRINCIPAL' || session.role === 'VICE_PRINCIPAL' || session.role.startsWith('VP_'))) },
-    { label: t('teachersLounge'), href: '/dashboard/teachers-lounge', icon: Coffee, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'TEACHER' || session.role === 'PRINCIPAL' || session.role === 'VICE_PRINCIPAL')) },
-    { label: t('auditLog'), href: '/dashboard/audit-log', icon: Clock, visible: Boolean(session && hasPermission(session.role, 'audit_log', 'read')) },
-    { label: t('reports'), href: '/dashboard/reports', icon: BarChart3, visible: Boolean(session && hasPermission(session.role, 'reports', 'read')) },
-    { label: locale === 'ar' ? 'مركز البلاغات' : 'Reports Center', href: '/dashboard/support-reports', icon: MessageSquare, visible: Boolean(session) },
-    { label: t('settings'), href: '/dashboard/settings', icon: Settings },
-    { label: t('rolesAndPermissions'), href: '/dashboard/settings/roles', icon: ShieldAlert, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL')) },
-    { label: locale === 'ar' ? 'ماسح تصاريح الخروج' : 'Gate pass scanner', href: '/dashboard/gate-security', icon: ScanLine, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL' || session.role === 'GATE_SECURITY')) },
-    { label: locale === 'ar' ? 'عمليات النقل المدرسي' : 'Transportation', href: '/dashboard/transportation', icon: Bus, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL' || session.role === 'TRANSPORTATION_SUPERVISOR')) },
+  const navGroups: BranchedMenuItem[] = [
+    { label: locale === 'ar' ? 'الرئيسية' : 'Overview', children: [
+      { value: '/dashboard', label: t('dashboard'), href: '/dashboard', icon: LayoutDashboard },
+    ] },
+    { label: locale === 'ar' ? 'شؤون المدرسة' : 'School', children: [
+      { value: '/dashboard/students', label: t('students'), href: '/dashboard/students', icon: Users },
+      { value: '/dashboard/teams', label: t('teams'), href: '/dashboard/teams', icon: Users },
+      { value: '/dashboard/divisions', label: t('divisions'), href: '/dashboard/divisions', icon: BookOpen },
+    ] },
+    { label: locale === 'ar' ? 'الحضور والمتابعة' : 'Attendance & follow-up', children: [
+      { value: '/dashboard/attendance', label: locale === 'ar' ? 'حضور المدرسة' : 'School attendance', href: '/dashboard/attendance', icon: CalendarCheck, visible: session?.role !== 'TEACHER' },
+      { value: '/dashboard/class-attendance', label: locale === 'ar' ? 'حضور الفصول' : 'Classroom attendance', href: '/dashboard/class-attendance', icon: CalendarCheck, visible: Boolean(session && (session.role === 'TEACHER' || hasPermission(session.role, 'attendance', 'read'))) },
+      { value: '/dashboard/warnings', label: t('warnings'), href: '/dashboard/warnings', icon: AlertCircle, visible: session?.role !== 'TEACHER' },
+      { value: '/dashboard/teacher-referrals', label: locale === 'ar' ? 'إحالات الطلاب' : 'Student referrals', href: '/dashboard/teacher-referrals', icon: FileText, visible: Boolean(session && (session.role === 'TEACHER' || session.role === 'CREATOR' || session.role === 'PRINCIPAL' || session.role === 'VICE_PRINCIPAL' || session.role.startsWith('VP_'))) },
+      { value: '/dashboard/vice-principal', label: t('vicePrincipalCenter'), href: '/dashboard/vice-principal', icon: ShieldAlert, visible: Boolean(session && (can(session.role, 'can_approve_gate_passes') || session.role === 'GATE_SECURITY')) },
+    ] },
+    { label: locale === 'ar' ? 'التقارير والسجلات' : 'Reports & records', children: [
+      { value: '/dashboard/reports', label: t('reports'), href: '/dashboard/reports', icon: BarChart3, visible: Boolean(session && hasPermission(session.role, 'reports', 'read')) },
+      { value: '/dashboard/audit-log', label: t('auditLog'), href: '/dashboard/audit-log', icon: Clock, visible: Boolean(session && hasPermission(session.role, 'audit_log', 'read')) },
+      { value: '/dashboard/support-reports', label: locale === 'ar' ? 'مركز البلاغات' : 'Reports Center', href: '/dashboard/support-reports', icon: MessageSquare, visible: Boolean(session) },
+    ] },
+    { label: locale === 'ar' ? 'عمليات المدرسة' : 'School operations', children: [
+      { value: '/dashboard/teachers-lounge', label: t('teachersLounge'), href: '/dashboard/teachers-lounge', icon: Coffee, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'TEACHER' || session.role === 'PRINCIPAL' || session.role === 'VICE_PRINCIPAL')) },
+      { value: '/dashboard/gate-security', label: locale === 'ar' ? 'ماسح تصاريح الخروج' : 'Gate pass scanner', href: '/dashboard/gate-security', icon: ScanLine, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL' || session.role === 'GATE_SECURITY')) },
+      { value: '/dashboard/transportation', label: locale === 'ar' ? 'عمليات النقل المدرسي' : 'Transportation', href: '/dashboard/transportation', icon: Bus, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL' || session.role === 'TRANSPORTATION_SUPERVISOR')) },
+    ] },
+    { label: locale === 'ar' ? 'الإعدادات والصلاحيات' : 'Administration', children: [
+      { value: '/dashboard/settings', label: t('settings'), href: '/dashboard/settings', icon: Settings },
+      { value: '/dashboard/settings/roles', label: t('rolesAndPermissions'), href: '/dashboard/settings/roles', icon: ShieldAlert, visible: Boolean(session && (isCreatorRole(session.role) || session.role === 'PRINCIPAL')) },
+    ] },
   ]
+  const visibleNavGroups = navGroups
+    .map((group) => ({ ...group, children: group.children?.filter((item) => item.visible !== false) }))
+    .filter((group) => group.children?.length)
+  const isActivePath = (href: string) => pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`))
+  const activeItem = visibleNavGroups
+    .flatMap((group) => group.children ?? [])
+    .filter((item) => item.href && isActivePath(item.href))
+    .sort((first, second) => (second.href?.length ?? 0) - (first.href?.length ?? 0))[0]
+  const activeGroupIndex = visibleNavGroups.findIndex((group) => group.children?.some((item) => item.value === activeItem?.value))
 
   const helpContent = useMemo(() => {
     if (pathname.includes('/students')) {
@@ -142,7 +164,7 @@ export function SidebarNav() {
     {mobileOpen && <button type="button" aria-label={locale === 'ar' ? 'إغلاق القائمة' : 'Close navigation'} onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 animate-[fadeIn_0.22s_ease-out] bg-slate-950/40 backdrop-blur-sm md:hidden" />}
     {navigating && <div className="fixed inset-0 z-[100] flex cursor-wait flex-col items-center justify-center gap-3 bg-slate-950/55 p-6 text-white backdrop-blur-sm" role="status" aria-live="polite"><Loader2 className="h-9 w-9 animate-spin text-emerald-300" /><span className="text-sm font-semibold">{locale === 'ar' ? 'يرجى الانتظار...' : 'Please wait...'}</span></div>}
     <aside id="dashboard-sidebar" className={cn(
-      'w-[280px] shrink-0 flex-col md:static md:flex md:w-[260px]',
+      'w-[min(280px,calc(100vw_-_2rem))] shrink-0 flex-col md:static md:flex md:w-[260px]',
       mobileOpen ? `fixed inset-y-0 start-0 z-50 flex ${dir === 'rtl' ? 'animate-[mobileSidebarEnterRtl_0.28s_cubic-bezier(0.22,1,0.36,1)]' : 'animate-[mobileSidebarEnterLtr_0.28s_cubic-bezier(0.22,1,0.36,1)]'}` : 'hidden',
       'border-r border-slate-200/80 bg-white/90 shadow-[inset_-1px_0_0_rgba(15,23,42,0.04)] backdrop-blur-xl dark:border-slate-800/80 dark:bg-slate-900/95',
       'md:sticky md:top-0 h-screen overflow-hidden'
@@ -170,40 +192,17 @@ export function SidebarNav() {
         </div>
       </div>}
 
-      <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-3 py-4">
-        {navItems.filter((item) => item.visible !== false).map((item) => {
-          const Icon = item.icon
-          const isActive = pathname === item.href
-
-          return (
-            <Link
-              key={item.href}
-              prefetch={false}
-              href={item.href}
-              onClick={() => {
-                if (pathname !== item.href) setNavigating(true)
-                setMobileOpen(false)
-              }}
-              className={cn(
-                'group flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ring-1 ring-transparent',
-                isActive
-                  ? 'bg-emerald-school-50 text-emerald-school-700 shadow-sm ring-emerald-school-100 dark:bg-emerald-school-950/30 dark:text-emerald-school-300 dark:ring-emerald-school-900/50'
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-white'
-              )}
-            >
-              <span className="flex items-center gap-3">
-                <span className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
-                  isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300'
-                )}>
-                  <Icon className="h-4 w-4 shrink-0" />
-                </span>
-                <span className="leading-none">{item.label}</span>
-              </span>
-              <ChevronLeft className={cn('h-3.5 w-3.5 opacity-60 transition-transform', isActive && 'translate-x-0')} />
-            </Link>
-          )
-        })}
+      <nav aria-label={locale === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'} className="min-h-0 flex-1 overscroll-contain overflow-y-auto overflow-x-hidden px-3 py-4">
+        <BranchedMenu
+          items={visibleNavGroups}
+          defaultOpen={activeGroupIndex >= 0 ? [activeGroupIndex] : [0]}
+          defaultActive={activeItem?.value ?? ''}
+          onSelect={(_value, item) => {
+            if (item.href && pathname !== item.href) setNavigating(true)
+            setMobileOpen(false)
+          }}
+          className="w-full"
+        />
       </nav>
 
       <div className="border-t border-slate-200/80 px-3 py-4 dark:border-slate-800/80">

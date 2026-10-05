@@ -4,6 +4,14 @@ import { formatRelativeTimeArabic, getDateOnly, getTimeOnly } from '../lib/utils
 import { prisma } from '../lib/prisma'
 
 async function main() {
+  const creatorPassword = process.env.SEED_CREATOR_PASSWORD
+  const principalPassword = process.env.SEED_PRINCIPAL_PASSWORD
+  const vicePrincipalPassword = process.env.SEED_VICE_PRINCIPAL_PASSWORD
+  const teacherPassword = process.env.SEED_TEACHER_PASSWORD
+  if (![creatorPassword, principalPassword, vicePrincipalPassword, teacherPassword].every((password) => password && password.length >= 12)) {
+    throw new Error('Set SEED_CREATOR_PASSWORD, SEED_PRINCIPAL_PASSWORD, SEED_VICE_PRINCIPAL_PASSWORD, and SEED_TEACHER_PASSWORD to unique values of at least 12 characters before seeding.')
+  }
+
   await prisma.auditLog.deleteMany()
   await prisma.warning.deleteMany()
   await prisma.transferHistory.deleteMany()
@@ -15,7 +23,7 @@ async function main() {
       id: '10',
       username: '10',
       name: 'حسين',
-      password: await bcrypt.hash('admin123', 10),
+      password: await bcrypt.hash(creatorPassword!, 12),
       role: 'CREATOR',
       isActive: true,
     },
@@ -27,7 +35,7 @@ async function main() {
       username: 'principal',
       name: 'سارة القحطاني',
       email: 'principal@thabat.local',
-      password: await bcrypt.hash('Admin123!', 10),
+      password: await bcrypt.hash(principalPassword!, 12),
       role: 'PRINCIPAL',
       isActive: true,
     },
@@ -39,7 +47,7 @@ async function main() {
       username: 'vice_principal',
       name: 'ريم الحربي',
       email: 'vice@thabat.local',
-      password: await bcrypt.hash('Admin123!', 10),
+      password: await bcrypt.hash(vicePrincipalPassword!, 12),
       role: 'VICE_PRINCIPAL',
       isActive: true,
     },
@@ -51,7 +59,7 @@ async function main() {
       username: 'teacher',
       name: 'نور السعدي',
       email: 'teacher@thabat.local',
-      password: await bcrypt.hash('Admin123!', 10),
+      password: await bcrypt.hash(teacherPassword!, 12),
       role: 'TEACHER',
       isActive: true,
       assignedDivisions: JSON.stringify(['101', '102']),

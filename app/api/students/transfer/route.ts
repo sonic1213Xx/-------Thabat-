@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDateOnly, getTimeOnly, formatRelativeTimeArabic, isValidDivisionCode } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
+import { MANAGEMENT_ROLES } from '@/lib/division-auth'
 
 function parseDivisions(value: string) {
   try { return JSON.parse(value) as string[] } catch { return [] }
@@ -8,14 +10,16 @@ function parseDivisions(value: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { studentId?: string; toDivision?: string; reason?: string; performedByUserId?: string }
+    const body = await request.json() as { studentId?: string; toDivision?: string; reason?: string }
     const toDivision = body.toDivision?.trim() ?? ''
     if (!body.studentId || !isValidDivisionCode(toDivision)) return NextResponse.json({ error: 'Student and target division are required.' }, { status: 400 })
-    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id') || body.performedByUserId
+    const requestUserId = await getAuthenticatedUserId(request)
     if (!requestUserId) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
     const actor = await prisma.user.findUnique({ where: { id: requestUserId } })
     const student = await prisma.student.findUnique({ where: { id: body.studentId } })
-    if (!actor || !actor.isActive || !student) return NextResponse.json({ error: 'Student or acting user was not found.' }, { status: 404 })
+    if (!actor || !actor.isActive) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
+    if (!MANAGEMENT_ROLES.has(actor.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!student) return NextResponse.json({ error: 'Student not found.' }, { status: 404 })
     const now = new Date()
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.student.update({ where: { id: student.id }, data: { divisionCode: toDivision, lastUpdatedBy: actor.id, lastUpdatedByName: actor.name, lastUpdatedByRole: actor.role } })

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { MANAGEMENT_ROLES } from '@/lib/division-auth'
 import { formatRelativeTimeArabic, getDateOnly, getTimeOnly, isValidDivisionCode } from '@/lib/utils'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 const scoreFields = ['taskPeriod1', 'taskPeriod2', 'examPeriod1', 'examPeriod2', 'finalExam'] as const
 const navigationPaths = new Set(['/dashboard', '/dashboard/students', '/dashboard/attendance', '/dashboard/class-attendance', '/dashboard/teacher-referrals', '/dashboard/divisions', '/dashboard/gradebook', '/dashboard/reports', '/dashboard/audit-log', '/dashboard/settings'])
@@ -18,7 +19,7 @@ function parseDivisions(value: string) {
 }
 
 async function getActor(request: NextRequest): Promise<Actor | null> {
-  const userId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
+  const userId = await getAuthenticatedUserId(request)
   if (!userId) return null
   return prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, role: true, isActive: true, assignedDivisions: true } })
 }

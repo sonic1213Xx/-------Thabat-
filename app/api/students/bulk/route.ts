@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isCreatorRole } from '@/lib/permissions'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 export async function DELETE(request: NextRequest) {
   try {
-    const body = await request.json() as { studentIds?: string[]; performedByUserId?: string }
+    const body = await request.json() as { studentIds?: string[] }
     const studentIds = Array.from(new Set(body.studentIds ?? []))
-    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id') || body.performedByUserId
+    const requestUserId = await getAuthenticatedUserId(request)
     if (!studentIds.length || !requestUserId) return NextResponse.json({ error: 'Students and acting user are required.' }, { status: 400 })
     const actor = await prisma.user.findUnique({ where: { id: requestUserId }, select: { id: true, role: true, isActive: true } })
     if (!actor?.isActive || (!isCreatorRole(actor.role) && actor.role !== 'PRINCIPAL')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

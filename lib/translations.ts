@@ -4,6 +4,7 @@ export type TranslationKey = keyof typeof translations.ar
 export const translations = {
   ar: {
     dashboard: 'لوحة التحكم',
+    updatesTab: 'التحديثات',
     'labels.roles.principal': 'مدير المدرسة', 'labels.roles.vpStudentAffairs': 'وكيل شؤون الطلاب', 'labels.roles.vpAcademicAffairs': 'وكيل الشؤون التعليمية', 'labels.roles.vpOperations': 'وكيل الشؤون المدرسية', 'labels.roles.teacher': 'معلم مادة', 'labels.roles.counselor': 'مرشد طلابي', 'labels.roles.gateSecurity': 'حارس الأمن', 'labels.roles.principalDescription': 'تحكم كامل بالنظام، اعتماد الدرجات والحضور نهائياً، وإدارة الأدوار.', 'labels.roles.vpStudentAffairsDescription': 'سجلات السلوك، حضور الحرم، تصاريح الخروج، والانضباط.', 'labels.roles.vpAcademicAffairsDescription': 'فحص سجل الدرجات، سجلات حضور الفصول، والإشراف على المعلمين.', 'labels.roles.vpOperationsDescription': 'المرافق، وتخصيص الموارد، والخدمات الإدارية.', 'labels.roles.teacherDescription': 'سجلات الدرجات وحضور الفصول ضمن الشعب المخصصة فقط.', 'labels.roles.counselorDescription': 'الاتجاهات السلوكية، الإنذارات الأكاديمية، وسجلات الإرشاد.', 'labels.roles.gateSecurityDescription': 'فحص خروج التصاريح وتسجيل الدخول الصباحي من البوابة.', 'labels.roles.assignedDivisions': 'الشعب المخصصة', 'labels.roles.assignedDivisionsHint': 'اختر الشعب من السجلات الموجودة في قاعدة بيانات المدرسة.', 'labels.roles.noDivisions': 'لا توجد شعب مسجلة لهذا الاختيار.',
     students: 'الطلاب',
     teams: 'إدارة الفرق',
@@ -130,6 +131,7 @@ export const translations = {
   },
   en: {
     dashboard: 'Dashboard',
+    updatesTab: 'Updates',
     'labels.roles.principal': 'School Principal', 'labels.roles.vpStudentAffairs': 'VP Student Affairs', 'labels.roles.vpAcademicAffairs': 'VP Academic Affairs', 'labels.roles.vpOperations': 'VP Operations', 'labels.roles.teacher': 'Subject Teacher', 'labels.roles.counselor': 'Guidance Counselor', 'labels.roles.gateSecurity': 'Gate Security', 'labels.roles.principalDescription': 'Full system control, final grade and attendance approvals, and role management.', 'labels.roles.vpStudentAffairsDescription': 'Behavior logs, campus attendance, gate passes, and discipline.', 'labels.roles.vpAcademicAffairsDescription': 'Gradebook inspection, class attendance logs, and teacher oversight.', 'labels.roles.vpOperationsDescription': 'Facilities, resource allocation, and administrative services.', 'labels.roles.teacherDescription': 'Gradebooks and class attendance restricted strictly to assigned divisions.', 'labels.roles.counselorDescription': 'Behavioral trends, academic warnings, and counseling records.', 'labels.roles.gateSecurityDescription': 'Gate-pass exit scanning and morning gate entry logs.', 'labels.roles.assignedDivisions': 'Assigned divisions', 'labels.roles.assignedDivisionsHint': 'Choose divisions from the school database records.', 'labels.roles.noDivisions': 'No divisions match this selection.',
     students: 'Students',
     teams: 'Teams',

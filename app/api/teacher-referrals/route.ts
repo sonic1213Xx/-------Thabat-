@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { formatRelativeTimeArabic } from '@/lib/utils'
 import { invalidateCache } from '@/lib/redis'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 const vicePrincipalRoles = ['VICE_PRINCIPAL', 'VP_STUDENT_AFFAIRS', 'VP_ACADEMIC_AFFAIRS', 'VP_OPERATIONS']
 const adminRoles = ['CREATOR', 'PRINCIPAL', 'CURATOR']
@@ -9,7 +10,7 @@ const leadershipRoles = [...adminRoles, ...vicePrincipalRoles]
 const transferStatuses = ['TRANSFERRED', 'REFERRED', 'NEW']
 
 async function requestUser(request: NextRequest) {
-  const id = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
+  const id = await getAuthenticatedUserId(request)
   return id ? prisma.user.findUnique({ where: { id }, select: { id: true, name: true, role: true, isActive: true, assignedDivisions: true } }) : null
 }
 

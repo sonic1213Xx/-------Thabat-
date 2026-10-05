@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, Check, Loader2, Send, Sparkles, Trash2, Undo2, X } from 'lucide-react'
+import { Bot, Check, Loader2, Sparkles, Trash2, Undo2, X } from 'lucide-react'
 import { type ChatMessage } from '@/lib/utils'
 import { useLanguage } from '@/components/language-provider'
 import { getSession } from '@/lib/auth'
 import { usePathname, useRouter } from 'next/navigation'
+import LatticeLoader from '@/components/lattice-loader'
+import { PromptBar } from '@/components/prompt-bar'
 
 const CHAT_LOADING_DELAY = 300
 type AgentPlan = { type: string; [key: string]: unknown }
@@ -54,14 +56,6 @@ function getScreenContext(pathname: string) {
   }
 }
 
-const TypingIndicator = () => (
-  <div className="flex w-fit items-center gap-1.5 rounded-2xl bg-slate-100 px-3 py-1.5 dark:bg-slate-800">
-    <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-    <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-    <div className="h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-  </div>
-)
-
 export function ChatBotDrawer() {
   const { dir, locale, t } = useLanguage()
   const pathname = usePathname()
@@ -72,9 +66,7 @@ export function ChatBotDrawer() {
   const [drawerClosing, setDrawerClosing] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [isInputFocused, setIsInputFocused] = useState(false)
   const [actionPreview, setActionPreview] = useState<AgentPreview | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
@@ -121,14 +113,12 @@ export function ChatBotDrawer() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, mounted, open])
 
-  const submit = async (event?: React.FormEvent) => {
-    event?.preventDefault()
-    const content = input.trim()
+  const submit = async (content: string) => {
+    content = content.trim()
     if (!content || loading) return
 
     const nextMessages = [...messages, { role: 'user' as const, content }]
     setMessages(nextMessages)
-    setInput('')
     setLoading(true)
     setMessages((current) => [...current, { role: 'model', content: '' }])
     const controller = new AbortController()
@@ -276,8 +266,6 @@ export function ChatBotDrawer() {
     }
   }
 
-  const isThinking = loading
-  const shouldShowGlow = isInputFocused || isThinking
   const floatingSide = dir === 'rtl' ? 'left-5' : 'right-5'
   const drawerSide = dir === 'rtl' ? 'left-4' : 'right-4'
   const userBubbleAlignment = 'justify-end'
@@ -376,7 +364,18 @@ export function ChatBotDrawer() {
               if (shouldShowTypingBubble) {
                 return (
                   <div key={`${message.role}-${index}`} className={`flex w-full ${botBubbleAlignment} animate-in fade-in slide-in-from-bottom-2 duration-200`}>
-                    <TypingIndicator />
+                    <LatticeLoader
+                      label={locale === 'ar' ? 'يفكر' : 'Thinking'}
+                      doneLabel={locale === 'ar' ? 'اكتمل خلال' : 'Done in'}
+                      errorLabel={locale === 'ar' ? 'فشل بعد' : 'Failed after'}
+                      pattern="orbit"
+                      cellSize={6}
+                      gap={2}
+                      fontSize={13}
+                      step={90}
+                      idleOpacity={0.15}
+                      className="text-muted-foreground"
+                    />
                   </div>
                 )
               }
@@ -443,70 +442,14 @@ export function ChatBotDrawer() {
             <div ref={endRef} />
           </div>
 
-          <form onSubmit={submit} className="border-t border-border bg-muted/25 p-3">
-            <div className="flex items-end gap-2">
-              <div className="relative flex flex-1 items-center overflow-hidden rounded-2xl border border-border bg-card transition-colors">
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                  style={{ overflow: 'visible' }}
-                  className={`pointer-events-none absolute inset-0 h-full w-full overflow-visible transition-opacity duration-500 ease-in-out ${shouldShowGlow ? 'opacity-100' : 'opacity-0'}`}
-                >
-                  <defs>
-                    <linearGradient id="beam-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="transparent" />
-                      <stop offset="20%" stopColor="#10b981" />
-                      <stop offset="50%" stopColor="#34d399" />
-                      <stop offset="80%" stopColor="#10b981" />
-                      <stop offset="100%" stopColor="transparent" />
-                    </linearGradient>
-                  </defs>
-                  <rect
-                    x="0"
-                    y="0"
-                    width="100%"
-                    height="100%"
-                    rx="16"
-                    ry="16"
-                    fill="none"
-                    stroke="url(#beam-gradient)"
-                    strokeWidth="3.5"
-                    pathLength="100"
-                    strokeDasharray="20 80"
-                    className="animate-border-beam"
-                    style={{
-                      filter: 'drop-shadow(0 0 6px rgba(16, 185, 129, 0.6))',
-                    }}
-                  />
-                </svg>
-                <textarea
-                  value={input}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault()
-                      void submit()
-                    }
-                  }}
-                  disabled={loading}
-                  rows={1}
-                  placeholder={t('botInput')}
-                  className="relative z-10 max-h-24 min-h-10 w-full resize-none rounded-2xl border border-transparent bg-transparent px-3 py-2 text-sm text-foreground outline-none transition focus:border-transparent focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !input.trim()}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 dark:disabled:bg-slate-700"
-                aria-label={t('send')}
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </form>
+          <div className="border-t border-border bg-muted/25 p-3">
+            <PromptBar
+              placeholder={t('botInput')}
+              busy={loading}
+              onSend={(content) => { void submit(content) }}
+              onStop={() => requestControllerRef.current?.abort()}
+            />
+          </div>
         </section>
       )}
     </>,

@@ -220,7 +220,7 @@ export default function RolesPage() {
     setProfile({
       id: item.id,
       name: item.name,
-      password: item.password,
+      password: item.password ?? '',
       role: item.role,
       subject: item.subject ?? "",
       gradeLevel: String(item.gradeLevel ?? ""),

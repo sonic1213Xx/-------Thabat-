@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { formatRelativeTimeArabic, getDateOnly, getTimeOnly, isValidDivisionCode } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
+import { MANAGEMENT_ROLES } from '@/lib/division-auth'
 
 function parseDivisions(value: string) {
   try { return JSON.parse(value) as string[] } catch { return [] }
@@ -8,16 +10,18 @@ function parseDivisions(value: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { studentIds?: string[]; toDivision?: string; reason?: string; performedByUserId?: string }
+    const body = await request.json() as { studentIds?: string[]; toDivision?: string; reason?: string }
     const studentIds = Array.from(new Set(body.studentIds ?? []))
     const toDivision = body.toDivision?.trim() ?? ''
-    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id') || body.performedByUserId
+    const requestUserId = await getAuthenticatedUserId(request)
     if (!studentIds.length || !isValidDivisionCode(toDivision) || !requestUserId) return NextResponse.json({ error: 'Students, target division, and acting user are required.' }, { status: 400 })
     const [actor, students] = await Promise.all([
       prisma.user.findUnique({ where: { id: requestUserId } }),
       prisma.student.findMany({ where: { id: { in: studentIds } } }),
     ])
-    if (!actor || !actor.isActive || !students.length || students.length !== studentIds.length) return NextResponse.json({ error: 'Acting user or students were not found.' }, { status: 404 })
+    if (!actor || !actor.isActive) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
+    if (!MANAGEMENT_ROLES.has(actor.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!students.length || students.length !== studentIds.length) return NextResponse.json({ error: 'Students were not found.' }, { status: 404 })
     const originalGrades = await prisma.gradebookScore.findMany({ where: { studentId: { in: studentIds } } })
     const recipients = (await prisma.user.findMany({ where: { role: 'TEACHER', isActive: true }, select: { id: true, assignedDivisions: true } })).filter((teacher) => parseDivisions(teacher.assignedDivisions).includes(toDivision))
     const now = new Date()

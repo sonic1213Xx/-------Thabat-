@@ -8,6 +8,7 @@ import { LanguageProvider } from '@/components/language-provider'
 import { STORAGE_KEYS } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 import { ToastProvider } from '@/components/toast-provider'
+import { getAuthenticatedUserIdFromToken, SESSION_COOKIE_NAME } from '@/lib/server-session'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -29,7 +30,7 @@ export default async function RootLayout({
   children: React.ReactNode
 }) {
   const cookieStore = cookies()
-  const sessionUserId = cookieStore.get('THABAT_USER_ID')?.value
+  const sessionUserId = await getAuthenticatedUserIdFromToken(cookieStore.get(SESSION_COOKIE_NAME)?.value)
   let profile: { locale: string } | null = null
   if (sessionUserId) {
     try {
@@ -53,7 +54,6 @@ export default async function RootLayout({
           attribute="class"
           defaultTheme="light"
           enableSystem
-          disableTransitionOnChange
           storageKey={STORAGE_KEYS.theme}
         >
           <LanguageProvider initialLocale={initialLocale}><ToastProvider>{children}</ToastProvider></LanguageProvider>

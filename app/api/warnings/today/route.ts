@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDateOnly } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 export async function GET(request: NextRequest) {
   try {
-    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
+    const requestUserId = await getAuthenticatedUserId(request)
     if (!requestUserId) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
     const user = await prisma.user.findUnique({ where: { id: requestUserId }, select: { id: true, isActive: true } })
     if (!user || !user.isActive) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })

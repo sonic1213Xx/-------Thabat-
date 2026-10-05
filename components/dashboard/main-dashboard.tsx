@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
@@ -21,16 +21,26 @@ import { TabLoadingSkeleton } from './tab-loading-skeleton'
 import { useLanguage } from '@/components/language-provider'
 import { getCurrentProfile, getSession } from '@/lib/auth'
 import { fetchCached, invalidateCached } from '@/lib/client-cache'
+import { normalizeDivisionCode } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
+import { PillNav, type PillNavItem } from '@/components/dashboard/pill-nav'
+import { UpdateLogTab } from '@/components/dashboard/update-log-tab'
 
 type ApiStudent = {
   id: string
   fullName: string
-  divisionCode: string
-  gradeLevel: number
+  divisionCode: string | null
+  gradeLevel: number | null
   behaviorScore: number
   attendanceScore: number
   createdAt?: string
+}
+
+function getStudentGradeLevel(student: Pick<ApiStudent, 'divisionCode' | 'gradeLevel'>): number | null {
+  const normalizedCode = normalizeDivisionCode(student.divisionCode?.replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit))))
+  const divisionGrade = normalizedCode.match(/^([1-3])\d{2}$/)?.[1]
+  if (divisionGrade) return Number(divisionGrade)
+  return student.gradeLevel && student.gradeLevel >= 1 && student.gradeLevel <= 3 ? student.gradeLevel : null
 }
 
 type ApiWarning = {
@@ -56,7 +66,7 @@ type ApiAudit = {
 }
 
 type ApiAttendance = { status: string }
-type DashboardTabId = 'overview' | 'students' | 'teams' | 'divisions'
+type DashboardTabId = 'overview' | 'students' | 'teams' | 'divisions' | 'updates'
 
 type DashboardStat = {
   id: string
@@ -134,6 +144,7 @@ const tabMeta: Array<{ id: DashboardTabId; label: string }> = [
   { id: 'students', label: 'students' },
   { id: 'teams', label: 'teamsTab' },
   { id: 'divisions', label: 'divisionsTab' },
+  { id: 'updates', label: 'updatesTab' },
 ]
 
 function OverviewTabView({
@@ -255,16 +266,20 @@ function StudentTabView({ students }: { students: ApiStudent[] }) {
       <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{t('studentManagement')}</h2>
       <p className="mt-2 text-slate-600 dark:text-slate-400">{t('currentStudents')}</p>
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {students.slice(0, 10).map((student) => (
-          <div key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
-            <p className="text-sm text-slate-500 dark:text-slate-400">{t('student')}</p>
-            <p className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{student.fullName}</p>
-            <div className="mt-3 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-              <span>{t('classLabel')}: {student.divisionCode || t('unspecified')}</span>
-              <span>{student.gradeLevel || 0}</span>
+        {students.slice(0, 10).map((student) => {
+          const gradeLevel = getStudentGradeLevel(student)
+          const gradeName = gradeLevel === 1 ? t('firstSecondary') : gradeLevel === 2 ? t('secondSecondary') : gradeLevel === 3 ? t('thirdSecondary') : t('unspecified')
+          return (
+            <div key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+              <p className="text-sm text-slate-500 dark:text-slate-400">{t('student')}</p>
+              <p className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{student.fullName}</p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span>{t('classLabel')}: {student.divisionCode || t('unspecified')}</span>
+                <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">{gradeName}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
       <div className="mt-6 flex justify-center border-t border-slate-200 pt-5 dark:border-slate-800">
         <button type="button" onClick={() => router.push('/dashboard/students')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
@@ -377,6 +392,8 @@ function ActiveTabContent({
   divisions: Array<{ id: string; code: string; name: string }>
 }) {
   switch (tab) {
+    case 'updates':
+      return <UpdateLogTab />
     case 'students':
       return <StudentTabView students={students} />
     case 'teams':
@@ -530,7 +547,7 @@ export function MainDashboard() {
     }
   }, [])
 
-  const handleTabChange = (nextTab: DashboardTabId) => {
+  const handleTabChange = useCallback((nextTab: DashboardTabId) => {
     if (nextTab === activeTab || isLoading) return
 
     setPendingTab(nextTab)
@@ -546,33 +563,29 @@ export function MainDashboard() {
       setIsLoading(false)
       tabTimerRef.current = null
     }, 500)
-  }
+  }, [activeTab, isLoading])
+
+  const dashboardTabItems = useMemo<PillNavItem[]>(() => tabMeta.map((tab) => ({
+    id: tab.id,
+    label: pendingTab === tab.id ? t('loading') : t(tab.label as never),
+    disabled: isLoading,
+    onClick: () => handleTabChange(tab.id),
+  })), [handleTabChange, isLoading, pendingTab, t])
 
   return (
     <div className="space-y-6">
-      <div className="flex h-14 max-w-full gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:h-12 md:grid-cols-4 dark:border-slate-800 dark:bg-slate-900">
-        {tabMeta.map((tab) => {
-          const isSelected = activeTab === tab.id
-          const isPending = pendingTab === tab.id
-
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleTabChange(tab.id)}
-              className={`inline-flex h-full min-w-[9.5rem] shrink-0 items-center justify-center rounded-xl px-2 text-sm font-medium leading-none transition md:min-w-0 md:w-full ${
-                isSelected
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : isLoading
-                    ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {isPending ? t('loading') : t(tab.label as never)}
-            </button>
-          )
-        })}
+      <div className="dashboard-tab-bar max-w-full rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-slate-800 dark:bg-slate-900">
+        <PillNav
+          showLogo={false}
+          items={dashboardTabItems}
+          activeId={activeTab}
+          baseColor="hsl(var(--primary))"
+          pillColor="hsl(var(--muted))"
+          pillTextColor="hsl(var(--card-foreground))"
+          hoveredPillTextColor="#ffffff"
+          ariaLabel={locale === 'ar' ? 'تبويبات لوحة التحكم' : 'Dashboard tabs'}
+          initialLoadAnimation={false}
+        />
       </div>
 
       {isLoading ? (

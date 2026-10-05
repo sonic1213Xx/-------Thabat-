@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ATTENDANCE_ESCALATIONS } from '@/lib/moe-rules'
 import { getDateOnly, getTimeOnly } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 const validStatuses = ['UNMARKED', 'PRESENT', 'ABSENT_UNEXCUSED', 'ABSENT_EXCUSED', 'LATE', 'OTHER']
 const vicePrincipalRoles = ['VICE_PRINCIPAL', 'VP_STUDENT_AFFAIRS', 'VP_ACADEMIC_AFFAIRS', 'VP_OPERATIONS']
@@ -13,7 +14,7 @@ function attendanceNotes(notes: string | undefined, user: { role: string }) {
 }
 
 async function getRequestUser(request: NextRequest) {
-  const userId = request.headers.get('x-thabat-user-id')
+  const userId = await getAuthenticatedUserId(request)
   if (!userId) return null
   return prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, role: true, assignedDivisions: true, isActive: true } })
 }

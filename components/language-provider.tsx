@@ -1,7 +1,6 @@
 'use client'
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { usePathname } from 'next/navigation'
 import { translations, type Locale, type TranslationKey } from '@/lib/translations'
 import { getSession } from '@/lib/auth'
 
@@ -17,7 +16,6 @@ type LanguageContextValue = {
 const LanguageContext = createContext<LanguageContextValue | null>(null)
 
 export function LanguageProvider({ children, initialLocale = 'ar' }: { children: React.ReactNode; initialLocale?: Locale }) {
-  const pathname = usePathname()
   const [locale, setLocale] = useState<Locale>(initialLocale)
   const [isChanging, setIsChanging] = useState(false)
 
@@ -47,7 +45,7 @@ export function LanguageProvider({ children, initialLocale = 'ar' }: { children:
       window.setTimeout(() => {
         setLocale((current) => current === 'ar' ? 'en' : 'ar')
         setIsChanging(false)
-      }, 720)
+      }, 900)
     },
   }), [locale])
 
@@ -55,10 +53,12 @@ export function LanguageProvider({ children, initialLocale = 'ar' }: { children:
     <LanguageContext.Provider value={value}>
       {children}
       {isChanging && (
-        <div className={`language-wave-overlay ${pathname === '/login' ? 'login-language-wave' : ''}`} role="status" aria-live="polite" aria-label={translations[locale].changingLanguage}>
+        <div className="language-wave-overlay" role="status" aria-live="polite" aria-label={translations[locale].changingLanguage}>
           <div className="language-transition-panel">
-            <div className="language-transition-mark"><span className="language-transition-ring" /></div>
-            <span>{translations[locale].changingLanguage}</span>
+               <div className="language-block-loader" aria-hidden="true">
+                 {Array.from({ length: 6 }, (_, index) => <span key={index} />)}
+               </div>
+               <span>{translations[locale].changingLanguage}</span>
           </div>
         </div>
       )}

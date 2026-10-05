@@ -4,10 +4,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDateOnly, getTimeOnly, formatRelativeTimeArabic } from '@/lib/utils'
 
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 export async function GET(request: NextRequest) {
   try {
-    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
+    const requestUserId = await getAuthenticatedUserId(request)
     if (!requestUserId) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
     const user = await prisma.user.findUnique({ where: { id: requestUserId }, select: { id: true, isActive: true } })
     if (!user || !user.isActive) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
@@ -60,13 +61,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
+    const requestUserId = await getAuthenticatedUserId(request)
     if (!requestUserId) return NextResponse.json({ error: 'Authenticated user is required.' }, { status: 401 })
     const body = await request.json()
     const {
       studentId,
       studentName,
-      issuedByUserId,
       type,
       reason,
       deduction,
@@ -74,7 +74,6 @@ export async function POST(request: NextRequest) {
     } = body as {
       studentId?: string
       studentName?: string
-      issuedByUserId?: string
       type?: string
       reason?: string
       deduction?: number
@@ -86,7 +85,7 @@ export async function POST(request: NextRequest) {
     if (!resolvedStudentId) {
       return NextResponse.json(
         {
-          error: 'studentId and issuedByUserId are required.',
+          error: 'A student is required.',
         },
         { status: 400 },
       )

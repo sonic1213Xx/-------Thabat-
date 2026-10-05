@@ -96,7 +96,10 @@ export default function ReportsPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="mb-4 text-lg font-bold text-slate-900 dark:text-white">{t('performanceSummary')}</h2>
         {loading ? (
-          <p className="text-slate-500">{t('loadingReport')}</p>
+          <div className="cube-loading-stage py-8 text-sm text-slate-500 dark:text-slate-400" role="status" aria-live="polite">
+            <div className="cube-loading-spinner" aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <div key={index} />)}</div>
+            <span>{t('loadingReport')}</span>
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between rounded-lg bg-slate-50 p-4 dark:bg-slate-800">

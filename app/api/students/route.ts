@@ -305,18 +305,16 @@ export async function PUT(request: NextRequest) {
       studentId,
       toDivision,
       reason,
-      performedByUserId,
     } = body as {
       studentId?: string
       toDivision?: string
       reason?: string
-      performedByUserId?: string
     }
 
-    if (!studentId || !toDivision || !performedByUserId) {
+    if (!studentId || !toDivision) {
       return NextResponse.json(
         {
-          error: 'studentId, toDivision, and performedByUserId are required.',
+          error: 'studentId and toDivision are required.',
         },
         { status: 400 },
       )
@@ -333,9 +331,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const actor = await prisma.user.findUnique({
-      where: { id: performedByUserId },
-    })
+    const actor = authorization.user
 
     if (!actor) {
       return NextResponse.json(

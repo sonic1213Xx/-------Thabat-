@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { formatRelativeTimeArabic, getDateOnly, getTimeOnly } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 export async function DELETE(_request: NextRequest, context: { params: { id: string } }) {
   try {
-    const requestUserId = _request.cookies.get('THABAT_USER_ID')?.value || _request.headers.get('x-thabat-user-id')
+    const requestUserId = await getAuthenticatedUserId(_request)
     if (!requestUserId) return NextResponse.json({ error: 'Authenticated user is required.' }, { status: 401 })
     const warning = await prisma.warning.findUnique({ where: { id: context.params.id }, include: { student: true } })
     if (!warning) return NextResponse.json({ error: 'Warning not found.' }, { status: 404 })

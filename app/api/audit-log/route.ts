@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { formatRelativeTimeArabic } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/server-session'
 
 function normalizePositiveInteger(value: string | null, fallback: number, max?: number) {
   const parsed = Number(value ?? String(fallback))
@@ -13,7 +14,7 @@ function normalizePositiveInteger(value: string | null, fallback: number, max?: 
 
 export async function GET(request: NextRequest) {
   try {
-    const requestUserId = request.cookies.get('THABAT_USER_ID')?.value || request.headers.get('x-thabat-user-id')
+    const requestUserId = await getAuthenticatedUserId(request)
     if (!requestUserId) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
     const currentUser = await prisma.user.findUnique({ where: { id: requestUserId }, select: { id: true, role: true, isActive: true } })
     if (!currentUser || !currentUser.isActive) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
@@ -88,11 +89,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { userId?: string; action?: string; targetType?: string; targetId?: string; targetName?: string; studentId?: string; details?: string }
+    const userId = await getAuthenticatedUserId(request)
+    if (!userId) return NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })
+    const body = await request.json() as { action?: string; targetType?: string; targetId?: string; targetName?: string; studentId?: string; details?: string }
     if (!body.action || !body.targetType) return NextResponse.json({ error: 'action and targetType are required.' }, { status: 400 })
-    const actor = body.userId
-      ? await prisma.user.findUnique({ where: { id: body.userId } })
-      : await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } })
+    const actor = await prisma.user.findUnique({ where: { id: userId } })
     if (!actor) return NextResponse.json({ error: 'Audit actor not found.' }, { status: 404 })
     const now = new Date()
     const log = await prisma.auditLog.create({ data: { userId: actor.id, userName: actor.name, userRole: actor.role, action: body.action, targetType: body.targetType, targetId: body.targetId, targetName: body.targetName, studentId: body.studentId, details: body.details, dateOnly: now.toISOString().slice(0, 10), timeOnly: now.toTimeString().slice(0, 8), relativeTime: formatRelativeTimeArabic(now), ipAddress: request.headers.get('x-forwarded-for') ?? 'local', userAgent: request.headers.get('user-agent') ?? 'unknown' } })
