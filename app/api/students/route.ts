@@ -50,11 +50,20 @@ export async function GET(request: NextRequest) {
     }
 
     if (division && isValidDivisionCode(division)) {
-      const legacyDivision = division.match(/^(\d)(\d)\d$/)
-        ? `${division[0] === '1' ? 'المستوى الأول' : division[0] === '2' ? 'المستوى الرابع' : 'المستوى السادس'} - الشعبة ${division[1]}`
-        : null
+      const normalizedDivision = normalizeDivisionCode(division)
+      const divisionCodes = new Set([division, normalizedDivision])
+      const gradeCode = normalizedDivision.match(/^([1-3])\d{2}$/)?.[1]
+      if (gradeCode) {
+        divisionCodes.add(`الشعبة ${normalizedDivision}`)
+        const legacyGradeName = gradeCode === '1'
+          ? 'المستوى الأول'
+          : gradeCode === '2'
+            ? 'المستوى الرابع'
+            : 'المستوى السادس'
+        divisionCodes.add(`${legacyGradeName} - الشعبة ${normalizedDivision[2]}`)
+      }
       const existingConditions = where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []
-      where.AND = [...existingConditions, { OR: legacyDivision ? [{ divisionCode: division }, { divisionCode: legacyDivision }] : [{ divisionCode: division }] }]
+      where.AND = [...existingConditions, { divisionCode: { in: Array.from(divisionCodes) } }]
     }
 
     if (gradeLevel) {
