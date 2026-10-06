@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Eye, EyeOff, Lock, Pencil, Trash2, UserPlus, X } from "lucide-react";
+import { Eye, EyeOff, Lock, Pencil, Trash2, UserPlus } from "lucide-react";
 import { StyledSelect } from "@/components/ui/styled-select";
 import {
-  DEFAULT_ROLES,
   PERMISSIONS,
   getRoles,
   saveRoles,

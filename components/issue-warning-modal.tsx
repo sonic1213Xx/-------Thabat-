@@ -37,7 +37,7 @@ export function IssueWarningModal({
   onClose: () => void;
   onSaved?: (warning: unknown) => void;
 }) {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const locationOptions = [t("classroom"), t("courtyard"), t("corridors"), t("gym"), t("cafeteria"), t("schoolBus"), t("prayerRoom")];
   const [studentId, setStudentId] = useState("");
   const [studentSearch, setStudentSearch] = useState("");

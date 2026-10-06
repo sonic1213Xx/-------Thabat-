@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileText, Printer, Search, Send, ShieldAlert } from "lucide-react";
+import { FileText, Printer, Search, Send, ShieldAlert } from "lucide-react";
 import { getProfileSignature, getSession } from "@/lib/auth";
 import { useLanguage } from "@/components/language-provider";
 import { StyledSelect } from "@/components/ui/styled-select";

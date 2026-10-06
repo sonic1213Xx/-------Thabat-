@@ -21,7 +21,7 @@ import { TabLoadingSkeleton } from './tab-loading-skeleton'
 import { useLanguage } from '@/components/language-provider'
 import { getCurrentProfile, getSession } from '@/lib/auth'
 import { fetchCached, invalidateCached } from '@/lib/client-cache'
-import { getGradeLevelFromDivisionCode, normalizeDivisionCode } from '@/lib/utils'
+import { getGradeLevelFromDivisionCode } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
 import { PillNav, type PillNavItem } from '@/components/dashboard/pill-nav'
 import { UpdateLogTab } from '@/components/dashboard/update-log-tab'
@@ -408,7 +408,7 @@ export function MainDashboard() {
   const [students, setStudents] = useState<ApiStudent[]>([])
   const [warnings, setWarnings] = useState<ApiWarning[]>([])
   const [auditLogs, setAuditLogs] = useState<ApiAudit[]>([])
-  const [attendance, setAttendance] = useState<ApiAttendance[]>([])
+  const [, setAttendance] = useState<ApiAttendance[]>([])
   const [teams, setTeams] = useState<Array<{ id: string; label: string }>>([])
   const [divisions, setDivisions] = useState<Array<{ id: string; code: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
@@ -446,8 +446,6 @@ export function MainDashboard() {
       window.removeEventListener('thabat-warnings-changed', refreshWarnings)
     }
   }, [session?.id])
-
-  const hasDashboardData = students.length > 0 || warnings.length > 0 || auditLogs.length > 0 || attendance.length > 0 || teams.length > 0 || divisions.length > 0
 
   const accessibleStudents = useMemo(() => {
     const session = getSession()

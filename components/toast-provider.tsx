@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 
 export type ToastKind = 'loading' | 'success' | 'error' | 'info'
@@ -26,33 +26,32 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>())
   const exitTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>())
 
-  const clearTimers = (id: number) => {
+  const clearTimers = useCallback((id: number) => {
     const timer = timers.current.get(id)
     if (timer) clearTimeout(timer)
     timers.current.delete(id)
     const exitTimer = exitTimers.current.get(id)
     if (exitTimer) clearTimeout(exitTimer)
     exitTimers.current.delete(id)
-  }
+  }, [])
 
-  const dismissToast = (id: number) => {
+  const dismissToast = useCallback((id: number) => {
     if (exitTimers.current.has(id)) return
-    clearTimeout(timers.current.get(id))
-    timers.current.delete(id)
+    clearTimers(id)
     setToasts((current) => current.map((toast) => toast.id === id ? { ...toast, dismissing: true } : toast))
     const exitTimer = setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id))
       exitTimers.current.delete(id)
     }, EXIT_DURATION)
     exitTimers.current.set(id, exitTimer)
-  }
+  }, [clearTimers])
 
-  const scheduleDismissal = (id: number, duration = DEFAULT_DURATION) => {
+  const scheduleDismissal = useCallback((id: number, duration = DEFAULT_DURATION) => {
     clearTimeout(timers.current.get(id))
     timers.current.delete(id)
     if (duration <= 0) return
     timers.current.set(id, setTimeout(() => dismissToast(id), duration))
-  }
+  }, [dismissToast])
 
   const value = useMemo<ToastContextValue>(() => {
     const showToast = (message: string, kind: ToastKind = 'info', duration = DEFAULT_DURATION) => {
@@ -74,7 +73,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         info: (message, duration = DEFAULT_DURATION) => showToast(message, 'info', duration),
       },
     }
-  }, [])
+  }, [dismissToast, scheduleDismissal])
 
   useEffect(() => () => {
     timers.current.forEach((timer) => clearTimeout(timer))

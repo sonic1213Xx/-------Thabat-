@@ -6,26 +6,6 @@ import { getDateOnly, getTimeOnly, formatRelativeTimeArabic, isValidDivisionCode
 import { prisma } from '@/lib/prisma'
 import { authorizeDivisions } from '@/lib/division-auth'
 
-async function getActor(userId?: string) {
-  if (userId) {
-    const actor = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, role: true, isActive: true } })
-    if (actor) return actor
-  }
-
-  const existing = await prisma.user.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true, role: true, isActive: true } })
-  if (existing) return existing
-
-  return prisma.user.create({
-    data: {
-      username: 'system',
-      name: 'نظام ثَبَت',
-      password: 'system-managed',
-      role: 'PRINCIPAL',
-      isActive: true,
-    },
-  })
-}
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)

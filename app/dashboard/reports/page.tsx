@@ -6,20 +6,21 @@ import { useLanguage } from '@/components/language-provider'
 import { ReportExportButton } from '@/components/report-export-button'
 import { useToast } from '@/components/toast-provider'
 import { fetchCached } from '@/lib/client-cache'
+import type { Student, Warning } from '@prisma/client'
 
 export default function ReportsPage() {
   const { t, locale } = useLanguage()
   const { toast } = useToast()
-  const [students, setStudents] = useState<any[]>([])
-  const [warnings, setWarnings] = useState<any[]>([])
+  const [students, setStudents] = useState<Student[]>([])
+  const [warnings, setWarnings] = useState<Warning[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadData() {
       try {
         const [studentsRes, warningsRes] = await Promise.all([
-          fetchCached<{ data?: any[] }>('dashboard:students:all', '/api/students'),
-          fetchCached<{ data?: any[] }>('dashboard:warnings:all', '/api/warnings'),
+          fetchCached<{ data?: Student[] }>('dashboard:students:all', '/api/students'),
+          fetchCached<{ data?: Warning[] }>('dashboard:warnings:all', '/api/warnings'),
         ])
         const studentsData = studentsRes.data ?? []
         const warningsData = warningsRes.data ?? []

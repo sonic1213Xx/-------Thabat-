@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { AlertCircle, CheckCircle2, Plus, Trash2, X } from 'lucide-react'
 import { StyledSelect } from '@/components/ui/styled-select'
 import { Modal } from '@/components/ui/modal'

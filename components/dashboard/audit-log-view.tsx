@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, User, Filter, Search, FileText } from 'lucide-react'
+import { Calendar, Search, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDateArabic, getAuditActionArabic } from '@/lib/utils'
 import { StyledSelect } from '@/components/ui/styled-select'
@@ -78,7 +78,7 @@ const severityConfig = {
 }
 
 export function AuditLogView() {
-  const [auditLog, setAuditLog] = useState<AuditEntry[]>(mockAuditLog)
+  const [auditLog] = useState<AuditEntry[]>(mockAuditLog)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterAction, setFilterAction] = useState<string | 'all'>('all')
   const [filterSeverity, setFilterSeverity] = useState<string | 'all'>('all')

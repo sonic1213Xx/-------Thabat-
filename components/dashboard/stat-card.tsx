@@ -41,7 +41,7 @@ const colorMap = {
   },
 }
 
-export function StatCard({ id, label, value, change, icon: Icon, color, loading = false }: StatCardProps) {
+export function StatCard({ label, value, change, icon: Icon, color, loading = false }: StatCardProps) {
   const colors = colorMap[color]
   const normalizedChange = typeof change === 'string' ? change.trim() : ''
   const isBadgeVisible = Boolean(normalizedChange && normalizedChange !== '0' && normalizedChange !== '+0' && normalizedChange !== '-0')

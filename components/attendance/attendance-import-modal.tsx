@@ -40,12 +40,6 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
 
   const filteredReviews = useMemo(() => reviews.filter((review) => divisionFilter === "ALL" || review.row.divisionCode === divisionFilter), [reviews, divisionFilter]);
   const approvalRows = filteredReviews.filter((review) => review.reason === "NEEDS_APPROVAL");
-  const selectedCount = filteredReviews.filter((review) => {
-    if (review.reason === "EXACT") return true;
-    if (review.reason === "NEEDS_APPROVAL") return approvalChecked[review.row.sourceRow];
-    return false;
-  }).length;
-
   const buildRecords = () => {
     const records: Array<{ studentId: string; status: string; date: string; notes: string; entryTime?: string; divisionId: string }> = [];
     const scannedByDate = new Map<string, Set<string>>();
@@ -97,7 +91,7 @@ export function AttendanceImportModal({ students, divisions, defaultDate, userId
   };
 
   const selectAllSuggestions = () => {
-    setApprovalChecked((current) => Object.fromEntries(approvalRows.map((review) => [review.row.sourceRow, true])));
+    setApprovalChecked(() => Object.fromEntries(approvalRows.map((review) => [review.row.sourceRow, true])));
   };
 
   const deselectAll = () => {

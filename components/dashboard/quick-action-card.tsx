@@ -15,7 +15,6 @@ interface QuickActionCardProps {
 }
 
 export function QuickActionCard({
-  id,
   label,
   icon: Icon,
   href,

@@ -30,7 +30,11 @@ export function getProfiles(): Profile[] {
   if (typeof window === 'undefined') return []
   try {
     const profiles = JSON.parse(localStorage.getItem(PROFILES_STORAGE_KEY) ?? '[]') as Array<Profile & { password?: string }>
-    const sanitized = profiles.map(({ password: _password, ...profile }) => profile)
+    const sanitized = profiles.map((profile) => {
+      const sanitizedProfile = { ...profile }
+      delete sanitizedProfile.password
+      return sanitizedProfile
+    })
     if (profiles.some((profile) => profile.password !== undefined)) localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(sanitized))
     return sanitized
   } catch { return [] }
@@ -38,7 +42,8 @@ export function getProfiles(): Profile[] {
 
 export function saveProfile(profile: Profile): void {
   if (typeof window !== 'undefined') {
-    const { password: _password, ...safeProfile } = profile
+    const safeProfile = { ...profile }
+    delete safeProfile.password
     localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify([...getProfiles().filter((item) => item.id !== profile.id), safeProfile]))
   }
 }

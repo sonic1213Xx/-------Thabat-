@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, Plus, Check } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Student {

@@ -7,7 +7,6 @@ import {
 import {
   exportEmptyGradebookTemplates,
   exportGradebookToExcel,
-  exportGradebookToPdf,
   normalizeDivisionLabel,
   type GradebookExportMetadata,
   type GradebookPeriod,

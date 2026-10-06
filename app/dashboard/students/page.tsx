@@ -3,12 +3,10 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
-  AlertCircle,
   BookOpen,
   Check,
   ChevronLeft,
   ChevronRight,
-  Download,
   Edit3,
   Eye,
   FileText,
@@ -31,11 +29,8 @@ import { DivisionGuard } from "@/components/dashboard/division-guard";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { Modal } from "@/components/ui/modal";
 import {
-  getStoredDivisions,
-  getStoredTeamId,
   getGradeLevelFromDivisionCode,
   normalizeDivisionCode,
-  setStoredDivisions,
 } from "@/lib/utils";
 import { TransferModal } from "@/components/dashboard/transfer-modal";
 import { BulkTransferModal } from "@/components/dashboard/bulk-transfer-modal";
@@ -184,8 +179,6 @@ export default function StudentsPage() {
       showToast,
       updateToast,
     ).finally(() => setIsExporting(false));
-  const exportEmptyGradebookTemplatesToPdf = (_divisions: string[]) =>
-    notifyPdfComingSoon(showToast);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [divisions, setDivisions] = useState<
     Array<{ id: string; code: string; name: string }>
@@ -470,11 +463,6 @@ export default function StudentsPage() {
   const isTeacher = currentRole === "TEACHER";
   const canInspectTeachers =
     hasPermission(currentRole, "gradebooks", "read") && !isTeacher;
-  const canDownloadGradebookTemplates = hasPermission(
-    currentRole,
-    "gradebooks",
-    "read",
-  );
   const canEditStudents = currentRole
     ? can(currentRole, "can_edit_students")
     : false;
@@ -588,56 +576,6 @@ export default function StudentsPage() {
     });
     await refreshStudents();
     window.dispatchEvent(new CustomEvent("thabat-students-changed"));
-  };
-
-  const handleImportedStudents = (
-    parsed: Array<{
-      name: string;
-      nationalId: string;
-      divisionCode?: string;
-      gradeLevel?: number;
-    }>,
-  ) => {
-    const imported = parsed.map((entry, index) => ({
-      id: `imported-${Date.now()}-${index}`,
-      fullName: entry.name,
-      arabicName: entry.name,
-      nationalId: entry.nationalId,
-      divisionCode:
-        (entry.divisionCode ?? "").trim() || divisions[0]?.code || "",
-      gradeLevel: entry.gradeLevel || 1,
-      behaviorScore: 100,
-      attendanceScore: 100,
-      isActive: true,
-    }));
-
-    const validImported = imported.filter((student) => student.divisionCode);
-
-    const nextDivisions = parsed
-      .map((entry) => (entry.divisionCode ?? "").trim())
-      .filter(Boolean)
-      .filter((code, index, arr) => arr.indexOf(code) === index)
-      .map((code, index) => ({
-        id: `division-${Date.now()}-${index}`,
-        code,
-        name: `${t("division")} ${code}`,
-        teamId: getStoredTeamId(),
-      }));
-
-    if (nextDivisions.length) {
-      const existing = getStoredDivisions();
-      const merged = [
-        ...existing.filter(
-          (item) => !nextDivisions.some((next) => next.code === item.code),
-        ),
-        ...nextDivisions,
-      ];
-      setStoredDivisions(merged);
-      window.dispatchEvent(new CustomEvent("thabat-divisions-changed"));
-    }
-
-    setStudents((current) => [...validImported, ...current]);
-    setIsImportOpen(false);
   };
 
   const deleteStudent = async () => {

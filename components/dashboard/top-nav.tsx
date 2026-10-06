@@ -7,7 +7,7 @@ import { Menu, Sun, Moon, LogOut, Users, Plus, Check, ChevronDown, X, Trash2, La
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
-import { cn, getStoredTeamId, setStoredTeamId, TEAM_OPTIONS, type TeamDefinition } from '@/lib/utils'
+import { cn, getStoredTeamId, setStoredTeamId, TEAM_OPTIONS } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
 import { useLanguage } from '@/components/language-provider'
 import { clearSession } from '@/lib/auth'
@@ -120,7 +120,6 @@ export function TopNav() {
     popup.document.close()
   }
 
-  const unreadNotifications = transferNotifications.filter((notification) => !notification.readAt).length
   const openNotification = async (notification: Notification) => {
     setSelectedNotification(notification)
     if (!notification.readAt && sessionUser) {

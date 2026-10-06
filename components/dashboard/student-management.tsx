@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Upload, Filter, Search } from "lucide-react";
+import { Plus, Upload, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ExcelParser } from "./excel-parser";
 import { StyledSelect } from "@/components/ui/styled-select";
@@ -51,7 +51,7 @@ const mockStudents: Student[] = [
 
 export function StudentManagement() {
   const { t, locale } = useLanguage();
-  const [students, setStudents] = useState<Student[]>(mockStudents);
+  const [students] = useState<Student[]>(mockStudents);
   const [showImportModal, setShowImportModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterGrade, setFilterGrade] = useState<number | "all">("all");

@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, User, AlertCircle, ArrowRight, Edit2 } from 'lucide-react'
+import { Calendar, User, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatRelativeTimeArabic, formatFullArabicDateTime, getAuditActionArabic } from '@/lib/utils'
+import { formatFullArabicDateTime, getAuditActionArabic } from '@/lib/utils'
 
 interface StudentHistoryEntry {
   id: string
@@ -145,7 +145,6 @@ const severityConfig = {
 }
 
 export function StudentHistoryTab({
-  studentId,
   studentName,
   divisionCode,
 }: StudentHistoryTabProps) {

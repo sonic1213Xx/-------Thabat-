@@ -13,6 +13,7 @@ import { fetchCached, invalidateCached } from '@/lib/client-cache'
 import { getCurrentProfile, getSession } from '@/lib/auth'
 import { normalizeDivisionCode } from '@/lib/utils'
 import { DivisionStudentsModal } from '@/components/division-students-modal'
+import type { Student as StudentRecord } from '@prisma/client'
 
 interface DivisionRecord {
   id: string
@@ -29,7 +30,7 @@ export default function DivisionsPage() {
   const { t } = useLanguage()
   const router = useRouter()
   const [divisions, setDivisions] = useState<DivisionRecord[]>([])
-  const [students, setStudents] = useState<any[]>([])
+  const [students, setStudents] = useState<StudentRecord[]>([])
   const { isLoading, withMinimumDelay } = useTabLoading(true)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editingDivision, setEditingDivision] = useState<DivisionRecord | null>(null)
@@ -47,7 +48,7 @@ export default function DivisionsPage() {
       try {
         const [divisionsRes, studentsRes] = await Promise.all([
           fetchCached<{ data?: DivisionRecord[] }>(`dashboard:divisions:v2:${session?.id}:${session?.role}`, '/api/divisions'),
-          fetchCached<{ data?: any[] }>('dashboard:students:all', '/api/students'),
+          fetchCached<{ data?: StudentRecord[] }>('dashboard:students:all', '/api/students'),
         ])
 
         if (!isActive()) return

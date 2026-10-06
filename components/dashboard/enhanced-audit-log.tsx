@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calendar, User, Filter, Search, FileText, ChevronDown } from 'lucide-react'
+import { Calendar, User, Search, FileText, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatFullArabicDateTime, formatRelativeTimeArabic, getAuditActionArabic, getUserRoleArabic } from '@/lib/utils'
+import { formatFullArabicDateTime, getAuditActionArabic, getUserRoleArabic } from '@/lib/utils'
 import { StyledSelect } from '@/components/ui/styled-select'
 
 interface AuditEntry {
@@ -93,7 +93,7 @@ const severityConfig = {
 }
 
 export function EnhancedAuditLogView() {
-  const [auditLog, setAuditLog] = useState<AuditEntry[]>(mockAuditLog)
+  const [auditLog] = useState<AuditEntry[]>(mockAuditLog)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterAction, setFilterAction] = useState<string | 'all'>('all')
   const [filterSeverity, setFilterSeverity] = useState<string | 'all'>('all')
