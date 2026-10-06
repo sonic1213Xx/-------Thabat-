@@ -170,7 +170,8 @@ export function GatePassModal({
                   <strong>{issuedPass.departureTime}</strong>
                 </p>
               </div>
-              <div className="mt-6 border-t border-emerald-200 pt-4 text-center text-xs text-slate-500">
+              <div className="mt-6 flex flex-col items-center gap-2 border-t border-emerald-200 pt-4 text-center text-xs text-slate-500">
+                <Image src="/school-logo.jpeg" alt="شعار المدرسة" width={200} height={153} unoptimized className="h-12 w-auto object-contain" />
                 {locale === "ar" ? "ختم المدرسة الرسمي" : "Official school stamp"}
               </div>
               {qrImage && <div className="mt-4 flex flex-col items-center gap-2"><Image src={qrImage} alt={locale === "ar" ? "رمز تصريح الخروج" : "Gate pass QR code"} width={128} height={128} unoptimized className="h-32 w-32 rounded-lg bg-white p-2" /><span className="font-mono text-[10px] text-slate-400">{issuedPass.qrToken}</span></div>}

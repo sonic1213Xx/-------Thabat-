@@ -25,7 +25,7 @@ type DocumentData = {
 };
 type SignTarget = "administrator" | "student" | "parent";
 const fieldClass =
-  "pointer-events-auto relative z-20 w-full rounded-lg border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500 focus:outline-none dark:border-slate-700";
+  "pointer-events-auto relative z-20 box-border min-h-11 w-full rounded-lg border border-border bg-card p-3 text-start leading-relaxed text-card-foreground outline-none placeholder:text-card-foreground/50 focus:ring-2 focus:ring-emerald-500 focus:outline-none";
 
 export function MoeDocument({
   type,
@@ -127,18 +127,17 @@ export function MoeDocument({
       onClick={onClose}
       >
         <div
-          className="relative z-10 w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl rounded-sm p-10 dir-rtl"
+          className="relative z-10 w-full max-w-[210mm] rounded-sm border border-border bg-card p-10 text-card-foreground shadow-2xl dir-rtl"
           onClick={(event) => event.stopPropagation()}
         >
           <div className="max-h-[80vh] overflow-y-auto p-2">
             <article
               id="moe-document"
               ref={printDocumentRef}
-              className="printable-moe mx-auto max-w-3xl text-slate-900"
+              className="printable-moe mx-auto max-w-3xl bg-card text-card-foreground"
               dir="rtl"
             >
-              <header className="border-b-2 border-slate-900 pb-5 text-center">
-                <Image src="/school-logo.jpeg" alt="" width={200} height={56} unoptimized className="pdf-school-logo mx-auto mb-2 h-14 w-auto object-contain" />
+              <header className="border-b-2 border-border pb-5 text-center">
                 <p className="font-bold">المملكة العربية السعودية</p>
                 <p>وزارة التعليم · إدارة التعليم</p>
                 <label className="mt-3 block text-sm font-semibold">
@@ -218,7 +217,7 @@ export function MoeDocument({
                   onChange={(event) => setDocumentText(event.target.value)}
                   rows={6}
                   placeholder="اكتب تفاصيل المستند..."
-                  className={`${fieldClass} mt-2 resize-y cursor-text leading-8`}
+                  className={`${fieldClass} mt-2 resize-y cursor-text leading-relaxed`}
                 />
               </label>
               <label className="mt-4 block text-sm font-semibold">
@@ -252,9 +251,13 @@ export function MoeDocument({
                   onClick={() => setSigning("administrator")}
                 />
               </div>
-              <p className="mt-8 text-center text-xs text-slate-500">
-                ختم المدرسة: __________________
-              </p>
+              <div className="mt-8 flex items-end justify-between gap-6 border-t border-border pt-4 text-xs">
+                <span>توقيع المسؤول: __________________</span>
+                <div className="flex flex-col items-center gap-1">
+                  <Image src="/school-logo.jpeg" alt="شعار المدرسة" width={200} height={153} unoptimized className="h-14 w-auto object-contain" />
+                  <span>ختم المدرسة</span>
+                </div>
+              </div>
             </article>
           </div>
           <footer className="mt-4 flex justify-end gap-3 border-t border-slate-200 pt-4 print:hidden">
@@ -307,7 +310,7 @@ function SignatureField({
     <button
       type="button"
       onClick={onClick}
-      className="pointer-events-auto relative min-h-24 cursor-pointer rounded-lg border border-dashed border-slate-300 p-3 text-right hover:border-emerald-500"
+      className="pointer-events-auto relative min-h-24 cursor-pointer rounded-lg border border-dashed border-border p-3 text-right text-card-foreground hover:border-primary"
     >
       <span className="block text-xs font-semibold">{label}</span>
       {signature ? (
@@ -326,7 +329,7 @@ function SignatureField({
         </span>
       )}
       {signature && (
-        <span className="absolute end-2 top-2 rounded bg-white/80 p-1 text-[10px] text-emerald-700">
+        <span className="absolute end-2 top-2 rounded bg-muted p-1 text-[10px] text-primary">
           <Pencil className="inline h-3 w-3" /> تغيير التوقيع
         </span>
       )}

@@ -49,11 +49,31 @@ export async function downloadOnePagePdf(root: HTMLElement, filename: string): P
         const documentRoot = clonedRoot as HTMLElement
         documentRoot.style.backgroundColor = '#ffffff'
         documentRoot.style.color = '#111827'
-        documentRoot.querySelectorAll<HTMLElement>('*').forEach((element) => { element.style.color = '#111827' })
+        documentRoot.style.fontFamily = 'Cairo, Almarai, sans-serif'
+        documentRoot.style.lineHeight = '1.6'
+        documentRoot.querySelectorAll<HTMLElement>('.template-background').forEach((image) => {
+          image.style.display = 'block'
+        })
+        documentRoot.querySelectorAll<HTMLElement>('*').forEach((element) => {
+          element.style.color = '#111827'
+          element.style.backgroundColor = 'transparent'
+        })
         documentRoot.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea').forEach((field) => {
           field.style.backgroundColor = '#ffffff'
           field.style.borderColor = '#111827'
           field.style.color = '#111827'
+          field.style.boxSizing = 'border-box'
+          field.style.fontFamily = 'Cairo, Almarai, sans-serif'
+          field.style.fontSize = '10pt'
+          field.style.lineHeight = '1.6'
+          field.style.direction = 'rtl'
+          field.style.textAlign = 'right'
+          field.style.padding = '8px 10px'
+        })
+        documentRoot.querySelectorAll<HTMLTextAreaElement>('textarea').forEach((field) => {
+          field.style.whiteSpace = 'pre-wrap'
+          field.style.overflowWrap = 'break-word'
+          field.style.wordBreak = 'normal'
         })
       },
     })

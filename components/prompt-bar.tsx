@@ -77,10 +77,11 @@ export function PromptBar({ placeholder, busy, onSend, onStop }: PromptBarProps)
   useLayoutEffect(() => {
     const input = inputRef.current
     if (!input) return
-    input.style.height = '0px'
+    input.style.height = 'auto'
     const maxHeight = 22 * 5
-    input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`
-    input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden'
+    const contentHeight = input.scrollHeight
+    input.style.height = `${Math.max(22, Math.min(contentHeight, maxHeight))}px`
+    input.style.overflowY = contentHeight > maxHeight ? 'auto' : 'hidden'
   }, [draft])
 
   useEffect(() => {
