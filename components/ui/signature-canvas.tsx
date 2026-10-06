@@ -3,7 +3,6 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import { Eraser, X } from 'lucide-react'
-import { useTheme } from 'next-themes'
 import { useLanguage } from '@/components/language-provider'
 
 export function SignatureCanvas({ initialSignature, onCancel, onSave, showDefaultOption = false }: { initialSignature?: string | null; onCancel: () => void; onSave: (signature: string, saveAsDefault?: boolean) => void; showDefaultOption?: boolean }) {
@@ -15,12 +14,12 @@ export function SignatureCanvas({ initialSignature, onCancel, onSave, showDefaul
   const [closing, setClosing] = useState(false)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { locale } = useLanguage()
-  const { resolvedTheme } = useTheme()
-  const inkColor = resolvedTheme === 'dark' ? '#ffffff' : '#000000'
+  const inkColor = '#111827'
   const text = locale === 'ar' ? { title: 'التوقيع الرقمي', hint: 'ارسم توقيعك بالماوس أو اللمس أو القلم.', clear: 'مسح', cancel: 'إلغاء', save: 'حفظ التوقيع', defaultOption: 'حفظ كـ توقيع افتراضي لحسابي' } : { title: 'Digital signature', hint: 'Draw your signature with a mouse, touch, or pen.', clear: 'Clear', cancel: 'Cancel', save: 'Save signature', defaultOption: 'Save as my default account signature' }
 
   useEffect(() => {
     setMounted(true)
+    if (canvasRef.current) canvasRef.current.style.backgroundColor = '#ffffff'
     return () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current) }
   }, [])
 
@@ -28,7 +27,16 @@ export function SignatureCanvas({ initialSignature, onCancel, onSave, showDefaul
     const canvas = canvasRef.current
     if (!canvas || !initialSignature) return
     const image = new Image()
-    image.onload = () => { canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height); setEmpty(false) }
+    image.onload = () => {
+      const context = canvas.getContext('2d')
+      if (!context) return
+      context.drawImage(image, 0, 0, canvas.width, canvas.height)
+      context.globalCompositeOperation = 'source-in'
+      context.fillStyle = '#111827'
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.globalCompositeOperation = 'source-over'
+      setEmpty(false)
+    }
     image.src = initialSignature
   }, [initialSignature])
 

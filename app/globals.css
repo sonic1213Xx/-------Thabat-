@@ -22,14 +22,14 @@
 
 html {
   scroll-behavior: smooth;
-  overflow-x: hidden;
+  overflow-x: clip;
   font-family: 'Almarai', 'Cairo', system-ui, -apple-system, sans-serif;
 }
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow-x: clip;
+  overflow-y: visible;
   padding-right: 0 !important;
   margin-right: 0 !important;
 }
@@ -63,7 +63,10 @@ body {
 @media print {
   body { background: white !important; color: black !important; }
   body * { visibility: hidden !important; }
-  @page { size: A4; margin: 15mm; }
+  @page { size: A4 portrait; margin: 12mm; }
+  html,
+  body { height: auto !important; overflow: visible !important; }
+  body > *:not(.print-document) { display: none !important; }
   .print-dashboard,
   .print-dashboard * { display: none !important; }
   .print-document {
@@ -77,6 +80,7 @@ body {
     color: black !important;
     direction: rtl !important;
   }
+  .print-document * { overflow: visible !important; max-height: none !important; }
   .print-document,
   .print-document * {
     visibility: visible !important;
@@ -90,12 +94,13 @@ body {
   }
   .printable-referral {
     display: block !important;
-    height: 297mm !important;
+    position: relative !important;
+    height: 270mm !important;
     min-height: 0 !important;
-    width: 210mm !important;
+    width: 100% !important;
     max-width: none !important;
     overflow: hidden !important;
-    margin: -15mm !important;
+    margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
     font-size: 12px !important;
@@ -104,27 +109,33 @@ body {
   .printable-referral .print-toolbar,
   .printable-referral .print-toolbar * { display: none !important; }
   .printable-referral > .relative.z-10 {
-    height: 100% !important;
-    padding: 48mm 15mm 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 38mm 4mm 10mm !important;
   }
+  .printable-referral .print-fit-content,
+  .printable-moe .print-fit-content { width: calc(100% / var(--print-scale, 1)) !important; transform: scale(var(--print-scale, 1)) !important; transform-origin: top right !important; }
   .printable-referral .template-background {
+    position: absolute !important;
     top: 0 !important;
     right: 0 !important;
     bottom: auto !important;
     left: 0 !important;
     width: 100% !important;
-    height: 100% !important;
+    height: 270mm !important;
     margin: 0 !important;
     object-position: top center !important;
     transform: none !important;
   }
-  .printable-referral img.print-signature { display: block !important; max-height: 55px !important; }
+  .printable-referral img.print-signature { display: block !important; width: auto !important; height: auto !important; max-width: 65mm !important; max-height: 22mm !important; object-fit: contain !important; object-position: right center !important; print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
   .printable-referral h1 { font-size: 22px !important; }
   .printable-referral h2 { font-size: 15px !important; }
   .printable-referral .mt-14 { margin-top: 12px !important; }
   .printable-referral .mt-6 { margin-top: 10px !important; }
   .printable-referral .mt-3 { margin-top: 5px !important; }
-  .printable-referral .min-h-32 { min-height: 82px !important; }
+  .printable-referral .min-h-32 { min-height: 30mm !important; }
+  .printable-referral .referral-metadata,
+  .printable-referral .referral-signatures { break-inside: avoid !important; page-break-inside: avoid !important; }
   .printable-referral section > div { min-height: 56px !important; }
   .printable-referral button { border: 1px solid black !important; }
   .printable-permit,
@@ -176,22 +187,31 @@ body {
     color: #111827 !important;
   }
   .printable-moe {
-    position: fixed !important;
-    top: 0 !important;
-    right: 0 !important;
-    bottom: auto !important;
-    left: 0 !important;
+    position: relative !important;
     display: block !important;
     width: 100% !important;
     max-width: none !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
+    height: 270mm !important;
+    max-height: 270mm !important;
+    overflow: hidden !important;
     margin: 0 !important;
-    padding: 12mm !important;
+    padding: 0 !important;
     background: white !important;
     box-shadow: none !important;
   }
+  .printable-moe .printable-moe-content { transform-origin: top right !important; padding: 0 !important; }
+  .printable-moe header { padding-bottom: 3mm !important; }
+  .printable-moe header h1 { margin-top: 3mm !important; font-size: 20px !important; }
+  .printable-moe section { margin-top: 4mm !important; gap: 3mm !important; }
+  .printable-moe label { font-size: 10px !important; }
+  .printable-moe input,
+  .printable-moe textarea { min-height: 0 !important; padding: 2mm !important; font-size: 10px !important; line-height: 1.25 !important; }
+  .printable-moe textarea { resize: none !important; }
+  .printable-moe .mt-8 { margin-top: 4mm !important; }
+  .printable-moe .mt-10 { margin-top: 5mm !important; }
+  .printable-moe .min-h-24 { min-height: 18mm !important; }
+  .printable-moe img { display: block !important; max-width: 100% !important; max-height: 18mm !important; object-fit: contain !important; print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+  .printable-moe button { break-inside: avoid !important; page-break-inside: avoid !important; }
   .printable-moe input,
   .printable-moe textarea {
     border-color: #111827 !important;
@@ -205,7 +225,6 @@ body {
   .attendance-page main section { break-inside: avoid; margin-bottom: 1rem; }
   .attendance-page table { width: 100%; border-collapse: collapse; }
   .attendance-page th, .attendance-page td { border: 1px solid #cbd5e1; padding: 0.4rem; }
-  @page { size: A4 portrait; margin: 12mm; }
 }
 
 @supports (direction: rtl) {
@@ -237,6 +256,12 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes studentCheckboxBounce {
+  0%,
+  100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
 }
 
 @keyframes pageReveal {

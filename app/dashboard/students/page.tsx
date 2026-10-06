@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
   BookOpen,
+  Check,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -44,6 +45,7 @@ import { useTabLoading } from "@/components/dashboard/use-tab-loading";
 import { useLanguage } from "@/components/language-provider";
 import { can } from "@/lib/roles";
 import { hasPermission } from "@/lib/permissions";
+import { searchStudents } from "@/lib/student-search";
 import { getProfiles, getSession, type TeachingAssignment } from "@/lib/auth";
 import {
   GradebookTable,
@@ -100,6 +102,35 @@ function studentGradeLabel(
   if (gradeLevel === 2) return t("secondSecondary");
   if (gradeLevel === 3) return t("thirdSecondary");
   return fallback;
+}
+
+function StudentSelectionCheckbox({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <label
+      className="inline-flex cursor-pointer items-center justify-center rounded-lg p-1"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        onClick={(event) => event.stopPropagation()}
+        aria-label={label}
+        className="peer sr-only"
+      />
+      <span className={`grid h-5 w-5 place-items-center rounded-md border-2 transition-all duration-200 peer-focus-visible:ring-4 peer-focus-visible:ring-emerald-100 dark:peer-focus-visible:ring-emerald-900 ${checked ? "animate-[studentCheckboxBounce_0.3s_cubic-bezier(0.4,0,0.2,1)] border-emerald-500 bg-emerald-500" : "border-emerald-300 bg-white dark:border-emerald-700 dark:bg-slate-950"}`} aria-hidden="true">
+        <Check className={`h-3.5 w-3.5 text-white transition-transform duration-200 ${checked ? "scale-100" : "scale-0"}`} strokeWidth={3} />
+      </span>
+    </label>
+  );
 }
 
 export default function StudentsPage() {
@@ -396,13 +427,7 @@ export default function StudentsPage() {
               normalizeDivisionValue(division),
           )
         : students;
-    const query = deferredStudentSearch.trim().toLocaleLowerCase();
-    if (!query) return divisionStudents;
-    return divisionStudents.filter((student) =>
-      `${student.fullName} ${student.arabicName ?? ""} ${student.academicId ?? ""} ${student.nationalId ?? ""} ${student.divisionCode ?? ""}`
-        .toLocaleLowerCase()
-        .includes(query),
-    );
+    return searchStudents(divisionStudents, deferredStudentSearch);
   }, [deferredStudentSearch, division, students]);
   const totalPages = Math.max(
     1,
@@ -829,27 +854,27 @@ export default function StudentsPage() {
         )}
       </div>
       {canEditStudents && selectedStudentIds.length > 0 && (
-        <div className="sticky top-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur dark:border-emerald-900/50 dark:bg-slate-900/95">
-          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+        <div className="sticky top-16 z-50 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-500/30 border-s-4 border-s-emerald-500 bg-card px-3 py-2.5 text-card-foreground shadow-lg shadow-slate-950/15 backdrop-blur md:-top-6">
+          <p className="flex items-center gap-2 text-sm font-semibold">
             {locale === "ar"
               ? `تم تحديد ${selectedStudentIds.length} طالباً`
               : `${selectedStudentIds.length} students selected`}
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => setBulkEditing(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-600/70 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
             >
-              <Edit3 className="h-4 w-4" />
+              <Edit3 className="h-3.5 w-3.5" />
               {locale === "ar" ? "تعديل جماعي" : "Bulk edit"}
             </button>
             <button
               type="button"
               onClick={() => setBulkTransferOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
             >
-              <UserCog className="h-4 w-4" />
+              <UserCog className="h-3.5 w-3.5" />
               {locale === "ar" ? "نقل المحددين" : "Transfer selected"}
             </button>
             {canDeleteStudents && (
@@ -889,16 +914,16 @@ export default function StudentsPage() {
                         : "Unable to delete students.",
                     );
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
                 {locale === "ar" ? "حذف المحددين" : "Delete selected"}
               </button>
             )}
             <button
               type="button"
               onClick={() => setSelectedStudentIds([])}
-              className="rounded-lg border border-border px-3 py-2 text-sm font-semibold text-card-foreground/70"
+              className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-card-foreground/70 hover:bg-muted"
             >
               {locale === "ar" ? "إلغاء التحديد" : "Clear selection"}
             </button>
@@ -1304,8 +1329,7 @@ export default function StudentsPage() {
                       <tr>
                         {canEditStudents && (
                           <th className="w-12 px-3 py-3 text-center">
-                            <input
-                              type="checkbox"
+                            <StudentSelectionCheckbox
                               checked={
                                 visibleStudents.length > 0 &&
                                 visibleStudents.every((student) =>
@@ -1333,11 +1357,7 @@ export default function StudentsPage() {
                                       ),
                                 )
                               }
-                              aria-label={
-                                locale === "ar"
-                                  ? "تحديد جميع الطلاب"
-                                  : "Select all students"
-                              }
+                              label={locale === "ar" ? "تحديد جميع الطلاب" : "Select all students"}
                             />
                           </th>
                         )}
@@ -1434,11 +1454,8 @@ export default function StudentsPage() {
                             >
                               {canEditStudents && (
                                 <td className="px-3 py-3 text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedStudentIds.includes(
-                                      student.id,
-                                    )}
+                                  <StudentSelectionCheckbox
+                                    checked={selectedStudentIds.includes(student.id)}
                                     onChange={() =>
                                       setSelectedStudentIds((current) =>
                                         current.includes(student.id)
@@ -1448,8 +1465,7 @@ export default function StudentsPage() {
                                           : [...current, student.id],
                                       )
                                     }
-                                    onClick={(event) => event.stopPropagation()}
-                                    aria-label={`${locale === "ar" ? "تحديد" : "Select"} ${student.fullName}`}
+                                    label={`${locale === "ar" ? "تحديد" : "Select"} ${student.fullName}`}
                                   />
                                 </td>
                               )}

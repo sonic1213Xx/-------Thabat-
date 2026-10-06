@@ -11,6 +11,7 @@ import { exportAttendancePdf } from '@/lib/export-attendance-pdf'
 import { exportAttendanceWorkbook } from '@/lib/export-attendance-fixed'
 import { useToast } from '@/components/toast-provider'
 import { runExport } from '@/lib/export-feedback'
+import { searchStudents } from '@/lib/student-search'
 
 type StudentRow = { studentId: string; studentName: string; divisionCode?: string | null; status: string; notes?: string | null }
 type SavedSession = { id: string; date: string; divisionId: string; mode: string; presentCount: number; absentCount: number; createdAt: string }
@@ -76,7 +77,7 @@ export function AttendanceLogsModal({ open, onClose, english }: { open: boolean;
   }, [open, session?.id, selectedDate, selectedDivision])
 
   const dates = useMemo(() => Array.from(new Set(savedSessions.map((item) => item.date))), [savedSessions])
-  const filteredStudents = useMemo(() => students.filter((student) => student.studentName.toLocaleLowerCase().includes(query.toLocaleLowerCase()) && (statusFilter === 'ALL' || student.status === statusFilter)), [students, query, statusFilter])
+  const filteredStudents = useMemo(() => searchStudents(students, query).filter((student) => statusFilter === 'ALL' || student.status === statusFilter), [students, query, statusFilter])
   const pageSize = 100
   const pageCount = Math.max(1, Math.ceil(filteredStudents.length / pageSize))
   const visibleStudents = filteredStudents.slice(page * pageSize, (page + 1) * pageSize)

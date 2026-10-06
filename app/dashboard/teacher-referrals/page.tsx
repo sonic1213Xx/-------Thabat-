@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { FileText, Printer, Search, Send, ShieldAlert } from "lucide-react";
+import { createPortal } from "react-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Download, FileText, Printer, Search, Send, ShieldAlert } from "lucide-react";
 import { getProfileSignature, getSession } from "@/lib/auth";
 import { useLanguage } from "@/components/language-provider";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { SignatureCanvas } from "@/components/ui/signature-canvas";
+import { getConfiguredSchoolNameForExport } from "@/lib/school-settings";
+import { downloadOnePagePdf } from "@/lib/print-utils";
+import { searchStudents, STUDENT_SEARCH_RESULT_LIMIT } from "@/lib/student-search";
 
 type Student = {
   id: string;
@@ -97,6 +101,10 @@ export default function TeacherReferralsPage() {
   const [savingAdministrativeActionId, setSavingAdministrativeActionId] = useState<string | null>(null);
   const [expandedReferralId, setExpandedReferralId] = useState<string | null>(null);
   const [printingReferral, setPrintingReferral] = useState<Referral | null>(null);
+  const [schoolName, setSchoolName] = useState("");
+  const [schoolNameLoaded, setSchoolNameLoaded] = useState(false);
+  const [preparingPrint, setPreparingPrint] = useState(false);
+  const printDocumentRef = useRef<HTMLDivElement>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [signatureTarget, setSignatureTarget] = useState<"teacher" | "reviewer" | null>(null);
   const [teacherPrintSignatureOverride, setTeacherPrintSignatureOverride] = useState<string | null>(null);
@@ -116,14 +124,7 @@ export default function TeacherReferralsPage() {
   );
   const selectedStudent = students.find((student) => student.id === studentId);
   const visibleStudents = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    return students.filter(
-      (student) =>
-        !query ||
-        `${student.fullName} ${student.academicId ?? ""} ${student.divisionCode ?? ""}`
-          .toLocaleLowerCase()
-          .includes(query),
-    );
+    return searchStudents(students, search, STUDENT_SEARCH_RESULT_LIMIT);
   }, [students, search]);
   const labels = english
     ? {
@@ -448,7 +449,29 @@ export default function TeacherReferralsPage() {
     setReviewerPrintSignatureOverride(null);
     setPrintingReferral(referral);
   };
-  const handlePrint = () => window.print();
+  useEffect(() => {
+    if (!printingReferral) return;
+    let active = true;
+    setSchoolName("");
+    setSchoolNameLoaded(false);
+    void getConfiguredSchoolNameForExport().then((name) => {
+      if (!active) return;
+      setSchoolName(name);
+      setSchoolNameLoaded(true);
+    });
+    return () => { active = false; };
+  }, [printingReferral?.id]);
+  const handlePrint = async () => {
+    if (!printDocumentRef.current || preparingPrint) return;
+    setPreparingPrint(true);
+    try {
+      await downloadOnePagePdf(printDocumentRef.current, "student-referral.pdf");
+    } catch {
+      setMessage(english ? "Unable to create the PDF. Please try again." : "تعذر إنشاء ملف PDF. حاول مرة أخرى.");
+    } finally {
+      setPreparingPrint(false);
+    }
+  };
 
   const teacherPrintSignature = teacherPrintSignatureOverride ?? (printingReferral
     ? printingReferral.createdBy?.id === session?.id
@@ -460,24 +483,6 @@ export default function TeacherReferralsPage() {
   const reviewerPrintSignature = reviewerPrintSignatureOverride ?? (printingReferral && session?.role !== "TEACHER"
     ? getProfileSignature(session?.id)
     : null);
-
-  if (loading)
-    return (
-      <div className="space-y-5" dir={dir} aria-busy="true">
-        <div className="h-32 animate-pulse rounded-2xl bg-muted" />
-        <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
-          <div className="h-6 w-48 animate-pulse rounded bg-muted" />
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="h-11 animate-pulse rounded-xl bg-muted" />
-            <div className="h-11 animate-pulse rounded-xl bg-muted" />
-            <div className="h-11 animate-pulse rounded-xl bg-muted" />
-            <div className="h-11 animate-pulse rounded-xl bg-muted" />
-            <div className="h-28 animate-pulse rounded-xl bg-muted md:col-span-2" />
-          </div>
-        </div>
-        <div className="h-48 animate-pulse rounded-2xl bg-muted" />
-      </div>
-    );
 
   return (
     <>
@@ -672,7 +677,12 @@ export default function TeacherReferralsPage() {
           <FileText className="h-5 w-5 text-primary" />
           <h2 className="text-xl font-bold">{labels.log}</h2>
         </div>
-        {referrals.length ? (
+        {loading ? (
+          <div className="cube-loading-stage min-h-48 justify-center rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-card-foreground/65" role="status" aria-live="polite" aria-busy="true">
+            <div className="cube-loading-spinner" aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <div key={index} />)}</div>
+            <span>{english ? "Loading referrals..." : "جارٍ تحميل الإحالات..."}</span>
+          </div>
+        ) : referrals.length ? (
           <div className="space-y-3">
             {referrals.map((referral) => (
               <article
@@ -805,24 +815,26 @@ export default function TeacherReferralsPage() {
         )}
       </section>
     </div>
-    {printingReferral && (
+    {printingReferral && createPortal(
       <div className="print-document fixed inset-0 z-[100] overflow-y-auto bg-slate-950/60 p-4" dir="rtl">
-        <div className="relative mx-auto max-w-4xl overflow-hidden bg-white p-6 text-slate-900 shadow-2xl print:block print:max-w-none print:p-0 print:shadow-none">
-          <div className="printable-referral relative min-h-[1120px] overflow-hidden bg-white text-black">
-          <img src="/image.png" alt="" className="template-background pointer-events-none absolute inset-0 h-full w-full object-cover" aria-hidden="true" />
+        <div className="relative mx-auto max-w-4xl overflow-visible bg-white p-6 text-slate-900 shadow-2xl print:block print:max-w-none print:p-0 print:shadow-none">
+          <div ref={printDocumentRef} data-pdf-document className="printable-referral relative min-h-[1120px] overflow-visible bg-white text-black">
+          <img src="/image.png" alt="" className="template-background pointer-events-none absolute inset-x-0 top-0 h-[1120px] w-full object-cover" aria-hidden="true" />
           <div className="relative z-10 px-6 pb-24 pt-40">
-          <div className="print-toolbar mb-5 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 print:hidden">
+          <div className="print-toolbar pdf-hidden mb-5 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 print:hidden">
             <h2 className="text-lg font-bold">{labels.printPreview}</h2>
             <div className="flex gap-2">
-              <button type="button" onClick={handlePrint} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">{labels.print}</button>
+              <button type="button" onClick={() => void handlePrint()} disabled={preparingPrint || !schoolNameLoaded} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{preparingPrint ? (english ? "Preparing PDF..." : "جارٍ تجهيز PDF...") : !schoolNameLoaded ? (english ? "Loading school settings..." : "جارٍ تحميل بيانات المدرسة...") : (english ? "Download PDF" : "تنزيل PDF")}</button>
               <button type="button" onClick={() => setPrintingReferral(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">{labels.close}</button>
             </div>
           </div>
         <header className="border-b-2 border-black pb-4 text-center">
+          <img src="/school-logo.jpeg" alt="" className="pdf-school-logo mx-auto mb-2 h-14 w-auto object-contain" />
+          <p className="mb-2 text-sm font-bold">{schoolName}</p>
           <h1 className="text-2xl font-bold text-black">استمارة تحويل طالب إلى وكيل الشؤون الطلابية</h1>
         </header>
         <h2 className="print-section-title mt-6 text-lg font-bold text-black">بيانات الطالب والإحالة</h2>
-        <div className="grid grid-cols-2 overflow-hidden border border-black">
+        <div className="referral-metadata grid grid-cols-2 border border-black">
           {[
             ["اسم الطالب", printingReferral.studentName],
             ["الشعبة", printingReferral.divisionCode],
@@ -834,14 +846,15 @@ export default function TeacherReferralsPage() {
           </div>
         <section className="break-inside-avoid"><h2 className="mt-6 text-lg font-bold text-black">سبب التحويل / نوع المخالفة</h2><div className="min-h-24 whitespace-pre-wrap border border-black p-3 text-sm">{printingReferral.reason || "-"}</div></section>
         <section className="break-inside-avoid"><h2 className="mt-6 text-lg font-bold text-black">إجراءات وكيل الشؤون الطلابية</h2><div className="min-h-28 whitespace-pre-wrap border border-black p-3 text-sm">{printingReferral.vicePrincipalAction || ""}</div>{printingReferral.teacherNotes && <p className="mt-2 whitespace-pre-wrap text-sm"><b>ملاحظات المعلم:</b> {printingReferral.teacherNotes}</p>}</section>
-        <div className="mt-14 grid grid-cols-2 gap-8 border-t border-slate-300 pt-6 text-sm break-inside-avoid">
-          <div><button type="button" onClick={() => setSignatureTarget("teacher")} className="block min-h-32 w-full border border-black p-3 text-start print:border-black"><span className="font-bold">توقيع المعلم</span>{teacherPrintSignature ? <img src={teacherPrintSignature} alt="توقيع المعلم" className="print-signature mt-2 h-20 max-w-[220px] object-contain" /> : <span className="mt-8 block">التوقيع: ____________________</span>}</button>{teacherPrintSignature && <button type="button" onClick={() => setTeacherPrintSignatureOverride("")} className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700 print:hidden">{labels.removeSignature}</button>}<p className="mt-3 border-t border-black pt-2">الاسم: {printingReferral.createdBy?.name ?? ""}</p></div>
-          <div><button type="button" onClick={() => setSignatureTarget("reviewer")} className="block min-h-32 w-full border border-black p-3 text-start print:border-black"><span className="font-bold">توقيع وكيل الشؤون الطلابية</span>{reviewerPrintSignature ? <img src={reviewerPrintSignature} alt="توقيع وكيل الشؤون الطلابية" className="print-signature mt-2 h-20 max-w-[220px] object-contain" /> : <span className="mt-8 block">التوقيع: ____________________</span>}</button>{reviewerPrintSignature && <button type="button" onClick={() => setReviewerPrintSignatureOverride("")} className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700 print:hidden">{labels.removeSignature}</button>}<p className="mt-3 border-t border-black pt-2">الاسم: {session?.name ?? printingReferral.recipient?.name ?? ""}</p></div>
+        <div className="referral-signatures mt-14 grid grid-cols-2 gap-8 border-t border-slate-300 pt-6 text-sm break-inside-avoid">
+          <div><button type="button" onClick={() => setSignatureTarget("teacher")} className="block min-h-32 w-full border border-black p-3 text-start print:border-black"><span className="font-bold">توقيع المعلم</span>{teacherPrintSignature ? <img src={teacherPrintSignature} alt="توقيع المعلم" className="pdf-signature print-signature mt-2 h-20 max-w-[220px] object-contain" /> : <span className="mt-8 block">التوقيع: ____________________</span>}</button>{teacherPrintSignature && <button type="button" onClick={() => setTeacherPrintSignatureOverride("")} className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700 print:hidden">{labels.removeSignature}</button>}<p className="mt-3 border-t border-black pt-2">الاسم: {printingReferral.createdBy?.name ?? ""}</p></div>
+          <div><button type="button" onClick={() => setSignatureTarget("reviewer")} className="block min-h-32 w-full border border-black p-3 text-start print:border-black"><span className="font-bold">توقيع وكيل الشؤون الطلابية</span>{reviewerPrintSignature ? <img src={reviewerPrintSignature} alt="توقيع وكيل الشؤون الطلابية" className="pdf-signature print-signature mt-2 h-20 max-w-[220px] object-contain" /> : <span className="mt-8 block">التوقيع: ____________________</span>}</button>{reviewerPrintSignature && <button type="button" onClick={() => setReviewerPrintSignatureOverride("")} className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700 print:hidden">{labels.removeSignature}</button>}<p className="mt-3 border-t border-black pt-2">الاسم: {session?.name ?? printingReferral.recipient?.name ?? ""}</p></div>
         </div>
         </div>
           </div>
           </div>
-      </div>
+      </div>,
+      document.body,
     )}
     {signatureTarget && printingReferral && (
       <SignatureCanvas

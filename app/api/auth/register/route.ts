@@ -25,9 +25,10 @@ export async function POST(request: NextRequest) {
         assignedDivisions: JSON.stringify(body.divisions ?? []),
         subjectsTaught: JSON.stringify(body.subjectsTaught ?? []),
         teachingAssignments: JSON.stringify(body.teachingAssignments ?? []),
+        sessionCheckShownAt: new Date(),
       },
     })
-    const response = NextResponse.json({ data: { id: user.id, name: user.name, role: user.role, locale: user.locale, assigned_divisions: body.divisions ?? [], subjectsTaught: body.subjectsTaught ?? [], teachingAssignments: body.teachingAssignments ?? [] } }, { status: 201 })
+    const response = NextResponse.json({ data: { id: user.id, name: user.name, role: user.role, locale: user.locale, assigned_divisions: body.divisions ?? [], subjectsTaught: body.subjectsTaught ?? [], teachingAssignments: body.teachingAssignments ?? [] }, showSessionCheck: true }, { status: 201 })
     response.cookies.set('NEXT_LOCALE', user.locale, { maxAge: 31536000, path: '/', sameSite: 'lax' })
     setSessionCookie(response, user.id, body.remember === true)
     return response

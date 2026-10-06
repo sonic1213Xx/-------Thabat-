@@ -56,10 +56,13 @@ export default function LoginPage() {
     void fetch('/api/divisions/public').then((response) => response.json()).then((json) => setDivisions((json.data ?? []).map((item: { code: string }) => item.code))).catch(() => setDivisions([]))
   }, [router])
 
-  const enterDashboard = (user: AuthenticatedUser) => {
+  const enterDashboard = (user: AuthenticatedUser, showSessionCheck: boolean) => {
     if (!user) return
     setSession(user, remember)
-    try { sessionStorage.setItem(SESSION_CHECK_ANIMATION_KEY, 'true') } catch {}
+    try {
+      if (showSessionCheck) sessionStorage.setItem(SESSION_CHECK_ANIMATION_KEY, 'true')
+      else sessionStorage.removeItem(SESSION_CHECK_ANIMATION_KEY)
+    } catch {}
     setIsEntering(true)
     window.setTimeout(() => router.push('/dashboard'), 900)
   }
@@ -79,25 +82,25 @@ export default function LoginPage() {
           return
         }
         const response = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: trimmedId, name: trimmedName, password, remember, divisions: Array.from(new Set(normalizedAssignments.flatMap((assignment) => assignment.divisions))), subjectsTaught: normalizedAssignments.map((assignment) => assignment.subject), teachingAssignments: normalizedAssignments }) })
-        const result = await response.json() as { data?: AuthenticatedUser; error?: string }
+        const result = await response.json() as { data?: AuthenticatedUser; showSessionCheck?: boolean; error?: string }
         if (!response.ok || !result.data) {
           setError(result.error ?? (locale === 'ar' ? 'تعذر إنشاء الحساب.' : 'Unable to create account.'))
           return
         }
         saveProfile({ ...result.data, createdAt: new Date().toISOString(), lastActivity: locale === 'ar' ? 'لم يسجل الدخول بعد' : 'Not logged in yet', assigned_divisions: result.data.assigned_divisions ?? [], subjectsTaught: result.data.subjectsTaught ?? [], teachingAssignments: result.data.teachingAssignments ?? [] })
-        enterDashboard(result.data)
+        enterDashboard(result.data, result.showSessionCheck === true)
         return
       }
 
       const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, password, remember }) })
-      const result = await response.json() as { data?: AuthenticatedUser }
+      const result = await response.json() as { data?: AuthenticatedUser; showSessionCheck?: boolean }
       const user = result.data ?? null
       if (!user) {
         setError(locale === 'ar' ? 'رقم الهوية أو كلمة المرور غير صحيحة.' : 'Incorrect ID number or password.')
         return
       }
       saveProfile({ ...user, createdAt: new Date().toISOString(), lastActivity: new Date().toISOString(), assigned_divisions: user.assigned_divisions ?? [], subjectsTaught: user.subjectsTaught ?? [], teachingAssignments: user.teachingAssignments ?? [] })
-      enterDashboard(user)
+      enterDashboard(user, result.showSessionCheck === true)
     } catch {
       setError(locale === 'ar' ? (createMode ? 'تعذر إنشاء الحساب.' : 'تعذر تسجيل الدخول.') : (createMode ? 'Unable to create account.' : 'Unable to sign in.'))
     } finally {
@@ -148,7 +151,7 @@ export default function LoginPage() {
                   {!teachingAssignments.length && <p className="text-xs text-white/40">{locale === 'ar' ? 'أضف مادة واربطها بالشعب.' : 'Add a subject and map it to divisions.'}</p>}
                   {teachingAssignments.map((assignment) => <div key={assignment.id} className="space-y-2 rounded-lg border border-white/10 p-2"><div className="flex gap-2"><input value={assignment.subject} onChange={(event) => setTeachingAssignments((current) => current.map((item) => item.id === assignment.id ? { ...item, subject: event.target.value } : item))} placeholder={locale === 'ar' ? 'المادة' : 'Subject'} className="h-10 min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-950/70 px-3 text-sm text-white placeholder:text-white/35 focus:border-emerald-400/70 focus:outline-none" /><button type="button" onClick={() => setTeachingAssignments((current) => current.filter((item) => item.id !== assignment.id))} className="rounded-lg px-2 text-red-300" aria-label={locale === 'ar' ? 'حذف المادة' : 'Remove subject'}>×</button></div><div className="flex flex-wrap gap-2">{divisions.map((code) => <label key={code} className={`cursor-pointer rounded-md border px-2 py-1 text-xs transition ${assignment.divisions.includes(code) ? 'border-emerald-400 bg-emerald-500 text-slate-950' : 'border-white/15 text-white/65 hover:border-emerald-400/50'}`}><input type="checkbox" className="sr-only" checked={assignment.divisions.includes(code)} onChange={() => setTeachingAssignments((current) => current.map((item) => item.id === assignment.id ? { ...item, divisions: item.divisions.includes(code) ? item.divisions.filter((division) => division !== code) : [...item.divisions, code] } : item))} />{code}</label>)}</div></div>)}
                 </div>}
-                <label className="group flex cursor-pointer items-center gap-2.5 py-1 text-sm text-white/65"><span className="relative flex h-5 w-5 shrink-0 items-center justify-center"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border border-white/25 bg-white/[0.04] transition hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/30 checked:border-emerald-400 checked:bg-emerald-400" /><Check className="pointer-events-none absolute h-3.5 w-3.5 scale-75 text-slate-950 opacity-0 transition peer-checked:scale-100 peer-checked:opacity-100" /></span><span className="transition-colors group-hover:text-white">{locale === 'ar' ? 'تذكرني' : 'Remember me'}</span></label>
+                <label className="group flex cursor-pointer items-center gap-2.5 py-1 text-sm text-white/65"><span className="relative grid h-7 w-7 shrink-0 place-items-center"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} aria-label={locale === 'ar' ? 'تذكرني' : 'Remember me'} className="peer sr-only" /><span aria-hidden="true" className={`absolute inset-0 rounded-lg border-2 transition-all duration-200 peer-focus-visible:ring-4 peer-focus-visible:ring-emerald-200/40 ${remember ? 'animate-[studentCheckboxBounce_0.3s_cubic-bezier(0.4,0,0.2,1)] border-emerald-500 bg-emerald-500' : 'border-emerald-300 bg-white'}`} /><Check className={`pointer-events-none relative h-4 w-4 text-white transition-transform duration-200 ${remember ? 'scale-100' : 'scale-0'}`} strokeWidth={3} /></span><span className="transition-colors group-hover:text-white">{locale === 'ar' ? 'تذكرني' : 'Remember me'}</span></label>
                 {error && <div role="alert" className="rounded-lg border border-red-400/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>}
                 <motion.button type="submit" disabled={isSubmitting || isEntering} whileHover={prefersReducedMotion ? undefined : { scale: 1.015 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.985 }} className="relative flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-emerald-500 px-4 font-semibold text-slate-950 shadow-lg shadow-emerald-950/30 transition-colors hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-75">
                   <motion.span className="pointer-events-none absolute inset-y-0 w-2/3 -translate-x-full bg-gradient-to-r from-transparent via-white/35 to-transparent" aria-hidden="true" animate={isSubmitting && !prefersReducedMotion ? { x: ['-120%', '180%'] } : { x: '-120%' }} transition={isSubmitting && !prefersReducedMotion ? { duration: 1.15, repeat: Infinity, ease: 'linear' } : { duration: 0.2 }} />

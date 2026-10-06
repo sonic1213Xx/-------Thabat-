@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Pencil, Printer, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, Pencil, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
   getProfileSignature,
   getSession,
   saveProfileSignature,
 } from "@/lib/auth";
-import { getConfiguredSchoolName } from '@/lib/school-settings';
+import { getConfiguredSchoolName, getConfiguredSchoolNameForExport } from '@/lib/school-settings';
 import { SignatureCanvas } from "@/components/ui/signature-canvas";
+import { downloadOnePagePdf } from "@/lib/print-utils";
 
 type DocumentData = {
   studentName: string;
@@ -61,11 +62,21 @@ export function MoeDocument({
   const [parentSignature, setParentSignature] = useState<string | null>(null);
   const [signing, setSigning] = useState<SignTarget | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [preparingPrint, setPreparingPrint] = useState(false);
+  const [schoolNameLoaded, setSchoolNameLoaded] = useState(false);
+  const [pdfError, setPdfError] = useState("");
+  const printDocumentRef = useRef<HTMLElement>(null);
   const canUseProfileSignature =
     getSession()?.role === "PRINCIPAL" ||
     getSession()?.role === "VICE_PRINCIPAL";
   useEffect(() => {
     setMounted(true);
+    let active = true;
+    void getConfiguredSchoolNameForExport().then((name) => {
+      if (!active) return;
+      if (name) setSchoolName(name);
+      setSchoolNameLoaded(true);
+    });
     setAdministratorSignature(
       canUseProfileSignature ? getProfileSignature() : null,
     );
@@ -74,8 +85,10 @@ export function MoeDocument({
         canUseProfileSignature ? getProfileSignature() : null,
       );
     window.addEventListener("thabat-profile-signature-changed", sync);
-    return () =>
+    return () => {
+      active = false;
       window.removeEventListener("thabat-profile-signature-changed", sync);
+    };
   }, [canUseProfileSignature]);
   const signatures = {
     administrator: administratorSignature,
@@ -91,11 +104,25 @@ export function MoeDocument({
     else if (signing === "parent") setParentSignature(signature);
     setSigning(null);
   };
+  const printDocument = async () => {
+    if (!printDocumentRef.current || preparingPrint) return;
+    setPreparingPrint(true);
+    setPdfError("");
+    try {
+      const filename = type === "pledge" ? "behavioral-pledge.pdf" : type === "incident" ? "incident-report.pdf" : "parent-summons.pdf";
+      await downloadOnePagePdf(printDocumentRef.current, filename);
+    } catch (error) {
+      console.error("PDF export failed:", error);
+      setPdfError("تعذر إنشاء ملف PDF. حاول مرة أخرى.");
+    } finally {
+      setPreparingPrint(false);
+    }
+  };
   if (!mounted) return null;
   return createPortal(
     <>
       <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 pointer-events-auto overflow-y-auto"
+      className="print-document fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 pointer-events-auto overflow-y-auto"
       onClick={onClose}
       >
         <div
@@ -105,10 +132,12 @@ export function MoeDocument({
           <div className="max-h-[80vh] overflow-y-auto p-2">
             <article
               id="moe-document"
+              ref={printDocumentRef}
               className="printable-moe mx-auto max-w-3xl text-slate-900"
               dir="rtl"
             >
               <header className="border-b-2 border-slate-900 pb-5 text-center">
+                <img src="/school-logo.jpeg" alt="" className="pdf-school-logo mx-auto mb-2 h-14 w-auto object-contain" />
                 <p className="font-bold">المملكة العربية السعودية</p>
                 <p>وزارة التعليم · إدارة التعليم</p>
                 <label className="mt-3 block text-sm font-semibold">
@@ -230,11 +259,12 @@ export function MoeDocument({
           <footer className="mt-4 flex justify-end gap-3 border-t border-slate-200 pt-4 print:hidden">
             <button
               type="button"
-              onClick={() => window.print()}
-              className="rounded-lg bg-emerald-600 px-5 py-3 font-semibold text-white"
+              onClick={() => void printDocument()}
+              disabled={preparingPrint || !schoolNameLoaded}
+              className="rounded-lg bg-emerald-600 px-5 py-3 font-semibold text-white disabled:opacity-60"
             >
-              <Printer className="me-2 inline h-4 w-4" />
-              طباعة
+              <Download className="me-2 inline h-4 w-4" />
+              {preparingPrint ? "جارٍ تجهيز PDF..." : schoolNameLoaded ? "تنزيل PDF" : "جارٍ تحميل بيانات المدرسة..."}
             </button>
             <button
               type="button"
@@ -245,6 +275,7 @@ export function MoeDocument({
               إغلاق
             </button>
           </footer>
+          {pdfError && <p role="alert" className="px-5 pb-3 text-sm text-red-600">{pdfError}</p>}
         </div>
       </div>
       {signing && (
@@ -282,7 +313,7 @@ function SignatureField({
         <img
           src={signature}
           alt={label}
-          className="mt-2 h-14 w-full object-contain"
+          className="pdf-signature mt-2 h-14 w-full object-contain"
         />
       ) : (
         <span className="mt-6 block text-xs text-slate-400">

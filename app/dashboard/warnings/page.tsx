@@ -12,6 +12,7 @@ import { getGradeLevelArabic } from '@/lib/utils'
 import { IssueWarningModal } from '@/components/issue-warning-modal'
 import { getSession } from '@/lib/auth'
 import { fetchCached } from '@/lib/client-cache'
+import { searchStudents, STUDENT_SEARCH_RESULT_LIMIT } from '@/lib/student-search'
 
 interface WarningRecord {
   id: string
@@ -65,8 +66,7 @@ export default function WarningsPage() {
   }, [])
 
   const matchingStudentGroups = useMemo(() => {
-    const query = studentSearch.trim().toLocaleLowerCase()
-    const matches = query ? students.filter((student) => student.fullName.toLocaleLowerCase().includes(query)) : students
+    const matches = searchStudents(students, studentSearch, STUDENT_SEARCH_RESULT_LIMIT)
     const groups = new Map<number | null, StudentOption[]>()
     for (const student of matches) {
       const divisionGrade = student.divisionCode?.match(/^([1-3])\d{2}$/)?.[1]
@@ -157,7 +157,12 @@ export default function WarningsPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-500">{t('loadingWarnings')}</td>
+                  <td colSpan={7} className="px-4 py-8">
+                    <div className="cube-loading-stage py-4 text-sm text-slate-500 dark:text-slate-400" role="status" aria-live="polite">
+                      <div className="cube-loading-spinner" aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <div key={index} />)}</div>
+                      <span>{t('loadingWarnings')}</span>
+                    </div>
+                  </td>
                 </tr>
               ) : warnings.length === 0 ? (
                 <tr>

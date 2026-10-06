@@ -9,6 +9,7 @@ import { saveIncident } from "@/lib/vp-operations";
 import { VIOLATION_DEGREES } from "@/lib/moe-rules";
 import { useLanguage } from "@/components/language-provider";
 import { getGradeLevelArabic } from "@/lib/utils";
+import { searchStudents, STUDENT_SEARCH_RESULT_LIMIT } from "@/lib/student-search";
 
 type Student = {
   id: string;
@@ -37,10 +38,7 @@ export function IncidentLogger({
   const [documentType, setDocumentType] = useState<"pledge" | "summon" | null>(null);
   const student = students.find((item) => item.id === studentId);
   const matchingStudentGroups = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    const matches = query
-      ? students.filter((item) => `${item.fullName} ${item.divisionCode ?? ""}`.toLocaleLowerCase().includes(query))
-      : students;
+    const matches = searchStudents(students, search, STUDENT_SEARCH_RESULT_LIMIT);
     const groups = new Map<number | null, Student[]>();
     matches.forEach((item) => {
       const codeGrade = item.divisionCode?.match(/^([1-3])\d{2}$/)?.[1];

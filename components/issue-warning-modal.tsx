@@ -14,6 +14,7 @@ import {
 import { MoeDocument } from "@/components/moe-documents";
 import { useLanguage } from "@/components/language-provider";
 import { getSession } from "@/lib/auth";
+import { searchStudents, STUDENT_SEARCH_RESULT_LIMIT } from "@/lib/student-search";
 
 type Student = {
   id: string;
@@ -66,14 +67,7 @@ export function IssueWarningModal({
   }, []);
 
   const matchingGroups = useMemo(() => {
-    const query = studentSearch.trim().toLocaleLowerCase();
-    const matches = query
-      ? students.filter((item) =>
-          `${item.fullName} ${item.academicId ?? ""} ${item.divisionCode ?? ""}`
-            .toLocaleLowerCase()
-            .includes(query),
-        )
-      : students;
+    const matches = searchStudents(students, studentSearch, STUDENT_SEARCH_RESULT_LIMIT);
     const groups = new Map<number | null, Student[]>();
     matches.forEach((item) => {
       const codeGrade = item.divisionCode?.match(/^([1-3])\d{2}$/)?.[1];

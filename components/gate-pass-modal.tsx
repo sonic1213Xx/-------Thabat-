@@ -9,6 +9,7 @@ import { getGradeLevelArabic } from "@/lib/utils";
 import { useLanguage } from "@/components/language-provider";
 import { getSession } from "@/lib/auth";
 import QRCode from "qrcode";
+import { searchStudents, STUDENT_SEARCH_RESULT_LIMIT } from "@/lib/student-search";
 
 type Student = {
   id: string;
@@ -62,14 +63,7 @@ export function GatePassModal({
     }
   }, [initialPass, initialStudentId, students]);
   const matchingStudentGroups = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    const matches = query
-      ? students.filter((item) =>
-          `${item.fullName} ${item.academicId ?? ""} ${item.divisionCode ?? ""}`
-            .toLocaleLowerCase()
-            .includes(query),
-        )
-      : students;
+    const matches = searchStudents(students, search, STUDENT_SEARCH_RESULT_LIMIT);
     const groups = new Map<number | null, Student[]>();
     for (const item of matches) {
       const codeGrade = item.divisionCode?.match(/^([1-3])\d{2}$/)?.[1];

@@ -8,6 +8,7 @@ import { LanguageProvider } from '@/components/language-provider'
 import { STORAGE_KEYS } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 import { ToastProvider } from '@/components/toast-provider'
+import { AppVersionNotice } from '@/components/app-version-notice'
 import { getAuthenticatedUserIdFromToken, SESSION_COOKIE_NAME } from '@/lib/server-session'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -56,7 +57,7 @@ export default async function RootLayout({
           enableSystem
           storageKey={STORAGE_KEYS.theme}
         >
-          <LanguageProvider initialLocale={initialLocale}><ToastProvider>{children}</ToastProvider></LanguageProvider>
+          <LanguageProvider initialLocale={initialLocale}><ToastProvider><AppVersionNotice />{children}</ToastProvider></LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

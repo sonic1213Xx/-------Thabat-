@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { ExcelParser } from "./excel-parser";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { useLanguage } from "@/components/language-provider";
+import { searchStudents } from "@/lib/student-search";
 
 interface Student {
   id: string;
@@ -55,13 +56,10 @@ export function StudentManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterGrade, setFilterGrade] = useState<number | "all">("all");
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.name.includes(searchQuery) ||
-      student.nationalId.includes(searchQuery);
+  const filteredStudents = searchStudents(students, searchQuery).filter((student) => {
     const matchesGrade =
       filterGrade === "all" || student.gradeLevel === filterGrade;
-    return matchesSearch && matchesGrade;
+    return matchesGrade;
   });
 
   return (

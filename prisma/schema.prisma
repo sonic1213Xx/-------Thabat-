@@ -31,6 +31,7 @@ model User {
   subjectsTaught String @default("[]")
   teachingAssignments String @default("[]")
   locale    String   @default("ar")
+  sessionCheckShownAt DateTime?
 
   // Relations
   warnings      Warning[]
