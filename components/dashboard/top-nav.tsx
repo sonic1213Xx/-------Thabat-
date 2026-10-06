@@ -11,14 +11,13 @@ import Image from 'next/image'
 import { cn, getStoredTeamId, setStoredTeamId, TEAM_OPTIONS } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
 import { useLanguage } from '@/components/language-provider'
-import { clearSession } from '@/lib/auth'
-import { getSession, type SessionUser } from '@/lib/auth'
+import { clearSession, getProfileSignature, getSession, type SessionUser } from '@/lib/auth'
 import { isCreatorRole } from '@/lib/permissions'
 
 type DBTeam = { id: string; label: string }
 type TransferNotification = { type: 'TRANSFER'; id: string; fromDivision: string; toDivision: string; createdAt: string; readAt: string | null; reviewedAt: string | null; students: Array<{ id: string; fullName: string; fromDivision: string; toDivision: string }>; grades: Array<{ id?: string; studentId: string; divisionId: string; subject: string; teacherId: string; taskPeriod1?: number | null; taskPeriod2?: number | null; examPeriod1?: number | null; examPeriod2?: number | null; finalExam?: number | null; customScores?: Record<string, number | null> }> }
 type AttendanceNotification = { type: 'ATTENDANCE'; id: string; createdAt: string; readAt: string | null; studentId: string; studentName: string; divisionId: string; subject: string; date: string; status: 'ABSENT_UNEXCUSED' | 'ESCAPED' }
-type ReferralNotification = { type: 'REFERRAL'; id: string; createdAt: string; readAt: string | null; studentName: string; divisionCode: string; subject: string; reason: string; incidentDate: string; incidentTime: string; location: string; actionTaken: string; createdBy: { name: string } }
+type ReferralNotification = { type: 'REFERRAL'; id: string; createdAt: string; readAt: string | null; studentName: string; divisionCode: string; subject: string; reason: string; incidentDate: string; incidentTime: string; location: string; actionTaken: string; createdBy: { id: string; name: string } }
 type Notification = TransferNotification | AttendanceNotification | ReferralNotification
 
 const canUseTeamSwitcher = (role?: string) => Boolean(role && (isCreatorRole(role) || role === 'PRINCIPAL' || role === 'VICE_PRINCIPAL' || role.startsWith('VP_')))
@@ -117,7 +116,17 @@ export function TopNav() {
   const printReferral = (referral: ReferralNotification) => {
     const popup = window.open('', '_blank', 'width=900,height=700')
     if (!popup) return
-    popup.document.write(`<html dir="rtl"><head><title>نموذج إحالة طالب</title><style>body{font-family:Arial,sans-serif;color:#111;padding:36px;line-height:1.8}header{text-align:center;border-bottom:3px solid #047857;padding-bottom:18px}h1{font-size:24px;margin:0}h2{font-size:18px;color:#047857;margin-top:28px}.meta{display:grid;grid-template-columns:1fr 1fr;border:1px solid #9ca3af}.meta div{padding:10px;border:1px solid #d1d5db}.box{border:1px solid #9ca3af;min-height:90px;padding:12px}.sign{display:flex;justify-content:space-between;margin-top:70px}</style></head><body><header><h1>نموذج إحالة طالب إلى وكيل المدرسة</h1><p>ثَبَت - سجل المتابعة المدرسية</p></header><h2>بيانات الإحالة</h2><div class="meta"><div><b>اسم الطالب:</b> ${referral.studentName}</div><div><b>الشعبة:</b> ${referral.divisionCode}</div><div><b>المادة:</b> ${referral.subject}</div><div><b>تاريخ الواقعة:</b> ${referral.incidentDate}</div><div><b>وقت الواقعة:</b> ${referral.incidentTime}</div><div><b>المكان:</b> ${referral.location}</div><div><b>المعلم:</b> ${referral.createdBy.name}</div></div><h2>سبب الإحالة</h2><div class="box">${referral.reason}</div><h2>الإجراء الفوري المتخذ</h2><div class="box">${referral.actionTaken}</div><div class="sign"><span>توقيع المعلم: __________________</span><span>توقيع وكيل المدرسة: __________________</span></div><script>window.onload=()=>window.print()</script></body></html>`)
+    const signatureMarkup = (label: string, userId?: string) => {
+      const signature = userId ? getProfileSignature(userId) : null
+      const safeSignature = signature && /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(signature)
+        ? signature
+        : null
+      const mark = safeSignature ? `<img src="${safeSignature}" alt="" />` : '__________________'
+      return `<span>${label}: ${mark}</span>`
+    }
+    const teacherSignature = signatureMarkup('توقيع المعلم', referral.createdBy.id)
+    const reviewerSignature = signatureMarkup('توقيع وكيل المدرسة', sessionUser?.id)
+    popup.document.write(`<html dir="rtl"><head><title>نموذج إحالة طالب</title><style>body{font-family:Arial,sans-serif;color:#111;padding:36px;line-height:1.8}header{text-align:center;border-bottom:3px solid #047857;padding-bottom:18px}h1{font-size:24px;margin:0}h2{font-size:18px;color:#047857;margin-top:28px}.meta{display:grid;grid-template-columns:1fr 1fr;border:1px solid #9ca3af}.meta div{padding:10px;border:1px solid #d1d5db}.box{border:1px solid #9ca3af;min-height:90px;padding:12px}.sign{display:flex;justify-content:space-between;margin-top:70px}.sign img{display:block;max-width:180px;height:48px;object-fit:contain}</style></head><body><header><h1>نموذج إحالة طالب إلى وكيل المدرسة</h1><p>ثَبَت - سجل المتابعة المدرسية</p></header><h2>بيانات الإحالة</h2><div class="meta"><div><b>اسم الطالب:</b> ${referral.studentName}</div><div><b>الشعبة:</b> ${referral.divisionCode}</div><div><b>المادة:</b> ${referral.subject}</div><div><b>تاريخ الواقعة:</b> ${referral.incidentDate}</div><div><b>وقت الواقعة:</b> ${referral.incidentTime}</div><div><b>المكان:</b> ${referral.location}</div><div><b>المعلم:</b> ${referral.createdBy.name}</div></div><h2>سبب الإحالة</h2><div class="box">${referral.reason}</div><h2>الإجراء الفوري المتخذ</h2><div class="box">${referral.actionTaken}</div><div class="sign">${teacherSignature}${reviewerSignature}</div><script>window.onload=()=>window.print()</script></body></html>`)
     popup.document.close()
   }
 

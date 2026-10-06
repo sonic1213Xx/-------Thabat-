@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const [transfers, attendanceRows, referrals] = await prisma.$transaction([
     prisma.transferNotification.findMany({ where: { recipientId: user.id }, orderBy: { createdAt: 'desc' }, take: 50 }),
     prisma.attendanceNotification.findMany({ where: { recipientId: user.id }, orderBy: { createdAt: 'desc' }, take: 50 }),
-    prisma.teacherReferral.findMany({ where: { recipientId: user.id }, orderBy: { createdAt: 'desc' }, take: 50, include: { createdBy: { select: { name: true } } } }),
+    prisma.teacherReferral.findMany({ where: { recipientId: user.id }, orderBy: { createdAt: 'desc' }, take: 50, include: { createdBy: { select: { id: true, name: true } } } }),
   ])
   const attendance = canReceiveAttendanceAlerts ? attendanceRows : []
   const data = [

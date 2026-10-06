@@ -44,13 +44,24 @@ export async function downloadOnePagePdf(root: HTMLElement, filename: string): P
       scale: 2,
       useCORS: true,
       logging: false,
+      windowHeight: Math.max(window.innerHeight, Math.ceil(root.getBoundingClientRect().bottom + 32), root.scrollHeight + 32),
       onclone: (_document, clonedRoot) => {
         clonedRoot.querySelectorAll('.pdf-hidden, .print-toolbar').forEach((element) => element.remove())
         const documentRoot = clonedRoot as HTMLElement
         documentRoot.style.backgroundColor = '#ffffff'
         documentRoot.style.color = '#111827'
+        documentRoot.style.height = 'auto'
+        documentRoot.style.maxHeight = 'none'
+        documentRoot.style.overflow = 'visible'
         documentRoot.style.fontFamily = 'Cairo, Almarai, sans-serif'
         documentRoot.style.lineHeight = '1.6'
+        let ancestor = documentRoot.parentElement
+        while (ancestor && ancestor !== _document.documentElement) {
+          ancestor.style.height = 'auto'
+          ancestor.style.maxHeight = 'none'
+          ancestor.style.overflow = 'visible'
+          ancestor = ancestor.parentElement
+        }
         documentRoot.querySelectorAll<HTMLElement>('.template-background').forEach((image) => {
           image.style.display = 'block'
         })

@@ -20,6 +20,7 @@ type Student = {
 };
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-start text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white";
+const MAX_INCIDENT_DETAILS_LENGTH = 500;
 export function IncidentLogger({
   students,
   onClose,
@@ -189,6 +190,7 @@ export function IncidentLogger({
           <textarea
             value={form.details}
             onChange={(event) => setForm({ ...form, details: event.target.value })}
+            maxLength={MAX_INCIDENT_DETAILS_LENGTH}
             placeholder={text.detailsPlaceholder}
             className={`${inputClass} min-h-28`}
           />

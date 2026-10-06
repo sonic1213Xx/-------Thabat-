@@ -50,6 +50,9 @@ const vpRoles = [
 ];
 const inputClass =
   "w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/30";
+const MAX_REFERRAL_REASON_LENGTH = 500;
+const MAX_REFERRAL_ACTION_LENGTH = 400;
+const MAX_REFERRAL_NOTES_LENGTH = 250;
 
 function formatReferralDate(dateValue: string) {
   const date = new Date(`${dateValue}T12:00:00`);
@@ -622,6 +625,7 @@ export default function TeacherReferralsPage() {
               <textarea
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
+                maxLength={MAX_REFERRAL_REASON_LENGTH}
                 placeholder={
                   english
                     ? "Describe what happened factually"
@@ -635,6 +639,7 @@ export default function TeacherReferralsPage() {
               <textarea
                 value={actionTaken}
                 onChange={(event) => setActionTaken(event.target.value)}
+                maxLength={MAX_REFERRAL_ACTION_LENGTH}
                 placeholder={
                   english
                     ? "What did you do as the teacher before sending this referral?"
@@ -648,6 +653,7 @@ export default function TeacherReferralsPage() {
               <textarea
                 value={teacherNotes}
                 onChange={(event) => setTeacherNotes(event.target.value)}
+                maxLength={MAX_REFERRAL_NOTES_LENGTH}
                 placeholder={
                   english
                     ? "Optional additional context"
@@ -790,6 +796,7 @@ export default function TeacherReferralsPage() {
                           id={`administrative-action-${referral.id}`}
                           value={administrativeAction}
                           onChange={(event) => setAdministrativeAction(event.target.value)}
+                          maxLength={MAX_REFERRAL_ACTION_LENGTH}
                           className={`${inputClass} mt-1 min-h-24`}
                           placeholder="يعبئ وكيل الشؤون الطلابية القرار أو الإجراء المتخذ"
                         />

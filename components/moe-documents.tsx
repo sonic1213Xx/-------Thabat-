@@ -24,6 +24,8 @@ type DocumentData = {
   parentName?: string;
 };
 type SignTarget = "administrator" | "student" | "parent";
+const MAX_DOCUMENT_TEXT_LENGTH = 500;
+const MAX_DOCUMENT_NOTES_LENGTH = 250;
 const fieldClass =
   "pointer-events-auto relative z-20 box-border min-h-11 w-full rounded-lg border border-border bg-card p-3 text-start leading-relaxed text-card-foreground outline-none placeholder:text-card-foreground/50 focus:ring-2 focus:ring-emerald-500 focus:outline-none";
 
@@ -70,6 +72,9 @@ export function MoeDocument({
   const canUseProfileSignature =
     getSession()?.role === "PRINCIPAL" ||
     getSession()?.role === "VICE_PRINCIPAL";
+  useEffect(() => {
+    setAcademicId(data.academicId ?? "");
+  }, [data.academicId]);
   useEffect(() => {
     setMounted(true);
     let active = true;
@@ -216,6 +221,7 @@ export function MoeDocument({
                   value={documentText}
                   onChange={(event) => setDocumentText(event.target.value)}
                   rows={6}
+                  maxLength={MAX_DOCUMENT_TEXT_LENGTH}
                   placeholder="اكتب تفاصيل المستند..."
                   className={`${fieldClass} mt-2 resize-y cursor-text leading-relaxed`}
                 />
@@ -226,6 +232,7 @@ export function MoeDocument({
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   rows={3}
+                  maxLength={MAX_DOCUMENT_NOTES_LENGTH}
                   placeholder="ملاحظات اختيارية"
                   className={`${fieldClass} mt-2 resize-y cursor-text`}
                 />
@@ -252,7 +259,6 @@ export function MoeDocument({
                 />
               </div>
               <div className="mt-8 flex items-end justify-between gap-6 border-t border-border pt-4 text-xs">
-                <span>توقيع المسؤول: __________________</span>
                 <div className="flex flex-col items-center gap-1">
                   <Image src="/school-logo.jpeg" alt="شعار المدرسة" width={200} height={153} unoptimized className="h-14 w-auto object-contain" />
                   <span>ختم المدرسة</span>
