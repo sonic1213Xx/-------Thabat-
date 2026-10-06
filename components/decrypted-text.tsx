@@ -92,7 +92,7 @@ export default function DecryptedText({
     setDirection('forward')
     setIsDecrypted(false)
     setIsAnimating(true)
-  }, [revealOrder, shuffleText, text])
+  }, [revealOrder, shuffleText])
 
   const startReverse = useCallback(() => {
     const allIndices = new Set(textCharacters.map((_, index) => index))

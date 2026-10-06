@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { Download, Pencil, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
@@ -137,7 +138,7 @@ export function MoeDocument({
               dir="rtl"
             >
               <header className="border-b-2 border-slate-900 pb-5 text-center">
-                <img src="/school-logo.jpeg" alt="" className="pdf-school-logo mx-auto mb-2 h-14 w-auto object-contain" />
+                <Image src="/school-logo.jpeg" alt="" width={200} height={56} unoptimized className="pdf-school-logo mx-auto mb-2 h-14 w-auto object-contain" />
                 <p className="font-bold">المملكة العربية السعودية</p>
                 <p>وزارة التعليم · إدارة التعليم</p>
                 <label className="mt-3 block text-sm font-semibold">
@@ -310,9 +311,12 @@ function SignatureField({
     >
       <span className="block text-xs font-semibold">{label}</span>
       {signature ? (
-        <img
+        <Image
           src={signature}
           alt={label}
+          width={220}
+          height={56}
+          unoptimized
           className="pdf-signature mt-2 h-14 w-full object-contain"
         />
       ) : (

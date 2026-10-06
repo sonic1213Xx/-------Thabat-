@@ -73,6 +73,10 @@ export function PillNav({
 
   useEffect(() => {
     let active = true
+    const timelines = timelineRefs.current
+    const activeTweens = activeTweenRefs.current
+    const logoElement = logoRef.current
+    const navItemsElement = navItemsRef.current
     const layout = () => {
       circleRefs.current.forEach((circle, index) => {
         if (!circle?.parentElement) return
@@ -127,10 +131,10 @@ export function PillNav({
     return () => {
       active = false
       window.removeEventListener('resize', layout)
-      timelineRefs.current.forEach((timeline) => timeline?.kill())
-      activeTweenRefs.current.forEach((tween) => tween?.kill())
+      timelines.forEach((timeline) => timeline?.kill())
+      activeTweens.forEach((tween) => tween?.kill())
       logoTweenRef.current?.kill()
-      gsap.killTweensOf([logoRef.current, navItemsRef.current])
+      gsap.killTweensOf([logoElement, navItemsElement])
     }
   }, [ease, initialLoadAnimation, items])
 

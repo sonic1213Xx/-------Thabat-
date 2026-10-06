@@ -146,7 +146,7 @@ export function GradebookTable({
     return () => {
       active = false;
     };
-  }, [divisionName, students, subject, teacherId]);
+  }, [divisionName, students, subject, teacherId, draftKey]);
 
   useEffect(() => {
     try {

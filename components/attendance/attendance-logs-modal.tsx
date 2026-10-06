@@ -1,7 +1,7 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CalendarDays, Check, ChevronDown, ClipboardList, Download, FileSpreadsheet, Loader2, Save, Search } from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
 import { getCurrentProfile, getSession } from '@/lib/auth'
@@ -27,6 +27,7 @@ const filterStatusOptions = (english: boolean) => [{ value: 'ALL', label: englis
 
 export function AttendanceLogsModal({ open, onClose, english }: { open: boolean; onClose: () => void; english: boolean }) {
   const session = getSession()
+  const sessionId = session?.id
   const profile = getCurrentProfile()
   const { showToast, updateToast } = useToast()
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([])
@@ -43,30 +44,30 @@ export function AttendanceLogsModal({ open, onClose, english }: { open: boolean;
   const [divisionMenuOpen, setDivisionMenuOpen] = useState(false)
   const initialStudentsRef = useRef(new Map<string, { status: string; notes: string }>())
 
-  const loadSavedDates = async () => {
-    if (!session) return
+  const loadSavedDates = useCallback(async () => {
+    if (!sessionId) return
     setLoading(true)
     try {
       const params = new URLSearchParams({ logs: 'true', month, divisionId: 'ALL' })
-      const response = await fetch(`/api/attendance?${params}`, { headers: { 'x-thabat-user-id': session.id } })
+      const response = await fetch(`/api/attendance?${params}`, { headers: { 'x-thabat-user-id': sessionId } })
       const result = await response.json() as { data?: SavedSession[] }
       setSavedSessions(result.data ?? [])
     } catch { setSavedSessions([]) } finally { setLoading(false) }
-  }
+  }, [sessionId, month])
 
   useEffect(() => {
-    if (!open || !session) return
+    if (!open || !sessionId) return
     void fetch('/api/divisions').then((response) => response.json()).then((result) => setDivisions((result.data ?? []).map((item: { code: string }) => item.code))).catch(() => setDivisions([]))
     void loadSavedDates()
-  }, [open, session?.id, month])
+  }, [open, sessionId, loadSavedDates])
 
   useEffect(() => {
-    if (!open || !session || !selectedDate || !selectedDivision) return
+    if (!open || !sessionId || !selectedDate || !selectedDivision) return
     const loadStudents = async () => {
       setLoading(true)
       try {
         const params = new URLSearchParams({ logs: 'true', date: selectedDate, divisionId: selectedDivision })
-        const response = await fetch(`/api/attendance?${params}`, { headers: { 'x-thabat-user-id': session.id } })
+        const response = await fetch(`/api/attendance?${params}`, { headers: { 'x-thabat-user-id': sessionId } })
         const result = await response.json() as { data?: StudentRow[] }
         const loadedStudents = result.data ?? []
         setStudents(loadedStudents)
@@ -74,7 +75,7 @@ export function AttendanceLogsModal({ open, onClose, english }: { open: boolean;
       } catch { setStudents([]) } finally { setLoading(false) }
     }
     void loadStudents()
-  }, [open, session?.id, selectedDate, selectedDivision])
+  }, [open, sessionId, selectedDate, selectedDivision])
 
   const dates = useMemo(() => Array.from(new Set(savedSessions.map((item) => item.date))), [savedSessions])
   const filteredStudents = useMemo(() => searchStudents(students, query).filter((student) => statusFilter === 'ALL' || student.status === statusFilter), [students, query, statusFilter])

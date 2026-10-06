@@ -51,7 +51,7 @@ export default function RolesPage() {
         ),
       )
       .catch(() => setDivisions([]));
-  }, []);
+  }, [locale]);
   const [roles, setRoles] = useState<RoleDefinition[]>(getRoles());
   const [permissionRoleKey, setPermissionRoleKey] = useState<AppRole | string>(
     "PRINCIPAL",
@@ -120,7 +120,7 @@ export default function RolesPage() {
       }
     };
     void loadDatabaseProfiles();
-  }, []);
+  }, [locale]);
   const selectedRole = ROLE_DEFINITIONS.find(
     (role) => role.key === profile.role,
   );

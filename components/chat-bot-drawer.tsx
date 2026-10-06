@@ -65,7 +65,7 @@ export function ChatBotDrawer() {
   const [drawerRendered, setDrawerRendered] = useState(false)
   const [drawerClosing, setDrawerClosing] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [{ role: 'model', content: t('botWelcome') }])
   const [loading, setLoading] = useState(false)
   const [actionPreview, setActionPreview] = useState<AgentPreview | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
@@ -75,7 +75,6 @@ export function ChatBotDrawer() {
 
   useEffect(() => {
     setMounted(true)
-    setMessages([welcomeMessage])
   }, [])
 
   useEffect(() => () => {

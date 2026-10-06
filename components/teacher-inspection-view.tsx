@@ -42,13 +42,16 @@ export function TeacherInspectionView({
     ...(assignments[selectedTeacher.id] ?? []),
     ...(selectedTeacher.teachingAssignments ?? []).flatMap((assignment) => assignment.divisions),
   ])) : []
+  const selectedTeacherId = selectedTeacher?.id
+  const teacherDivisionsKey = teacherDivisions.join("|")
   useEffect(() => {
-    if (!selectedTeacher || !teacherDivisions.length) {
+    const divisionCodes = teacherDivisionsKey ? teacherDivisionsKey.split("|") : []
+    if (!selectedTeacherId || !divisionCodes.length) {
       setInspectionStudents(students)
       return
     }
     let active = true
-    void Promise.all(teacherDivisions.map((division) =>
+    void Promise.all(divisionCodes.map((division) =>
       fetch(`/api/students?division=${encodeURIComponent(division)}`, { cache: "no-store" })
         .then((response) => response.json() as Promise<{ data?: GradebookRow[] }>)
         .then((json) => json.data ?? [])
@@ -58,7 +61,7 @@ export function TeacherInspectionView({
       setInspectionStudents(Array.from(new Map(results.flat().map((student) => [student.id, student])).values()))
     })
     return () => { active = false }
-  }, [selectedTeacher, students, teacherDivisions.join("|")])
+  }, [selectedTeacherId, students, teacherDivisionsKey])
   const labels = locale === "ar"
     ? { title: "كشوفات المعلمين", intro: "اختر ملف معلم لمراجعة الشعب المسندة والدرجات المسجلة للقراءة فقط.", teachers: "ملفات المعلمين", assignment: "الشعب المسندة", assignmentHint: "يحدد المدير أو المنشئ الشعب التي يمكن للمعلم إدارتها.", inspect: "فتح الكشف", empty: "لم يتم إسناد شعب لهذا المعلم بعد.", close: "إغلاق", noTeachers: "لا توجد ملفات معلمين محفوظة." }
     : { title: "Teacher inspection", intro: "Select a teacher profile to review assigned divisions and recorded grades in read-only mode.", teachers: "Teacher profiles", assignment: "Assigned divisions", assignmentHint: "The Principal or Creator controls which divisions this teacher can manage.", inspect: "Open inspection", empty: "No divisions have been assigned to this teacher yet.", close: "Close", noTeachers: "No teacher profiles have been saved." }

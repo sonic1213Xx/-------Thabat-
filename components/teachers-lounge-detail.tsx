@@ -24,12 +24,16 @@ export function TeachersLoungeDetail({ teacher, onClose }: { teacher: LoungeTeac
   const [gradebookRows, setGradebookRows] = useState<GradebookRow[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingRows, setLoadingRows] = useState(false)
+  const teacherSubjectsKey = teacher.subjects.join("|")
+  const teacherDivisionsKey = teacher.divisions.join("|")
 
   useEffect(() => {
-    setSubject(teacher.subjects[0] ?? "")
-    setDivision(teacher.divisions[0] ?? "ALL")
+    const subjects = teacherSubjectsKey ? teacherSubjectsKey.split("|") : []
+    const divisions = teacherDivisionsKey ? teacherDivisionsKey.split("|") : []
+    setSubject(subjects[0] ?? "")
+    setDivision(divisions[0] ?? "ALL")
     setSelectedDate("")
-  }, [teacher.id])
+  }, [teacher.id, teacherSubjectsKey, teacherDivisionsKey])
 
   useEffect(() => {
     if (!subject) return

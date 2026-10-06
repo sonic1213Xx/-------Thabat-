@@ -21,6 +21,8 @@ export default function VicePrincipalPage() {
   const { t, locale } = useLanguage();
   const searchParams = useSearchParams();
   const session = getSession();
+  const sessionId = session?.id;
+  const sessionRole = session?.role;
   const today = new Date().toISOString().slice(0, 10);
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
@@ -35,22 +37,22 @@ export default function VicePrincipalPage() {
   const incidents = getIncidents();
 
   useEffect(() => {
-    if (!session || !can(session.role, "can_approve_gate_passes")) { window.location.href = "/dashboard"; return; }
-    void fetchCached<{ data?: Student[] }>("dashboard:students:all", "/api/students", session?.id ? { headers: { "x-thabat-user-id": session.id } } : undefined)
+    if (!sessionId || !sessionRole || !can(sessionRole, "can_approve_gate_passes")) { window.location.href = "/dashboard"; return; }
+    void fetchCached<{ data?: Student[] }>("dashboard:students:all", "/api/students", { headers: { "x-thabat-user-id": sessionId } })
       .then((json) => setStudents(json.data ?? []))
       .catch(() => setStudents([]))
       .finally(() => setLoadingStudents(false));
-  }, []);
+  }, [sessionId, sessionRole]);
 
   useEffect(() => {
-    if (!session || !can(session.role, "can_approve_gate_passes")) return;
-    void fetch(`/api/gate-passes?date=${encodeURIComponent(passDate)}`, { headers: { "x-thabat-role": session.role } })
+    if (!sessionId || !sessionRole || !can(sessionRole, "can_approve_gate_passes")) return;
+    void fetch(`/api/gate-passes?date=${encodeURIComponent(passDate)}`, { headers: { "x-thabat-role": sessionRole } })
       .then((response) => response.ok ? response.json() as Promise<{ data?: ApiPass[] }> : Promise.reject(new Error("Unable to load permits")))
       .then((json) => setPasses((current) => {
         const stored = (json.data ?? []).map((pass) => ({ id: pass.id, studentId: pass.studentId, studentName: pass.student.fullName, divisionCode: pass.student.divisionCode ?? "غير معين", parentName: pass.parentName ?? "", reason: pass.reason, departureDate: pass.departureDate, departureTime: pass.departureTime, createdAt: pass.createdAt, qrToken: pass.qrToken, status: pass.status }));
         return [...stored, ...current.filter((localPass) => !stored.some((storedPass) => storedPass.id === localPass.id && storedPass.departureDate === passDate))];
       })).catch(() => undefined);
-  }, [passDate, session?.id, session?.role]);
+  }, [passDate, sessionId, sessionRole]);
 
   useEffect(() => { if (requestedStudentId && students.some((student) => student.id === requestedStudentId)) setGateOpen(true); }, [requestedStudentId, students]);
   const matches = useMemo(() => query.trim() ? searchStudents(students, query) : [], [query, students]);

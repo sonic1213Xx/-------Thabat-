@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Pencil, Plus, Trash2, Users, X } from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
@@ -23,7 +23,7 @@ export default function TeamsPage() {
   const [teamName, setTeamName] = useState('')
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
 
-  const loadTeams = async () => {
+  const loadTeams = useCallback(async () => {
     await withMinimumDelay(async () => {
       try {
         const response = await fetch('/api/teams')
@@ -33,11 +33,11 @@ export default function TeamsPage() {
         console.error('Failed to load teams:', error)
       }
     })
-  }
+  }, [withMinimumDelay])
 
   useEffect(() => {
     void loadTeams()
-  }, [])
+  }, [loadTeams])
 
   const openCreateModal = () => {
     setEditingTeam(null)

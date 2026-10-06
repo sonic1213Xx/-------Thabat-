@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
@@ -37,6 +37,7 @@ export function IssueWarningModal({
   onClose: () => void;
   onSaved?: (warning: unknown) => void;
 }) {
+  const studentListId = useId();
   const { t } = useLanguage();
   const locationOptions = [t("classroom"), t("courtyard"), t("corridors"), t("gym"), t("cafeteria"), t("schoolBus"), t("prayerRoom")];
   const [studentId, setStudentId] = useState("");
@@ -210,10 +211,11 @@ export function IssueWarningModal({
                 placeholder={`${t("studentName")} / ${t("academicId")} / ${t("divisionCode")}`}
                 role="combobox"
                 aria-expanded={studentPickerOpen}
+                aria-controls={studentListId}
                 className={`${inputClass} ps-10`}
               />
               {studentPickerOpen && (
-                <div className="absolute right-0 left-0 top-full z-30 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                <div id={studentListId} role="listbox" className="absolute right-0 left-0 top-full z-30 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-800">
                   {matchingGroups.length ? (
                     matchingGroups.map(([grade, group]) => (
                       <div key={grade ?? "unassigned"}>
@@ -224,6 +226,8 @@ export function IssueWarningModal({
                           <button
                             key={item.id}
                             type="button"
+                            role="option"
+                            aria-selected={item.id === studentId}
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => {
                               selectStudent(item);

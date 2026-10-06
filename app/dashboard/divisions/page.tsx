@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { BookOpen, Pencil, Plus, Trash2, Upload } from 'lucide-react'
@@ -40,10 +40,11 @@ export default function DivisionsPage() {
   const session = getSession()
   const profile = getCurrentProfile()
   const teachingCodes = Array.from(new Set((profile?.teachingAssignments?.flatMap((assignment) => assignment.divisions) ?? profile?.assigned_divisions ?? []).map(normalizeDivisionCode).filter(Boolean)))
+  const teachingCodesKey = teachingCodes.join(',')
   const readOnlyTeachingView = session?.role === 'TEACHER' || teachingCodes.length > 0
   const canManageDivisions = !readOnlyTeachingView
 
-  const loadData = async (isActive: () => boolean = () => true) => {
+  const loadData = useCallback(async (isActive: () => boolean = () => true) => {
     await withMinimumDelay(async () => {
       try {
         const [divisionsRes, studentsRes] = await Promise.all([
@@ -55,14 +56,14 @@ export default function DivisionsPage() {
         const loadedDivisions = divisionsRes.data ?? []
         const allowedCodes = session?.role === 'TEACHER'
           ? new Set(loadedDivisions.map((division) => normalizeDivisionCode(division.code)))
-          : new Set(teachingCodes)
+          : new Set(teachingCodesKey ? teachingCodesKey.split(',') : [])
         if (isActive()) setDivisions(readOnlyTeachingView ? loadedDivisions.filter((division) => allowedCodes.has(normalizeDivisionCode(division.code))) : loadedDivisions)
         if (isActive()) setStudents(readOnlyTeachingView ? (studentsRes.data ?? []).filter((student) => allowedCodes.has(normalizeDivisionCode(student.divisionCode))) : (studentsRes.data ?? []))
       } catch (error) {
         console.error('Failed to load divisions:', error)
       }
     })
-  }
+  }, [withMinimumDelay, session?.id, session?.role, readOnlyTeachingView, teachingCodesKey])
 
   useEffect(() => {
     let isActive = true
@@ -70,7 +71,7 @@ export default function DivisionsPage() {
     return () => {
       isActive = false
     }
-  }, [readOnlyTeachingView, teachingCodes.join(','), session?.id, session?.role])
+  }, [loadData])
 
   const divisionSummaries: DivisionSummary[] = (divisions.length ? divisions : []).map((division) => {
     const divisionCode = normalizeDivisionCode(division.code)

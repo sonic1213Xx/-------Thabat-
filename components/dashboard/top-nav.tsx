@@ -7,6 +7,7 @@ import { Menu, Sun, Moon, LogOut, Users, Plus, Check, ChevronDown, X, Trash2, La
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
+import Image from 'next/image'
 import { cn, getStoredTeamId, setStoredTeamId, TEAM_OPTIONS } from '@/lib/utils'
 import { Modal } from '@/components/ui/modal'
 import { useLanguage } from '@/components/language-provider'
@@ -237,8 +238,8 @@ export function TopNav() {
             </button>
             <Link href="/dashboard" prefetch={false} className="flex items-center gap-2">
               <div className="h-8 w-8 overflow-hidden rounded-lg">
-                <img src="/icons/app-icon-light.png" alt="Thabat" className="h-full w-full object-cover dark:hidden" />
-                <img src="/icons/app-icon-dark.png" alt="Thabat" className="hidden h-full w-full object-cover dark:block" />
+                <Image src="/icons/app-icon-light.png" alt="Thabat" width={32} height={32} unoptimized className="h-full w-full object-cover dark:hidden" />
+                <Image src="/icons/app-icon-dark.png" alt="Thabat" width={32} height={32} unoptimized className="hidden h-full w-full object-cover dark:block" />
               </div>
               <div className="hidden sm:flex flex-col">
                 <h1 className="text-lg font-bold text-slate-900 dark:text-white">ثَبَت</h1>

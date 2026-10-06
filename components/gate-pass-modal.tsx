@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import Image from "next/image";
 import { useEffect } from "react";
 import { CheckCircle2, Printer, Search } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
@@ -34,6 +35,7 @@ export function GatePassModal({
   onClose: () => void;
   onSaved?: (pass: GatePass) => void;
 }) {
+  const studentListId = useId();
   const { locale } = useLanguage();
   const text = locale === "ar" ? { management: "إدارة الخروج", title: "إصدار تصريح خروج", intro: "اختر الطالب، أدخل البيانات، ثم أصدر التصريح.", student: "الطالب", search: "ابحث بالاسم أو الرقم الأكاديمي أو الفصل", noMatches: "لا يوجد طلاب مطابقون", selected: "تم اختيار", parent: "اسم ولي الأمر", optional: "اختياري", parentPlaceholder: "اكتب اسم ولي الأمر", reason: "سبب الخروج", date: "تاريخ الخروج", time: "وقت الخروج", issue: "إصدار التصريح", print: "طباعة التصريح", close: "إغلاق", health: "حالة صحية", family: "سبب عائلي", emergency: "حالة طارئة", other: "سبب آخر", custom: "اكتب سبب الخروج", attendanceNote: "يبقى التصريح معلقاً لمدة 30 دقيقة، ولا يتغير الحضور إلا بعد مسح رمز QR", excused: "استئذان بعذر" } : { management: "Gate pass management", title: "Issue gate pass", intro: "Choose a student, enter the details, then issue the pass.", student: "Student", search: "Search by name, academic ID, or division", noMatches: "No matching students", selected: "Selected", parent: "Parent name", optional: "optional", parentPlaceholder: "Enter parent name", reason: "Reason for leaving", date: "Departure date", time: "Departure time", issue: "Issue pass", print: "Print pass", close: "Close", health: "Health reason", family: "Family reason", emergency: "Emergency", other: "Other reason", custom: "Enter reason for leaving", attendanceNote: "The pass stays pending for 30 minutes; attendance changes only after the QR code is scanned", excused: "Excused permission" };
   const today = new Date().toISOString().slice(0, 10);
@@ -171,7 +173,7 @@ export function GatePassModal({
               <div className="mt-6 border-t border-emerald-200 pt-4 text-center text-xs text-slate-500">
                 {locale === "ar" ? "ختم المدرسة الرسمي" : "Official school stamp"}
               </div>
-              {qrImage && <div className="mt-4 flex flex-col items-center gap-2"><img src={qrImage} alt={locale === "ar" ? "رمز تصريح الخروج" : "Gate pass QR code"} className="h-32 w-32 rounded-lg bg-white p-2" /><span className="font-mono text-[10px] text-slate-400">{issuedPass.qrToken}</span></div>}
+              {qrImage && <div className="mt-4 flex flex-col items-center gap-2"><Image src={qrImage} alt={locale === "ar" ? "رمز تصريح الخروج" : "Gate pass QR code"} width={128} height={128} unoptimized className="h-32 w-32 rounded-lg bg-white p-2" /><span className="font-mono text-[10px] text-slate-400">{issuedPass.qrToken}</span></div>}
               </div>
             </div>
             <div className="flex flex-wrap gap-3 print:hidden">
@@ -211,10 +213,11 @@ export function GatePassModal({
                   placeholder={text.search}
                   role="combobox"
                   aria-expanded={pickerOpen}
+                  aria-controls={studentListId}
                   className={`${inputClass} ps-10`}
                 />
                 {pickerOpen && (
-                  <div className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                  <div id={studentListId} role="listbox" className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
                     {matchingStudentGroups.length ? (
                       matchingStudentGroups.map(
                         ({ grade, students: group }) => (
@@ -228,6 +231,8 @@ export function GatePassModal({
                                 type="button"
                                 onMouseDown={(event) => event.preventDefault()}
                                 onClick={() => selectStudent(item)}
+                                role="option"
+                                aria-selected={item.id === studentId}
                                 className="flex w-full items-center justify-between rounded-md px-3 py-3 text-start hover:bg-emerald-50 dark:hover:bg-slate-800"
                               >
                                 <span className="font-medium">

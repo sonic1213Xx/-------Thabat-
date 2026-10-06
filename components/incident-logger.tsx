@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { AlertTriangle, FileText, MinusCircle, Phone, Search } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { StyledSelect } from "@/components/ui/styled-select";
@@ -27,6 +27,7 @@ export function IncidentLogger({
   students: Student[];
   onClose: () => void;
 }) {
+  const studentListId = useId();
   const { locale } = useLanguage();
   const text = locale === "ar" ? { management: "التزام وسلوك الطلاب", title: "محضر ضبط واقعة وسلوك", intro: "وثّق ما حدث بدقة، ثم اختر الإجراء المطلوب للمتابعة.", student: "الطالب", search: "ابحث بالاسم أو الرقم الأكاديمي أو الفصل", noMatches: "لا يوجد طلاب مطابقون", selected: "تم اختيار", unassigned: "غير معين", details: "وصف الواقعة", detailsHint: "اكتب ماذا حدث، ومتى بدأ، وما السلوك الذي تمت ملاحظته.", detailsPlaceholder: "مثال: استخدم الطالب هاتفه أثناء الحصة بعد التنبيه...", location: "مكان الواقعة", locationHint: "حدد المكان الذي وقعت فيه الحادثة.", locationPlaceholder: "مثال: الفصل 2 / الساحة / المختبر", witnesses: "الشهود والملاحظات", witnessesHint: "أضف أسماء الشهود وأي ملاحظات مفيدة للتحقق.", witnessesPlaceholder: "مثال: أحمد العتيبي، معلم الصف...", degree: "درجة المخالفة", degreeHint: "اختر الدرجة حسب لائحة السلوك المعتمدة.", actions: "إجراء المتابعة", actionsHint: "اختر الإجراء الذي تريد تنفيذه بعد حفظ المحضر.", pledge: "إصدار تعهد سلوكي", pledgeHint: "فتح التعهد الرسمي وتوقيعه أو طباعته.", summons: "استدعاء ولي الأمر", summonsHint: "فتح نموذج الاستدعاء الرسمي وتعبئته أو طباعته.", deduct: "حسم درجات السلوك", deductHint: "حفظ المحضر وتسجيل الحسم في سجل الإنذارات.", ready: "تم تجهيز إشعار استدعاء ولي الأمر.", saved: "تم حفظ المحضر بنجاح.", deductionSaved: "تم حفظ المحضر وتسجيل حسم درجات السلوك.", error: "تعذر تنفيذ الإجراء. تحقق من الاتصال وحاول مرة أخرى.", working: "جارٍ تنفيذ الإجراء..." } : { management: "Student conduct and compliance", title: "Incident and behavior report", intro: "Document what happened clearly, then choose the follow-up action.", student: "Student", search: "Search by name, academic ID, or division", noMatches: "No matching students", selected: "Selected", unassigned: "Unassigned", details: "Incident description", detailsHint: "Describe what happened, when it started, and the behavior observed.", detailsPlaceholder: "Example: The student used a phone during class after being warned...", location: "Incident location", locationHint: "Specify where the incident took place.", locationPlaceholder: "Example: Room 2 / courtyard / lab", witnesses: "Witnesses and notes", witnessesHint: "Add witness names and any notes that help verify the report.", witnessesPlaceholder: "Example: Ahmed Al-Otaibi, classroom teacher...", degree: "Violation level", degreeHint: "Choose the level according to the approved conduct policy.", actions: "Follow-up action", actionsHint: "Choose what should happen after saving this report.", pledge: "Issue behavior pledge", pledgeHint: "Open the official pledge for signing or printing.", summons: "Parent summons", summonsHint: "Open the official summons for completion or printing.", deduct: "Deduct behavior points", deductHint: "Save the report and record the deduction in warnings.", ready: "The parent summons notice is ready.", saved: "The incident report was saved successfully.", deductionSaved: "The report was saved and the behavior deduction was recorded.", error: "The action could not be completed. Check the connection and try again.", working: "Processing action..." };
   const [studentId, setStudentId] = useState("");
@@ -148,11 +149,12 @@ export function IncidentLogger({
               placeholder={text.search}
               role="combobox"
               aria-expanded={pickerOpen}
+              aria-controls={studentListId}
               aria-activedescendant={pickerOpen && matchingStudents[highlightedStudentIndex] ? `incident-student-${matchingStudents[highlightedStudentIndex].id}` : undefined}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 ps-10 text-start text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
             />
             {pickerOpen && (
-              <div className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+              <div id={studentListId} role="listbox" className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
                 {matchingStudentGroups.length ? matchingStudentGroups.map(([grade, group]) => (
                   <div key={grade ?? "unassigned"}>
                     <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-bold text-emerald-800 dark:border-slate-800 dark:bg-slate-950 dark:text-emerald-300">

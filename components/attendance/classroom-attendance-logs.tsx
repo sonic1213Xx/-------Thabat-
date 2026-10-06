@@ -25,6 +25,7 @@ export function ClassroomAttendanceLogs() {
   const { locale } = useLanguage();
   const english = locale === "en";
   const session = getSession();
+  const sessionId = session?.id;
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [teacherId, setTeacherId] = useState("");
   const [subject, setSubject] = useState("");
@@ -39,28 +40,30 @@ export function ClassroomAttendanceLogs() {
   const selectedTeacher = teachers.find((teacher) => teacher.id === teacherId);
   const assignments = selectedTeacher?.teachingAssignments?.filter((assignment) => assignment.attendance !== false) ?? [];
   const subjects = Array.from(new Set(assignments.map((assignment) => assignment.subject).filter(Boolean)));
+  const subjectsKey = subjects.join("|");
   const divisions = Array.from(new Set(assignments.filter((assignment) => !subject || assignment.subject === subject).flatMap((assignment) => assignment.divisions))).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
 
   useEffect(() => {
-    if (!session) return;
+    if (!sessionId) return;
     void fetch("/api/users", { cache: "no-store" }).then((response) => response.json()).then((result: { data?: Teacher[] }) => {
       const teacherProfiles = (result.data ?? []).filter((teacher) => teacher.role === "TEACHER");
       setTeachers(teacherProfiles);
       if (teacherProfiles[0]) setTeacherId(teacherProfiles[0].id);
     }).catch(() => setTeachers([]));
-  }, [session?.id]);
+  }, [sessionId]);
 
   useEffect(() => {
-    const nextSubject = subjects[0] ?? "";
-    if (!subjects.includes(subject)) setSubject(nextSubject);
-  }, [teacherId, subjects.join(",")]);
+    const subjectOptions = subjectsKey ? subjectsKey.split("|") : [];
+    const nextSubject = subjectOptions[0] ?? "";
+    if (!subjectOptions.includes(subject)) setSubject(nextSubject);
+  }, [teacherId, subjectsKey, subject]);
 
   useEffect(() => {
-    if (!session || !teacherId || !subject) return;
+    if (!sessionId || !teacherId || !subject) return;
     setLoading(true);
     const params = new URLSearchParams({ logs: "true", mode: "CLASS", month, teacherId, subject, divisionId: "ALL" });
-    void fetch(`/api/attendance?${params}`, { headers: { "x-thabat-user-id": session.id } }).then((response) => response.json()).then((result: { data?: Session[] }) => setSessions(result.data ?? [])).catch(() => setSessions([])).finally(() => setLoading(false));
-  }, [session?.id, teacherId, subject, month]);
+    void fetch(`/api/attendance?${params}`, { headers: { "x-thabat-user-id": sessionId } }).then((response) => response.json()).then((result: { data?: Session[] }) => setSessions(result.data ?? [])).catch(() => setSessions([])).finally(() => setLoading(false));
+  }, [sessionId, teacherId, subject, month]);
 
   const loadDate = (date: string) => {
     if (!session || !teacherId || !subject) return;
@@ -70,11 +73,11 @@ export function ClassroomAttendanceLogs() {
   };
 
   useEffect(() => {
-    if (!session || !teacherId || !subject || !selectedDate || !division) return;
+    if (!sessionId || !teacherId || !subject || !selectedDate || !division) return;
     setLoadingStudents(true);
     const params = new URLSearchParams({ logs: "true", mode: "CLASS", date: selectedDate, teacherId, subject, divisionId: division });
-    void fetch(`/api/attendance?${params}`, { headers: { "x-thabat-user-id": session.id } }).then((response) => response.json()).then((result: { data?: StudentRow[] }) => setStudents(result.data ?? [])).catch(() => setStudents([])).finally(() => setLoadingStudents(false));
-  }, [session?.id, teacherId, subject, selectedDate, division]);
+    void fetch(`/api/attendance?${params}`, { headers: { "x-thabat-user-id": sessionId } }).then((response) => response.json()).then((result: { data?: StudentRow[] }) => setStudents(result.data ?? [])).catch(() => setStudents([])).finally(() => setLoadingStudents(false));
+  }, [sessionId, teacherId, subject, selectedDate, division]);
 
   const sessionByDate = useMemo(() => Array.from(new Map(sessions.map((item) => [item.date, item])).values()), [sessions]);
 

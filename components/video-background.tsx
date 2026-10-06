@@ -50,7 +50,7 @@ export function VideoBackground() {
     document.addEventListener('pointerdown', startAudio)
     return () => {
       document.removeEventListener('pointerdown', startAudio)
-      audioRef.current?.pause()
+      audio?.pause()
     }
   }, [])
 

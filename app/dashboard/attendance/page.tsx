@@ -75,6 +75,7 @@ export default function AttendancePage() {
   const subjects = Array.from(new Set(teachingAssignments.map((assignment) => assignment.subject).filter(Boolean)));
   const [selectedSubject, setSelectedSubject] = useState(subjects[0] ?? "");
   const teachingDivisions = Array.from(new Set(teachingAssignments.filter((assignment) => !selectedSubject || assignment.subject === selectedSubject).flatMap((assignment) => assignment.divisions).map(normalizeDivisionCode).filter(Boolean)));
+  const teachingDivisionsKey = teachingDivisions.join(",");
   const isClassroomPage = classroom;
   const canClassAttendance = isTeacher && isClassroomPage;
   const canExportAttendanceTemplates = Boolean(session);
@@ -150,27 +151,28 @@ export default function AttendancePage() {
     };
   }, [saving]);
   const assigned = Array.from(new Set((profile?.assigned_divisions ?? []).map(normalizeDivisionCode).filter(Boolean)));
-  const divisions = useMemo<DivisionGroup[]>(
-    () =>
-      Array.from(
-        new Set(
-          students
-            .map((student) => student.divisionCode)
-            .filter((code): code is string => Boolean(code)),
-        ),
-      )
-            .filter((code) => !canClassAttendance || teachingDivisions.includes(code) || (isTeacher && assigned.includes(code)))
-        .sort((a, b) => a.localeCompare(b, "en", { numeric: true }))
-        .map((code) => {
-          const divisionStudents = students.filter((student) => student.divisionCode === code);
-          return {
-            code,
-            grade: getGradeLevelFromDivisionCode(code, divisionStudents[0]?.gradeLevel),
-            students: divisionStudents,
-          };
-        }),
-    [students, canClassAttendance, teachingDivisions.join(","), isTeacher, assigned],
-  );
+  const assignedDivisionsKey = assigned.join(",");
+  const divisions = useMemo<DivisionGroup[]>(() => {
+    const allowedTeachingDivisions = new Set(teachingDivisionsKey.split(",").filter(Boolean));
+    const assignedDivisions = new Set(assignedDivisionsKey.split(",").filter(Boolean));
+    return Array.from(
+      new Set(
+        students
+          .map((student) => student.divisionCode)
+          .filter((code): code is string => Boolean(code)),
+      ),
+    )
+      .filter((code) => !canClassAttendance || allowedTeachingDivisions.has(code) || (isTeacher && assignedDivisions.has(code)))
+      .sort((a, b) => a.localeCompare(b, "en", { numeric: true }))
+      .map((code) => {
+        const divisionStudents = students.filter((student) => student.divisionCode === code);
+        return {
+          code,
+          grade: getGradeLevelFromDivisionCode(code, divisionStudents[0]?.gradeLevel),
+          students: divisionStudents,
+        };
+      });
+  }, [students, canClassAttendance, teachingDivisionsKey, isTeacher, assignedDivisionsKey]);
   const divisionKey = divisions.map((group) => group.code).join(",");
 
   useEffect(() => {
@@ -182,13 +184,16 @@ export default function AttendancePage() {
   }, [divisions, templateSelectionReady]);
 
   useEffect(() => {
-    const requestKey = `${session?.id ?? "anonymous"}:${isTeacher}:${assigned.join(",")}:${profile?.id ?? ""}`;
+    const requestKey = `${session?.id ?? "anonymous"}:${isTeacher}:${assignedDivisionsKey}:${profile?.id ?? ""}`;
     if (studentsRequestRef.current === requestKey) return;
     studentsRequestRef.current = requestKey;
     const headers = session?.id
       ? { "x-thabat-user-id": session.id }
       : undefined;
-    const allowedTeachingDivisions = teachingDivisions.length ? teachingDivisions : assigned;
+    const assignedDivisionCodes = assignedDivisionsKey.split(",").filter(Boolean);
+    const allowedTeachingDivisions = teachingDivisionsKey
+      ? teachingDivisionsKey.split(",").filter(Boolean)
+      : assignedDivisionCodes;
     const load = async () => {
       setLoadingStudents(true);
       try {
@@ -220,8 +225,8 @@ export default function AttendancePage() {
   }, [
     isTeacher,
     canClassAttendance,
-    teachingDivisions.join(","),
-    assigned.join(","),
+    teachingDivisionsKey,
+    assignedDivisionsKey,
     session?.id,
     session?.role,
     session?.name,
@@ -266,7 +271,7 @@ export default function AttendancePage() {
       }
     };
     void load().catch(() => setMessage("تعذر تحميل الحضور."));
-  }, [date, mode, divisionKey, session?.id, attendanceRevision, selectedSubject, sharedAttendanceSettings.defaultAttendance]);
+  }, [date, mode, divisionKey, session?.id, attendanceRevision, selectedSubject, sharedAttendanceSettings.defaultAttendance, students, divisions.length]);
 
   const applyStatus = (studentIds: string[], status: Status) => {
     const eligibleIds = studentIds.filter((studentId) => statuses[studentId] !== "LEFT_WITH_PERMISSION");

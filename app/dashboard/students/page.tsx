@@ -253,7 +253,7 @@ export default function StudentsPage() {
       navigator.hardwareConcurrency <= 4 ||
         (navigatorWithMemory.deviceMemory ?? 8) <= 4,
     );
-  }, []);
+  }, [setIsLoading]);
 
   useEffect(() => {
     const session = getSession();
@@ -307,7 +307,7 @@ export default function StudentsPage() {
     } catch {
       setTeacherAssignments(profileAssignments);
     }
-  }, []);
+  }, [setIsLoading]);
 
   useEffect(() => {
     if (currentRole === "TEACHER" && !division) {
@@ -362,7 +362,7 @@ export default function StudentsPage() {
     return () => {
       window.removeEventListener("thabat-divisions-changed", syncDivisions);
     };
-  }, []);
+  }, [setIsLoading]);
 
   useEffect(() => {
     let active = true;
@@ -498,13 +498,15 @@ export default function StudentsPage() {
         .map((assignment) => assignment.subject),
     ),
   ).filter(Boolean);
+  const availableSubjectsKey = availableSubjects.join("|");
   useEffect(() => {
+    const subjectOptions = availableSubjectsKey ? availableSubjectsKey.split("|") : [];
     if (
-      availableSubjects.length > 0 &&
-      !availableSubjects.includes(currentSubject)
+      subjectOptions.length > 0 &&
+      !subjectOptions.includes(currentSubject)
     )
-      setCurrentSubject(availableSubjects[0]);
-  }, [availableSubjects.join("|"), currentSubject]);
+      setCurrentSubject(subjectOptions[0]);
+  }, [availableSubjectsKey, currentSubject]);
 
   const refreshStudents = async (selectedDivision = division) => {
     if (!selectedDivision) return;
